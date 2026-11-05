@@ -28,11 +28,11 @@ MAX_PLANOS = int(os.getenv("MAX_PLANOS", "1500"))
 PCA_PAGINA = int(os.getenv("PCA_PAGINA", "100"))
 
 
-def get(url, params=None, tentativas=5):
+def get(url, params=None, tentativas=7):
     """GET no PNCP com repeticao. Retorna JSON ou None (sem conteudo/parametro invalido)."""
     for i in range(tentativas):
         try:
-            r = requests.get(url, params=params, headers=UA, timeout=60)
+            r = requests.get(url, params=params, headers=UA, timeout=90)
             if r.status_code == 200:
                 return r.json()
             if r.status_code in (204, 400, 404):
@@ -120,9 +120,13 @@ def parse_edital(c):
 def coletar_edital(modalidade, uf):
     rows, pagina = [], 1
     while True:
-        j = get(f"{PNCP}/consulta/v1/contratacoes/proposta",
-                {"dataFinal": "20271231", "codigoModalidadeContratacao": modalidade, "uf": uf,
-                 "pagina": pagina, "tamanhoPagina": 50})
+        try:
+            j = get(f"{PNCP}/consulta/v1/contratacoes/proposta",
+                    {"dataFinal": "20271231", "codigoModalidadeContratacao": modalidade, "uf": uf,
+                     "pagina": pagina, "tamanhoPagina": 50})
+        except RuntimeError as e:
+            print(f"[editais] AVISO modalidade={modalidade} uf={uf} pag={pagina}: {e}", file=sys.stderr)
+            break
         if not j or not j.get("data"):
             break
         rows += [parse_edital(c) for c in j["data"]]
