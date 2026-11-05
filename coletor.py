@@ -161,21 +161,29 @@ def listar_planos(ano, esfera):
         if pagina * 100 >= min(j.get("total", 0), 10000):
             return
         pagina += 1
+        time.sleep(0.5)
 
 
 def planos():
-    rows = []
+    total = 0
     for ano in ANOS_PCA:
         for esfera in "MEFDN":
-            for it in listar_planos(ano, esfera):
-                rows.append({
-                    "orgao_cnpj": it["orgao_cnpj"], "ano": int(it["ano"]),
-                    "orgao_nome": it.get("orgao_nome"), "esfera": it.get("esfera_nome"),
-                    "poder": it.get("poder_nome"), "uf": it.get("uf"),
-                    "valor_total": it.get("valor_global"),
-                    "data_atualizacao": ts(it.get("data_atualizacao_pncp")),
-                })
-    return upsert("pca_planos", rows, "orgao_cnpj,ano")
+            rows = []
+            try:
+                for it in listar_planos(ano, esfera):
+                    rows.append({
+                        "orgao_cnpj": it["orgao_cnpj"], "ano": int(it["ano"]),
+                        "orgao_nome": it.get("orgao_nome"), "esfera": it.get("esfera_nome"),
+                        "poder": it.get("poder_nome"), "uf": it.get("uf"),
+                        "valor_total": it.get("valor_global"),
+                        "data_atualizacao": ts(it.get("data_atualizacao_pncp")),
+                    })
+            except RuntimeError as e:
+                print(f"[pca] AVISO ano={ano} esfera={esfera}: lista parcial ({len(rows)} planos): {e}",
+                      file=sys.stderr)
+            if rows:
+                total += upsert("pca_planos", rows, "orgao_cnpj,ano")
+    return total
 
 
 def perfis_pca():
@@ -229,6 +237,14 @@ def processar_plano(plano, perfis):
     return plano, itens
 
 
+def processar_seguro(plano, perfis):
+    try:
+        return processar_plano(plano, perfis)
+    except RuntimeError as e:
+        print(f"[pca] AVISO plano {plano['orgao_cnpj']}/{plano['ano']}: {e}", file=sys.stderr)
+        return plano, None
+
+
 def pca():
     perfis = perfis_pca()
     if not perfis:
@@ -245,7 +261,9 @@ def pca():
     print(f"{n} planos listados; {len(pendentes)} para ler os itens")
     total = 0
     with cf.ThreadPoolExecutor(WORKERS) as ex:
-        for plano, itens in ex.map(lambda p: processar_plano(p, perfis), pendentes):
+        for plano, itens in ex.map(lambda p: processar_seguro(p, perfis), pendentes):
+            if itens is None:
+                continue  # falhou: fica pendente para a proxima coleta
             if itens:
                 total += upsert("pca_itens", itens, "plano_id,sequencial_pca,numero_item")
             requests.patch(f"{SB}/pca_planos", params={"id": f"eq.{plano['id']}"}, headers=HDR, timeout=60,
