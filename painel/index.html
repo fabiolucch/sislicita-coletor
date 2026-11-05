@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SISLICITA</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#f4f6fa;--card:#fff;--bd:#e3e8f0;--tx:#2b3445;--mut:#7b8798;--pri:#5b7fd6;--pri2:#e8eefc;--ok:#4caf8a;--warn:#e8a94a;--bad:#d9667a;--r:14px}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--tx)}
+#login{max-width:340px;margin:12vh auto;background:var(--card);padding:28px;border-radius:var(--r);border:1px solid var(--bd);box-shadow:0 6px 24px #5b7fd614}
+#login h1{margin:0 0 4px;font-size:22px;color:var(--pri)}#login p{margin:0 0 18px;color:var(--mut)}
+input,select,textarea,button{font:inherit}input,select,textarea{width:100%;padding:8px 10px;border:1px solid var(--bd);border-radius:10px;background:#fff;color:var(--tx)}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--pri2);border-color:var(--pri)}
+button{cursor:pointer;border:0;border-radius:10px;padding:8px 14px;background:var(--pri);color:#fff}button.sec{background:var(--pri2);color:var(--pri)}button.bad{background:#fbe9ed;color:var(--bad)}
+#app{display:none;min-height:100vh}aside{position:fixed;inset:0 auto 0 0;width:208px;background:var(--card);border-right:1px solid var(--bd);padding:18px 12px}
+aside h1{font-size:18px;margin:0 8px 16px;color:var(--pri)}aside a{display:block;padding:9px 12px;border-radius:10px;color:var(--tx);text-decoration:none;margin-bottom:3px;cursor:pointer}
+aside a.on{background:var(--pri2);color:var(--pri);font-weight:600}aside .sair{position:absolute;bottom:16px;left:12px;right:12px}
+main{margin-left:208px;padding:22px 26px}h2{margin:0 0 14px;font-size:20px}
+.bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}.bar>*{width:auto;min-width:130px}.bar input[type=search]{flex:1;min-width:220px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:14px 16px;margin-bottom:10px}
+.row{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.t{font-weight:600}.m{color:var(--mut);font-size:12.5px}
+.tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;background:var(--pri2);color:var(--pri);margin:4px 5px 0 0}.tag.ok{background:#e4f5ee;color:var(--ok)}.tag.w{background:#fcf1de;color:#b9801f}.tag.b{background:#fbe9ed;color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}.kpi{font-size:26px;font-weight:700;color:var(--pri)}
+.cols{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(230px,1fr);gap:12px;overflow-x:auto}.col h3{font-size:13px;color:var(--mut);margin:0 0 8px;text-transform:uppercase}
+table{width:100%;border-collapse:collapse}td,th{padding:8px;border-bottom:1px solid var(--bd);text-align:left;vertical-align:top}th{color:var(--mut);font-weight:500;font-size:12.5px}
+label{display:block;font-size:12px;color:var(--mut);margin:8px 0 3px}a.l{color:var(--pri);text-decoration:none}.vazio{color:var(--mut);padding:30px;text-align:center}
+.pg{display:flex;gap:10px;align-items:center;justify-content:center;margin-top:12px}.f2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+@media(max-width:760px){aside{position:static;width:auto;display:flex;overflow-x:auto;border:0}aside h1,aside .sair{display:none}main{margin:0;padding:14px}.f2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div id="login"><h1>SISLICITA</h1><p>Radar de licitações públicas</p>
+<label>E-mail</label><input id="em" type="email" autocomplete="username">
+<label>Senha</label><input id="pw" type="password" autocomplete="current-password">
+<p id="err" style="color:var(--bad);margin:10px 0 0"></p><button style="width:100%;margin-top:12px" onclick="entrar()">Entrar</button></div>
+<div id="app"><aside><h1>SISLICITA</h1><div id="nav"></div><button class="sec sair" onclick="sair()">Sair</button></aside><main id="main"></main></div>
+<script>
+// Chave "anon" é pública por desenho; o acesso real é protegido pelo RLS + login.
+const SUPABASE_URL="https://tkbkkqebsxvmxnqiwjfl.supabase.co";
+const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrYmtrcWVic3h2bXhucWl3amZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5MDk1MjIsImV4cCI6MjEwOTQ4NTUyMn0.v--eJcYHEanBh9WG1xgOP-jPGwbR_fikk65AkvMPEaI";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const $=s=>document.querySelector(s), main=$('#main');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const brl=v=>v==null?'—':Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
+const dt=v=>v?new Date(v).toLocaleDateString('pt-BR'):'—';
+const dias=v=>v?Math.ceil((new Date(v)-Date.now())/864e5):null;
+const UFS="AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS SC SE SP TO".split(' ');
+const STATUS=['novo','analisando','em_abordagem','participando','ganho','perdido','descartado'];
+const ETAPAS=['listado','contatado','reuniao','contrato_assinado','habilitacao','proposta','resultado','descartado'];
+const opts=(a,sel)=>a.map(x=>`<option ${x===sel?'selected':''}>${esc(x)}</option>`).join('');
+const TELAS={radar:'Radar',oportunidades:'Oportunidades',pca:'PCA (previsão)',funil:'Funil',comissoes:'Comissões',perfis:'Perfis de busca',coletas:'Coletas'};
+let tela='radar';
+
+async function entrar(){const {error}=await sb.auth.signInWithPassword({email:$('#em').value,password:$('#pw').value});if(error)$('#err').textContent='Falha no login: '+error.message;else iniciar();}
+async function sair(){await sb.auth.signOut();location.reload();}
+async function iniciar(){const {data}=await sb.auth.getSession();if(!data.session)return;$('#login').style.display='none';$('#app').style.display='block';ir(location.hash.slice(1)||'radar');}
+function ir(t){if(!TELAS[t])t='radar';tela=t;location.hash=t;$('#nav').innerHTML=Object.entries(TELAS).map(([k,v])=>`<a class="${k===t?'on':''}" onclick="ir('${k}')">${v}</a>`).join('');main.innerHTML='<div class="vazio">Carregando…</div>';V[t]().catch(e=>main.innerHTML=`<div class="vazio">Erro: ${esc(e.message)}</div>`);}
+const q=async p=>{const {data,error,count}=await p;if(error)throw error;return {data,count};};
+const prazo=v=>{const d=dias(v);return d==null?'':`<span class="tag ${d<=5?'w':'ok'}">${d>=0?d+' dias':'encerrado'}</span>`;};
+
+const V={
+async radar(){
+ const perfis=(await q(sb.from('perfis_busca').select('id,nome').order('nome'))).data;
+ main.innerHTML=`<h2>Radar de oportunidades</h2><div class="bar"><select id="fp"><option value="">Todos os perfis</option>${perfis.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select>
+ <select id="fs"><option value="">Status (todos)</option>${opts(STATUS)}</select><select id="ff"><option value="">Edital + PCA</option><option value="e">Só editais</option><option value="p">Só PCA</option></select>
+ <select id="fu"><option value="">UF (todas)</option>${opts(UFS)}</select><input id="fq" type="search" placeholder="Buscar no objeto…"></div><div id="lista"></div>`;
+ const carregar=async()=>{
+  let r=sb.from('radar').select('id,score,status,observacoes,perfil_id,perfis_busca(nome),oportunidades(objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))').order('score',{ascending:false}).limit(120);
+  if($('#fp').value)r=r.eq('perfil_id',$('#fp').value);if($('#fs').value)r=r.eq('status',$('#fs').value);
+  if($('#ff').value==='e')r=r.not('oportunidade_id','is',null);if($('#ff').value==='p')r=r.not('pca_item_id','is',null);
+  let rows=(await q(r)).data;const uf=$('#fu').value,t=$('#fq').value.toLowerCase();
+  rows=rows.filter(x=>{const o=x.oportunidades,p=x.pca_itens;const u=o?o.uf:p?.pca_planos?.uf;const tx=(o?o.objeto:p?.descricao||'').toLowerCase();return(!uf||u===uf)&&(!t||tx.includes(t));});
+  $('#lista').innerHTML=rows.length?rows.map(x=>{const o=x.oportunidades,p=x.pca_itens;
+   const titulo=o?o.objeto:p?.descricao,org=o?o.orgao_nome:p?.pca_planos?.orgao_nome,uf=o?o.uf:p?.pca_planos?.uf;
+   return `<div class="card"><div class="row"><div><div class="t">${esc((titulo||'').slice(0,220))}</div><div class="m">${esc(org)} · ${esc(uf)}${o?' · '+esc(o.municipio||''):''}</div>
+   <span class="tag ${o?'':'w'}">${o?'Edital · '+esc(o.modalidade||''):'PCA · previsão'}</span><span class="tag">${esc(x.perfis_busca?.nome)}</span><span class="tag ok">score ${x.score??'—'}</span>
+   ${o?`<span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m"> encerra ${dt(o.data_fim_proposta)}</span>`:`<span class="tag">${brl(p?.valor_total)}</span><span class="m"> desejada ${dt(p?.data_desejada)}</span>`}
+   ${o?.link_pncp?` <a class="l" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">abrir no PNCP ↗</a>`:''}</div>
+   <select style="width:150px" onchange="mudarStatus(${x.id},this.value)">${opts(STATUS,x.status)}</select></div></div>`;}).join(''):'<div class="vazio">Nada por aqui ainda. Rode a coleta e o radar, ou ajuste os filtros.</div>';};
+ ['fp','fs','ff','fu'].forEach(i=>$('#'+i).onchange=carregar);let tm;$('#fq').oninput=()=>{clearTimeout(tm);tm=setTimeout(carregar,300);};await carregar();},
+
+async oportunidades(){
+ main.innerHTML=`<h2>Oportunidades (editais abertos)</h2><div class="bar"><input id="fq" type="search" placeholder="Buscar no objeto (ex.: carne bovina)…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select>
+ <input id="vmin" type="number" placeholder="Valor mín."><input id="vmax" type="number" placeholder="Valor máx."><label style="margin:0;align-self:center"><input id="ab" type="checkbox" checked style="width:auto"> só abertos</label><button onclick="pg=0;go()">Buscar</button></div><div id="lista"></div><div class="pg" id="pg"></div>`;
+ window.pg=0;window.go=async()=>{const N=30;let r=sb.from('oportunidades').select('objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,situacao',{count:'exact'}).order('data_fim_proposta',{ascending:true}).range(pg*N,pg*N+N-1);
+  const t=$('#fq').value.trim();if(t)r=r.textSearch('objeto_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)r=r.eq('uf',$('#fu').value);
+  if($('#vmin').value)r=r.gte('valor_estimado',$('#vmin').value);if($('#vmax').value)r=r.lte('valor_estimado',$('#vmax').value);if($('#ab').checked)r=r.gte('data_fim_proposta',new Date().toISOString());
+  const {data,count}=await q(r);$('#lista').innerHTML=data.length?data.map(o=>`<div class="card"><div class="t">${esc((o.objeto||'').slice(0,240))}</div><div class="m">${esc(o.orgao_nome)} · ${esc(o.uf)} · ${esc(o.municipio||'')}</div>
+  <span class="tag">${esc(o.modalidade)}</span><span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m"> encerra ${dt(o.data_fim_proposta)}</span> <a class="l" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">PNCP ↗</a></div>`).join(''):'<div class="vazio">Sem resultados.</div>';
+  $('#pg').innerHTML=`<button class="sec" ${pg?'':'disabled'} onclick="pg--;go()">‹</button><span class="m">${count??0} resultados · pág. ${pg+1}</span><button class="sec" ${(pg+1)*N>=(count||0)?'disabled':''} onclick="pg++;go()">›</button>`;};
+ $('#fq').onkeydown=e=>{if(e.key==='Enter'){pg=0;go();}};await go();},
+
+async pca(){
+ main.innerHTML=`<h2>PCA — previsão de contratações</h2><p class="m">Itens dos Planos de Contratações Anuais que casam com seus perfis. É a chance de chegar antes do edital.</p><div class="bar"><input id="fq" type="search" placeholder="Buscar item…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select><button onclick="go()">Buscar</button></div><div id="lista"></div>`;
+ window.go=async()=>{let r=sb.from('pca_itens').select('descricao,valor_total,quantidade,unidade_medida,data_desejada,nome_unidade,pca_planos!inner(orgao_nome,uf,ano)').order('data_desejada').limit(100);
+  const t=$('#fq').value.trim();if(t)r=r.textSearch('descricao_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)r=r.eq('pca_planos.uf',$('#fu').value);
+  const {data}=await q(r);$('#lista').innerHTML=data.length?data.map(i=>`<div class="card"><div class="t">${esc((i.descricao||'').slice(0,200))}</div><div class="m">${esc(i.pca_planos.orgao_nome)} · ${esc(i.pca_planos.uf)} · PCA ${i.pca_planos.ano}</div><span class="tag">${brl(i.valor_total)}</span><span class="tag">${esc(i.quantidade??'')} ${esc(i.unidade_medida||'')}</span><span class="tag w">desejada ${dt(i.data_desejada)}</span></div>`).join(''):'<div class="vazio">Nenhum item ainda. Rode a coleta PCA.</div>';};
+ $('#fq').onkeydown=e=>{if(e.key==='Enter')go();};await go();},
+
+async funil(){
+ const {data}=await q(sb.from('matches').select('id,etapa,score,prospects(razao_social,uf),radar(oportunidades(objeto))').limit(500));
+ main.innerHTML=`<h2>Funil de assessoria</h2><p class="m">Cada card liga uma oportunidade a uma empresa-alvo. Os prospects serão alimentados pela próxima etapa do projeto (Receita Federal + vencedores do PNCP).</p>`+(data.length?`<div class="cols">${ETAPAS.map(e=>`<div class="col"><h3>${e.replace('_',' ')} (${data.filter(m=>m.etapa===e).length})</h3>${data.filter(m=>m.etapa===e).map(m=>`<div class="card"><div class="t">${esc(m.prospects?.razao_social)}</div><div class="m">${esc((m.radar?.oportunidades?.objeto||'').slice(0,90))}</div><select style="margin-top:8px" onchange="mudarEtapa(${m.id},this.value)">${opts(ETAPAS,m.etapa)}</select></div>`).join('')}</div>`).join('')}</div>`:'<div class="card vazio">Ainda não há empresas no funil.</div>');},
+
+async comissoes(){
+ const {data}=await q(sb.from('contratos_comissao').select('*').order('criado_em',{ascending:false}));
+ const est=data.reduce((s,c)=>s+Number(c.valor_estimado_comissao||0),0),rec=data.reduce((s,c)=>s+Number(c.valor_recebido||0),0);
+ main.innerHTML=`<h2>Comissões</h2><div class="grid" style="margin-bottom:14px"><div class="card"><div class="m">Estimado</div><div class="kpi">${brl(est)}</div></div><div class="card"><div class="m">Recebido</div><div class="kpi" style="color:var(--ok)">${brl(rec)}</div></div><div class="card"><div class="m">Contratos</div><div class="kpi">${data.length}</div></div></div>
+ <div class="card"><div class="f2"><div><label>Empresa</label><input id="cn"></div><div><label>CNPJ</label><input id="cc"></div><div><label>Percentual (%)</label><input id="cp" type="number"></div><div><label>Comissão estimada (R$)</label><input id="ce" type="number"></div></div><button style="margin-top:10px" onclick="novaCom()">Adicionar contrato</button></div>
+ ${data.length?`<div class="card"><table><tr><th>Empresa</th><th>%</th><th>Estimado</th><th>Recebido</th><th>Status</th></tr>${data.map(c=>`<tr><td>${esc(c.empresa_nome)}<div class="m">${esc(c.empresa_cnpj||'')}</div></td><td>${c.percentual??'—'}</td><td>${brl(c.valor_estimado_comissao)}</td><td><input type="number" style="width:110px" value="${c.valor_recebido}" onchange="upd('contratos_comissao',${c.id},{valor_recebido:this.value})"></td><td><select onchange="upd('contratos_comissao',${c.id},{status:this.value})">${opts(['em_negociacao','assinado','em_execucao','concluido','cancelado'],c.status)}</select></td></tr>`).join('')}</table></div>`:''}`;},
+
+async perfis(){
+ const {data}=await q(sb.from('perfis_busca').select('*').order('nome'));const A=v=>(v||[]).join(', ');
+ main.innerHTML=`<h2>Perfis de busca</h2><p class="m">Defina o que procurar. Palavras separadas por vírgula. A coleta e o radar usam estes perfis; mudanças valem na próxima execução.</p>
+ ${data.map(p=>`<div class="card" id="p${p.id}"><div class="row"><div class="t">${esc(p.nome)}</div><label style="margin:0"><input type="checkbox" style="width:auto" data-k="ativo" ${p.ativo?'checked':''}> ativo</label></div>
+ <div class="f2"><div><label>Palavras a incluir</label><textarea rows="2" data-k="palavras_incluir">${esc(A(p.palavras_incluir))}</textarea></div><div><label>Palavras a excluir</label><textarea rows="2" data-k="palavras_excluir">${esc(A(p.palavras_excluir))}</textarea></div>
+ <div><label>UFs (vazio = todas)</label><input data-k="ufs" value="${esc(A(p.ufs))}"></div><div><label>Modalidades (vazio = todas)</label><input data-k="modalidades" value="${esc(A(p.modalidades))}"></div>
+ <div><label>Valor mínimo</label><input type="number" data-k="valor_min" value="${p.valor_min??''}"></div><div><label>Valor máximo</label><input type="number" data-k="valor_max" value="${p.valor_max??''}"></div>
+ <div><label>Dias mínimos até a abertura</label><input type="number" data-k="dias_min_abertura" value="${p.dias_min_abertura}"></div><div><label>Score mínimo</label><input type="number" data-k="score_minimo" value="${p.score_minimo}"></div></div>
+ <button style="margin-top:10px" onclick="salvarPerfil('${p.id}')">Salvar</button></div>`).join('')}
+ <button class="sec" onclick="novoPerfil()">+ Novo perfil</button>`;},
+
+async coletas(){
+ const {data}=await q(sb.from('coletas_log').select('*').order('id',{ascending:false}).limit(30));
+ const [o,p,r]=await Promise.all(['oportunidades','pca_itens','radar'].map(t=>q(sb.from(t).select('id',{count:'exact',head:true}))));
+ main.innerHTML=`<h2>Coletas</h2><div class="grid" style="margin-bottom:14px"><div class="card"><div class="m">Editais</div><div class="kpi">${o.count}</div></div><div class="card"><div class="m">Itens de PCA</div><div class="kpi">${p.count}</div></div><div class="card"><div class="m">No radar</div><div class="kpi">${r.count}</div></div></div>
+ <div class="card"><table><tr><th>Etapa</th><th>Início</th><th>Registros</th><th>Status</th><th>Erro</th></tr>${data.map(c=>`<tr><td>${esc(c.fonte)}</td><td>${new Date(c.iniciado_em).toLocaleString('pt-BR')}</td><td>${c.registros}</td><td><span class="tag ${c.status==='ok'?'ok':c.status==='erro'?'b':'w'}">${esc(c.status)}</span></td><td class="m">${esc((c.erro||'').slice(0,120))}</td></tr>`).join('')}</table></div>
+ <p class="m">A coleta roda automaticamente no GitHub Actions às 06:17 e 18:17 (Brasília).</p>`;}
+};
+
+async function upd(t,id,v){const {error}=await sb.from(t).update(v).eq('id',id);if(error)alert('Erro: '+error.message);}
+const mudarStatus=(id,s)=>upd('radar',id,{status:s}),mudarEtapa=(id,e)=>upd('matches',id,{etapa:e});
+async function novaCom(){if(!$('#cn').value)return alert('Informe a empresa');const {error}=await sb.from('contratos_comissao').insert({empresa_nome:$('#cn').value,empresa_cnpj:$('#cc').value||null,percentual:$('#cp').value||null,valor_estimado_comissao:$('#ce').value||null});if(error)alert(error.message);else ir('comissoes');}
+async function salvarPerfil(id){const c=$('#p'+id);const arr=v=>v.split(',').map(s=>s.trim()).filter(Boolean),num=v=>v===''?null:Number(v);const g=k=>c.querySelector(`[data-k=${k}]`);
+ const v={ativo:g('ativo').checked,palavras_incluir:arr(g('palavras_incluir').value),palavras_excluir:arr(g('palavras_excluir').value),ufs:arr(g('ufs').value.toUpperCase()),modalidades:arr(g('modalidades').value),valor_min:num(g('valor_min').value),valor_max:num(g('valor_max').value),dias_min_abertura:Number(g('dias_min_abertura').value),score_minimo:Number(g('score_minimo').value)};
+ const {error}=await sb.from('perfis_busca').update(v).eq('id',id);alert(error?error.message:'Perfil salvo.');}
+async function novoPerfil(){const n=prompt('Nome do novo perfil:');if(!n)return;const {error}=await sb.from('perfis_busca').insert({nome:n});if(error)alert(error.message);else ir('perfis');}
+$('#pw').onkeydown=e=>{if(e.key==='Enter')entrar();};
+iniciar();
+</script>
+</body>
+</html>
