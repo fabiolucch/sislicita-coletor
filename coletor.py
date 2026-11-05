@@ -30,6 +30,7 @@ PCA_PAGINA = int(os.getenv("PCA_PAGINA", "100"))
 
 def get(url, params=None, tentativas=7):
     """GET no PNCP com repeticao. Retorna JSON ou None (sem conteudo/parametro invalido)."""
+    ult = "sem resposta"
     for i in range(tentativas):
         try:
             r = requests.get(url, params=params, headers=UA, timeout=90)
@@ -37,10 +38,11 @@ def get(url, params=None, tentativas=7):
                 return r.json()
             if r.status_code in (204, 400, 404):
                 return None
-        except (requests.RequestException, ValueError):
-            pass
-        time.sleep(2 ** i)
-    raise RuntimeError(f"falha ao consultar {url} {params}")
+            ult = f"HTTP {r.status_code}: {r.text[:120]!r}"
+        except (requests.RequestException, ValueError) as e:
+            ult = f"{type(e).__name__}: {str(e)[:120]}"
+        time.sleep(min(2 ** i, 30))
+    raise RuntimeError(f"falha ao consultar {url} {params} -> {ult}")
 
 
 def norm(s):
