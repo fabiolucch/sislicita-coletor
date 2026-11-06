@@ -55,6 +55,19 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .oc .just{margin-top:8px;color:#64748b;font-size:12.5px;line-height:1.45}
 .oc .acts{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center;border-top:1px solid #eef2f7;margin:12px -18px 0;padding:9px 14px;background:#fbfcfe;border-radius:0 0 var(--r) var(--r)}.oc .acts .sp{flex:1}
 .oc .acts select{width:auto;padding:4px 26px 4px 11px;border-radius:99px;font-size:12px;font-weight:600;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.4'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center/12px;appearance:none;-webkit-appearance:none;color:var(--pri);border:1px solid var(--bd);cursor:pointer}
+.stsel{position:relative;display:inline-block}
+.stbtn{display:inline-flex;align-items:center;gap:7px;background:#fff;color:#334155;border:1px solid var(--bd);border-radius:99px;padding:4px 10px 4px 9px;font-size:12px;font-weight:600;cursor:pointer}.stbtn:hover{background:#f8fafc;border-color:#cbd5e1}
+.stbtn i{width:8px;height:8px;border-radius:50%;flex:none;box-shadow:0 0 0 3px currentColor;opacity:1}
+.stbtn svg{width:12px;height:12px;stroke:#94a3b8;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;margin-left:1px}
+.stmenu{position:absolute;z-index:40;top:calc(100% + 6px);left:0;width:250px;background:#fff;border:1px solid var(--bd);border-radius:12px;box-shadow:0 12px 32px #0f172a26;padding:6px;max-height:320px;overflow:auto}
+.stit{display:flex;gap:10px;align-items:flex-start;padding:7px 9px;border-radius:8px;cursor:pointer}.stit:hover{background:#f1f5f9}.stit.on{background:var(--pri2)}
+.stit i{width:9px;height:9px;border-radius:50%;flex:none;margin-top:5px}
+.stit b{display:block;font-size:12.5px;font-weight:600;color:#1e293b}.stit span{display:block;font-size:11px;color:var(--mut);margin-top:1px;line-height:1.35}
+.stit.on b::after{content:' ✓';color:var(--pri3)}
+.toastw{position:fixed;right:18px;bottom:18px;z-index:90;display:flex;flex-direction:column;gap:8px}
+.toast{background:#1e293b;color:#f1f5f9;border-radius:10px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px #0008;display:flex;align-items:center;gap:12px;animation:tsin .18s ease-out}
+.toast button{background:#ffffff1f;padding:5px 10px;font-size:12px;white-space:nowrap}.toast button:hover{background:#ffffff38}
+@keyframes tsin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
 .gh{display:inline-flex;align-items:center;gap:6px;background:transparent;color:#475569;border:1px solid transparent;border-radius:8px;padding:5px 10px;font-size:12.5px;font-weight:500;text-decoration:none;cursor:pointer}.gh:hover{background:#eef3fa;color:var(--pri)}.gh svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.oc .acts button.sm{border-radius:8px}.oc .acts .pri{display:inline-flex;align-items:center;gap:6px}.oc .acts .pri svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}
 .oc .det{margin:0 0 4px}
 @media(max-width:700px){.oc .acts .sp{display:none}}
@@ -114,6 +127,56 @@ const UFS="AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS 
 const STATUS=['novo','analisando','em_abordagem','participando','ganho','perdido','descartado'];
 const ETAPAS=['listado','contatado','reuniao','contrato_assinado','habilitacao','proposta','resultado','descartado'];
 const opts=(a,sel)=>a.map(x=>`<option ${x===sel?'selected':''}>${esc(x)}</option>`).join('');
+const STATUS_META={
+ novo:{l:'Novo',c:'#64748b',d:'Ainda não avaliado.'},
+ analisando:{l:'Analisando',c:'#2563eb',d:'Você está avaliando se vale a pena participar.'},
+ em_abordagem:{l:'Em abordagem',c:'#d97706',d:'Buscando empresas do setor para essa oportunidade.'},
+ participando:{l:'Participando',c:'#7c3aed',d:'Você decidiu seguir — considere iniciar o processo.'},
+ ganho:{l:'Ganho',c:'#16a34a',d:'Disputa vencida.'},
+ perdido:{l:'Perdido',c:'#dc2626',d:'Disputa perdida.'},
+ descartado:{l:'Descartado',c:'#94a3b8',d:'Sai do radar e para de gerar alertas.'},
+};
+const ETAPAS_META={
+ listado:{l:'Listado',c:'#64748b',d:'Empresa identificada como possível parceira.'},
+ contatado:{l:'Contatado',c:'#2563eb',d:'Primeiro contato feito com a empresa.'},
+ reuniao:{l:'Reunião',c:'#0891b2',d:'Conversa/alinhamento em andamento.'},
+ contrato_assinado:{l:'Contrato assinado',c:'#7c3aed',d:'Contrato de assessoria assinado.'},
+ habilitacao:{l:'Habilitação',c:'#d97706',d:'Reunindo documentos de habilitação.'},
+ proposta:{l:'Proposta',c:'#0d9488',d:'Proposta em preparação ou enviada.'},
+ resultado:{l:'Resultado',c:'#16a34a',d:'Aguardando ou com resultado da disputa.'},
+ descartado:{l:'Descartado',c:'#94a3b8',d:'Parceria não seguiu adiante.'},
+};
+function toast(msg,acaoTxt,acaoFn){
+ let w=$('.toastw');if(!w){w=document.createElement('div');w.className='toastw';document.body.appendChild(w);}
+ const el=document.createElement('div');el.className='toast';
+ el.innerHTML=`<span>${esc(msg)}</span>`;
+ if(acaoTxt){const b=document.createElement('button');b.textContent=acaoTxt;b.onclick=()=>{acaoFn();el.remove();};el.appendChild(b);}
+ w.appendChild(el);setTimeout(()=>el.remove(),acaoTxt?7000:3500);
+}
+function fecharSels(exceto){document.querySelectorAll('.stmenu').forEach(m=>{if(m!==exceto)m.hidden=true;});}
+document.addEventListener('click',e=>{if(!e.target.closest('.stsel'))fecharSels();});
+function toggleSel(btn){const w=btn.closest('.stsel'),m=w.querySelector('.stmenu');const abrir=m.hidden;fecharSels();m.hidden=!abrir;}
+function selHTML(fn,id,arr,sel,meta,extra=''){
+ const m=meta[sel]||{l:sel,c:'#64748b'};
+ return `<div class="stsel" data-fn="${fn}" data-id="${id}" data-extra="${esc(extra)}">
+  <button type="button" class="stbtn" onclick="toggleSel(this)"><i style="color:${m.c}"></i>${esc(m.l)}<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+  <div class="stmenu" hidden>${arr.map(k=>{const x=meta[k]||{l:k,c:'#64748b',d:''};return `<div class="stit ${k===sel?'on':''}" onclick="escolherSel(this,'${k}')"><i style="background:${x.c}"></i><div><b>${esc(x.l)}</b><span>${esc(x.d||'')}</span></div></div>`;}).join('')}</div>
+ </div>`;
+}
+async function escolherSel(el,val){
+ const w=el.closest('.stsel'),fn=w.dataset.fn,id=w.dataset.id,extra=w.dataset.extra;
+ w.querySelector('.stbtn').onclick=null;fecharSels();
+ const meta=fn==='mudarEtapa'?ETAPAS_META:STATUS_META,m=meta[val]||{l:val,c:'#64748b'};
+ w.querySelector('.stbtn').innerHTML=`<i style="color:${m.c}"></i>${esc(m.l)}<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>`;
+ w.querySelectorAll('.stit').forEach(it=>it.classList.toggle('on',it.querySelector('b').textContent.replace(' ✓','')===m.l));
+ w.querySelector('.stbtn').onclick=function(){toggleSel(this);};
+ await (fn==='mudarEtapa'?mudarEtapa:mudarStatus)(id,val);
+ if(fn==='mudarStatus'&&['participando','ganho'].includes(val)&&extra){
+  toast(`Status: ${m.l}`,'Iniciar processo',()=>irProc(extra));
+ }else{
+  toast(fn==='mudarEtapa'?`Etapa: ${m.l}`:`Status: ${m.l}`);
+ }
+}
 const P={market:'<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',building:'<path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/>',brief:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M3 13h18"/>',home:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',radar:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12l6-6"/>',list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',cal:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',tag:'<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1"/>',funnel:'<path d="M3 4h18l-7 8v7l-4 2v-9z"/>',coin:'<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.2 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2m0 8v2"/>',sliders:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',db:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/>'};
 const svg=k=>`<svg viewBox="0 0 24 24">${P[k]}</svg>`;
 const GRUPOS=[['Visão geral',[['home','Início','home'],['radar','Radar','radar']]],['Oportunidades',[['oportunidades','Editais abertos','list'],['pca','PCA (previsão)','cal'],['precos','Preços','tag'],['mercado','Mercado e fornecedores','market']]],['Negócios',[['processos','Meus processos','brief'],['empresas','Empresas','building'],['funil','Funil','funnel'],['comissoes','Comissões','coin']]],['Sistema',[['perfis','Perfis de busca','sliders'],['coletas','Coletas','db'],['usuarios','Usuários e alertas','users']]]];
@@ -255,7 +318,7 @@ async radar(){
   let rows=(await q(r)).data;const uf=$('#fu').value,t=$('#fq').value.toLowerCase();
   rows=rows.filter(x=>{const o=x.oportunidades,p=x.pca_itens;const u=o?o.uf:p?.pca_planos?.uf;const tx=(o?o.objeto:p?.descricao||'').toLowerCase();return(!uf||u===uf)&&(!t||tx.includes(t));});
   $('#lista').innerHTML=rows.length?rows.map(x=>{const o=x.oportunidades,p=x.pca_itens;
-   return o?cardOp(o,{score:x.score,perfil:x.perfis_busca?.nome,just:x.justificativa,status:`<select onchange="mudarStatus(${x.id},this.value)">${opts(STATUS,x.status)}</select>`}):cardPca(p,x);}).join(''):'<div class="vazio">Nada por aqui ainda. Rode a coleta e o radar, ou ajuste os filtros.</div>';};
+   return o?cardOp(o,{score:x.score,perfil:x.perfis_busca?.nome,just:x.justificativa,status:selHTML('mudarStatus',x.id,STATUS,x.status,STATUS_META,o.id)}):cardPca(p,x);}).join(''):'<div class="vazio">Nada por aqui ainda. Rode a coleta e o radar, ou ajuste os filtros.</div>';};
  ['fp','fs','ff','fu'].forEach(i=>$('#'+i).onchange=carregar);let tm;$('#fq').oninput=()=>{clearTimeout(tm);tm=setTimeout(carregar,300);};if(A0.perfil)$('#fp').value=A0.perfil;await carregar();},
 
 async oportunidades(){
@@ -284,7 +347,7 @@ async pca(){
 
 async funil(){
  const {data}=await q(sb.from('matches').select('id,etapa,score,prospects(razao_social,uf),radar(oportunidades(objeto))').limit(500));
- main.innerHTML=`<div class="top"><div><h2>Funil de assessoria</h2><p class="sub">Cada card liga uma oportunidade a uma empresa-alvo.</p></div></div>`+(data.length?`<div class="cols">${ETAPAS.map(e=>`<div class="col"><h3>${e.replace('_',' ')} (${data.filter(m=>m.etapa===e).length})</h3>${data.filter(m=>m.etapa===e).map(m=>`<div class="card"><div class="t">${esc(m.prospects?.razao_social)}</div><div class="m">${esc((m.radar?.oportunidades?.objeto||'').slice(0,90))}</div><select style="margin-top:8px" onchange="mudarEtapa(${m.id},this.value)">${opts(ETAPAS,m.etapa)}</select></div>`).join('')}</div>`).join('')}</div>`:'<div class="card vazio">Ainda não há empresas no funil.</div>');},
+ main.innerHTML=`<div class="top"><div><h2>Funil de assessoria</h2><p class="sub">Cada card liga uma oportunidade a uma empresa-alvo.</p></div></div>`+(data.length?`<div class="cols">${ETAPAS.map(e=>`<div class="col"><h3>${e.replace('_',' ')} (${data.filter(m=>m.etapa===e).length})</h3>${data.filter(m=>m.etapa===e).map(m=>`<div class="card"><div class="t">${esc(m.prospects?.razao_social)}</div><div class="m">${esc((m.radar?.oportunidades?.objeto||'').slice(0,90))}</div><div style="margin-top:8px">${selHTML('mudarEtapa',m.id,ETAPAS,m.etapa,ETAPAS_META)}</div></div>`).join('')}</div>`).join('')}</div>`:'<div class="card vazio">Ainda não há empresas no funil.</div>');},
 
 async comissoes(){
  const {data}=await q(sb.from('contratos_comissao').select('*').order('criado_em',{ascending:false}));
@@ -351,7 +414,7 @@ const cardOp=(o,ex={})=>`<div class="card oc"><div><div class="h" title="${esc(o
  ${ex.just?`<div class="just">${AI('Nota e justificativa geradas por IA (Gemini)')}${esc(ex.just)}</div>`:''}</div>${scoreRing(ex.score)}
  <div class="det" hidden></div>
  <div class="acts">${ex.status||''}<span class="sp"></span>${precoBtn(o,o.objeto)}<button class="gh" onclick="detalhes(this,${o.id})">${ic('det')}Detalhes</button>${o.link_pncp?`<a class="gh" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">${ic('ext')}PNCP</a>`:''}<button class="sm pri" onclick="irProc(${o.id})">Iniciar processo${ic('play')}</button></div></div>`;
-const cardPca=(p,x)=>`<div class="card oc"><div><div class="h">${esc(p?.descricao||'')}</div><div class="meta">${esc(p?.pca_planos?.orgao_nome||'')} · ${esc(p?.pca_planos?.uf||'')}</div><div class="tags"><span class="tag w">PCA · previsão</span>${x.perfis_busca?.nome?`<span class="tag">${esc(x.perfis_busca.nome)}</span>`:''}<span class="tag">${brl(p?.valor_total)}</span><span class="m">desejada ${dt(p?.data_desejada)}</span></div>${x.justificativa?`<div class="just">${AI('Nota e justificativa geradas por IA (Gemini)')}${esc(x.justificativa)}</div>`:''}</div>${scoreRing(x.score)}<div class="acts"><select onchange="mudarStatus(${x.id},this.value)">${opts(STATUS,x.status)}</select><span class="sp"></span><button class="gh" onclick="irPreco(this.dataset.t)" data-t="${esc((p?.descricao||'').slice(0,80))}">${ic('preco')}Preço</button></div></div>`;
+const cardPca=(p,x)=>`<div class="card oc"><div><div class="h">${esc(p?.descricao||'')}</div><div class="meta">${esc(p?.pca_planos?.orgao_nome||'')} · ${esc(p?.pca_planos?.uf||'')}</div><div class="tags"><span class="tag w">PCA · previsão</span>${x.perfis_busca?.nome?`<span class="tag">${esc(x.perfis_busca.nome)}</span>`:''}<span class="tag">${brl(p?.valor_total)}</span><span class="m">desejada ${dt(p?.data_desejada)}</span></div>${x.justificativa?`<div class="just">${AI('Nota e justificativa geradas por IA (Gemini)')}${esc(x.justificativa)}</div>`:''}</div>${scoreRing(x.score)}<div class="acts">${selHTML('mudarStatus',x.id,STATUS,x.status,STATUS_META)}<span class="sp"></span><button class="gh" onclick="irPreco(this.dataset.t)" data-t="${esc((p?.descricao||'').slice(0,80))}">${ic('preco')}Preço</button></div></div>`;
 
 async function histPNCP(t){t=String(t||'').trim();if(!t||!$('#histc'))return;$('#histc').hidden=false;await blocoMercado(t,null,'#hist',8);
  const {data}=await sb.rpc('contratos_parecidos',{q:t,p_limite:15});$('#hist2').innerHTML=(data||[]).length?`<h4 style="margin:14px 0 6px;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.5px">Contratos parecidos recentes</h4><table class="tb"><tr><th>Data</th><th>Objeto</th><th>Órgão</th><th>Fornecedor</th><th>Valor</th></tr>${data.map(c=>`<tr><td class="m">${dt(c.data+'T12:00')}</td><td>${esc(c.objeto)}</td><td class="m">${esc(c.orgao||'')}/${esc(c.uf||'')}</td><td class="m">${esc(c.fornecedor||'')}</td><td>${brl(c.valor)}</td></tr>`).join('')}</table>`:'';}
