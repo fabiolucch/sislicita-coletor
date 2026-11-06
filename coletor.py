@@ -1319,7 +1319,7 @@ EXTRAS = {"catalogo": catalogo}
 
 if __name__ == "__main__":
     modo = sys.argv[1] if len(sys.argv) > 1 else "tudo"
-    etapas = list(ETAPAS) if modo == "tudo" else [modo]
+    etapas = list(ETAPAS) if modo == "tudo" else [m.strip() for m in modo.split(",") if m.strip()]  # aceita varias: "contratos,resultados"
     ETAPAS = {**ETAPAS, **EXTRAS}
     falhou = False
     for nome in etapas:
