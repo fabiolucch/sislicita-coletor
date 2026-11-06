@@ -298,7 +298,7 @@ def catalogo():
     pag = 1
     while True:
         j = get(f"{CAT}/modulo-material/3_consultarPdmMaterial",
-                {"pagina": pag, "tamanhoPagina": 500, "statusPdm": "true"}).json()
+                {"pagina": pag, "tamanhoPagina": 500, "statusPdm": "true"})
         rows = [{"tipo": "M", "codigo": r["codigoPdm"], "nome": r.get("nomePdm"), "grupo": r.get("nomeGrupo"),
                  "classe": r.get("nomeClasse")} for r in j.get("resultado", [])]
         if rows:
@@ -310,7 +310,7 @@ def catalogo():
     pag = 1
     while True:
         j = get(f"{CAT}/modulo-servico/6_consultarItemServico",
-                {"pagina": pag, "tamanhoPagina": 500, "statusServico": "true"}).json()
+                {"pagina": pag, "tamanhoPagina": 500, "statusServico": "true"})
         rows = [{"tipo": "S", "codigo": r["codigoServico"], "nome": r.get("nomeServico"), "grupo": r.get("nomeGrupo"),
                  "classe": r.get("nomeClasse")} for r in j.get("resultado", [])]
         if rows:
