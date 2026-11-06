@@ -12,6 +12,10 @@ on:
         description: "maximo de editais para a IA classificar"
         default: "300"
 
+concurrency:
+  group: coleta-pncp
+  cancel-in-progress: false   # uma coleta por vez; as outras esperam na fila
+
 jobs:
   coletar:
     runs-on: ubuntu-latest
