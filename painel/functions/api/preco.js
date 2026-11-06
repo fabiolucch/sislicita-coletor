@@ -27,15 +27,35 @@ export async function onRequestGet({ request, env }) {
     : `${CAT}/modulo-pesquisa-preco/3_consultarServico?codigoItemCatalogo=${codigo}`;
   const url = n => `${base}&tamanhoPagina=500&pagina=${n}&dataCompraInicio=${ini}${uf ? `&estado=${uf}` : ""}`;
 
-  const r1 = await fetch(url(1));
-  if (!r1.ok) return J({ erro: `Compras.gov.br respondeu ${r1.status}` }, 502);
-  const j1 = await r1.json();
+  // Compras.gov.br limita a taxa (429): páginas em sequência, com nova tentativa e cache de 12 h por consulta
+  const cache = caches.default;
+  const pegar = async (n) => {
+    const u = url(n), ck = new Request(u);
+    const hit = await cache.match(ck);
+    if (hit) return hit.json();
+    for (const espera of [0, 1500, 4000, 8000]) {
+      if (espera) await new Promise(r => setTimeout(r, espera));
+      const r = await fetch(u, { headers: { accept: "application/json" } });
+      if (r.status === 429 || r.status >= 500) continue;
+      if (!r.ok) throw new Error(`Compras.gov.br respondeu ${r.status}`);
+      const j = await r.json();
+      await cache.put(ck, new Response(JSON.stringify(j), { headers: { "content-type": "application/json", "cache-control": "public, max-age=43200" } }));
+      return j;
+    }
+    return null;
+  };
+  let j1;
+  try { j1 = await pegar(1); } catch (e) { return J({ erro: String(e.message) }, 502); }
+  if (!j1) return J({ erro: "O Compras.gov.br está limitando as consultas agora. Aguarde um minuto e tente de novo." }, 429);
   const total = j1.totalRegistros || 0;
   const paginas = Math.min(j1.totalPaginas || 1, 6); // até 3.000 registros por consulta
   let itens = j1.resultado || [];
-  if (paginas > 1) {
-    const rest = await Promise.all(Array.from({ length: paginas - 1 }, (_, i) => fetch(url(i + 2)).then(r => r.ok ? r.json() : { resultado: [] }).catch(() => ({ resultado: [] }))));
-    for (const r of rest) itens = itens.concat(r.resultado || []);
+  for (let n = 2; n <= paginas; n++) {
+    let j = null;
+    try { j = await pegar(n); } catch { j = null; }
+    if (!j) break;                         // limite atingido: segue com o que já leu (parcial)
+    itens = itens.concat(j.resultado || []);
+    await new Promise(r => setTimeout(r, 350));
   }
   itens = itens.filter(i => Number(i.precoUnitario) > 0);
 
