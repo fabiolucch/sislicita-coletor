@@ -155,6 +155,50 @@ def editais():
     return total
 
 
+# ---------------------------------------------------------------- historico de editais (ja encerrados)
+HIST_DIAS = int(os.getenv("HIST_DIAS", "180"))               # ate onde voltar (dias)
+HIST_ORCAMENTO_MIN = int(os.getenv("HIST_ORCAMENTO_MIN", "110"))  # para de abrir dias novos depois disso
+HIST_PAR = int(os.getenv("HIST_PAR", "3"))                   # paginas em paralelo (acima disso o PNCP devolve 429)
+
+
+def historico():
+    """Preenche o banco com editais publicados no passado, ja encerrados ou nao.
+
+    A etapa 'editais' so ve o que esta recebendo proposta agora, entao nada anterior a primeira
+    coleta existe no banco. Esta etapa anda de tras para a frente, dia a dia, por data de publicacao,
+    guarda onde parou em coleta_estado e retoma na proxima execucao."""
+    inicio = time.monotonic()
+    hoje = datetime.now(timezone.utc).date()
+    limite = hoje - timedelta(days=HIST_DIAS)
+    mn = estado("historico_min")
+    d = (datetime.strptime(mn, "%Y%m%d").date() - timedelta(days=1)) if mn else hoje
+    total, dias_feitos = 0, 0
+    while d >= limite:
+        if (time.monotonic() - inicio) / 60 > HIST_ORCAMENTO_MIN:
+            print(f"[historico] orcamento de {HIST_ORCAMENTO_MIN} min atingido; retoma em {d:%Y-%m-%d}", flush=True)
+            break
+        s = d.strftime("%Y%m%d")
+        rows = []
+        try:
+            for m in MODALIDADES:
+                lista = paginas(f"{PNCP}/consulta/v1/contratacoes/publicacao",
+                                {"dataInicial": s, "dataFinal": s, "codigoModalidadeContratacao": m}, 50, HIST_PAR)
+                rows += [parse_edital(c) for c in lista if c.get("numeroControlePNCP")]
+        except RuntimeError as e:
+            print(f"[historico] AVISO {s}: {e}; paro aqui e retomo nesta data na proxima execucao", file=sys.stderr, flush=True)
+            break
+        if rows:
+            total += upsert("oportunidades", rows, "numero_controle_pncp")
+        estado("historico_min", s)           # so avanca depois que o dia inteiro foi gravado
+        dias_feitos += 1
+        print(f"[historico] {s}: {len(rows)} editais", flush=True)
+        d -= timedelta(days=1)
+    else:
+        print(f"[historico] concluido ate {limite:%Y-%m-%d}", flush=True)
+    print(f"[historico] {dias_feitos} dia(s), {total} editais nesta execucao", flush=True)
+    return total
+
+
 # -------------------------------------------------------------------- PCA
 def listar_planos(ano, esfera):
     pagina = 1
@@ -1512,7 +1556,7 @@ ETAPAS = {"editais": editais, "pca": pca, "radar": radar, "ia": ia, "radar_ia": 
           "vigia": vigia, "docs": docs, "radar_pca_ia": radar_pca_ia, "interesse": interesse,
           "briefing": briefing, "aprender": aprender, "alertas": alertas,
           "contratos": contratos, "resultados": resultados, "fornecedores": fornecedores}
-EXTRAS = {"catalogo": catalogo}
+EXTRAS = {"catalogo": catalogo, "historico": historico}
 
 if __name__ == "__main__":
     modo = sys.argv[1] if len(sys.argv) > 1 else "tudo"
