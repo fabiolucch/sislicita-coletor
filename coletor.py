@@ -288,11 +288,47 @@ def radar():
     return 0
 
 
+# ------------------------------------------------------------------ catalogo (CATMAT/CATSER)
+CAT = "https://dadosabertos.compras.gov.br"
+
+
+def catalogo():
+    """Carrega PDMs de materiais e servicos do catalogo do Compras.gov.br (para a pesquisa de precos)."""
+    total = 0
+    pag = 1
+    while True:
+        j = get(f"{CAT}/modulo-material/3_consultarPdmMaterial",
+                {"pagina": pag, "tamanhoPagina": 500, "statusPdm": "true"}).json()
+        rows = [{"tipo": "M", "codigo": r["codigoPdm"], "nome": r.get("nomePdm"), "grupo": r.get("nomeGrupo"),
+                 "classe": r.get("nomeClasse")} for r in j.get("resultado", [])]
+        if rows:
+            total += upsert("catalogo", rows, "tipo,codigo")
+        if pag >= (j.get("totalPaginas") or 1):
+            break
+        pag += 1
+        time.sleep(0.3)
+    pag = 1
+    while True:
+        j = get(f"{CAT}/modulo-servico/6_consultarItemServico",
+                {"pagina": pag, "tamanhoPagina": 500, "statusServico": "true"}).json()
+        rows = [{"tipo": "S", "codigo": r["codigoServico"], "nome": r.get("nomeServico"), "grupo": r.get("nomeGrupo"),
+                 "classe": r.get("nomeClasse")} for r in j.get("resultado", [])]
+        if rows:
+            total += upsert("catalogo", rows, "tipo,codigo")
+        if pag >= (j.get("totalPaginas") or 1):
+            break
+        pag += 1
+        time.sleep(0.3)
+    return total
+
+
 ETAPAS = {"editais": editais, "pca": pca, "radar": radar}
+EXTRAS = {"catalogo": catalogo}
 
 if __name__ == "__main__":
     modo = sys.argv[1] if len(sys.argv) > 1 else "tudo"
     etapas = list(ETAPAS) if modo == "tudo" else [modo]
+    ETAPAS = {**ETAPAS, **EXTRAS}
     falhou = False
     for nome in etapas:
         id_ = log_inicio(nome)
