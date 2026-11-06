@@ -284,6 +284,16 @@ def pca():
 
 
 # ------------------------------------------------------------------ radar
+def interesse():
+    """Recalcula o score de interesse (aderencia + retorno + margem + risco + prazo)."""
+    r = requests.post(f"{SB}/rpc/calcular_interesse", headers=HDR, timeout=600, data=json.dumps({"p_limite": 20000}))
+    if r.status_code >= 300:
+        raise RuntimeError(f"calcular_interesse: {r.status_code} {r.text[:200]}")
+    n = r.json()
+    print(f"[interesse] {n} linhas recalculadas", flush=True)
+    return n
+
+
 def radar():
     r = requests.post(f"{SB}/rpc/atualizar_radar", headers=HDR, data="{}", timeout=600)
     if r.status_code >= 300:
@@ -625,7 +635,7 @@ def radar_abertos(campos):
     """Editais abertos que estao no radar (sem repeticao), do maior para o menor score."""
     r = requests.get(f"{SB}/radar", headers=HDR, timeout=120, params={
         "select": "score,oportunidades(" + campos + ")", "oportunidade_id": "not.is.null",
-        "status": "neq.descartado", "order": "score.desc", "limit": "5000"})
+        "status": "neq.descartado", "order": "interesse.desc.nullsfirst", "limit": "5000"})
     r.raise_for_status()
     agora = datetime.now(timezone.utc).isoformat()
     vistos, saida = set(), []
@@ -1220,7 +1230,7 @@ def vigia():
 
 # ------------------------------------------------------------------ alertas no Telegram
 TG = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-ALERTA_SCORE = int(os.getenv("ALERTA_SCORE", "80"))
+ALERTA_SCORE = int(os.getenv("ALERTA_SCORE", "65"))
 PAINEL = os.getenv("PAINEL_URL", "https://sislicita.pages.dev")
 
 
@@ -1325,7 +1335,7 @@ def alertas():
         requests.patch(f"{SB}/radar", params={"notificado_em": "is.null"}, headers=HDR, timeout=120, data=json.dumps({"notificado_em": agora.isoformat()}))
         requests.patch(f"{SB}/alertas", params={"enviado_em": "is.null"}, headers=HDR, timeout=60, data=json.dumps({"enviado_em": agora.isoformat()}))
         requests.patch(f"{SB}/briefings", params={"enviado_em": "is.null"}, headers=HDR, timeout=60, data=json.dumps({"enviado_em": agora.isoformat()}))
-        tg(chat, f"✅ <b>SISLICITA conectado</b>\nVocê vai receber aqui: oportunidades com score ≥ {ALERTA_SCORE}, briefing diário, documentos novos em editais do radar, sessões próximas e documentos vencendo.\n{PAINEL}")
+        tg(chat, f"✅ <b>SISLICITA conectado</b>\nVocê vai receber aqui: oportunidades com interesse ≥ {ALERTA_SCORE}, briefing diário, documentos novos em editais do radar, sessões próximas e documentos vencendo.\n{PAINEL}")
         estado("telegram_inicio", agora.isoformat())
         return 1
     # 1) briefings novos
@@ -1338,8 +1348,8 @@ def alertas():
         enviados += 1
     # 2) oportunidades novas com score alto
     rr = requests.get(f"{SB}/radar", headers=HDR, timeout=120, params={
-        "select": "id,score,justificativa,perfis_busca(nome),oportunidades(objeto,orgao_nome,uf,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp),pca_itens(descricao,valor_total,pca_planos(orgao_nome,uf))",
-        "notificado_em": "is.null", "score": f"gte.{ALERTA_SCORE}", "status": "neq.descartado", "order": "score.desc", "limit": "40"}).json()
+        "select": "id,score,interesse,justificativa,perfis_busca(nome),oportunidades(objeto,orgao_nome,uf,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp),pca_itens(descricao,valor_total,pca_planos(orgao_nome,uf))",
+        "notificado_em": "is.null", "interesse": f"gte.{ALERTA_SCORE}", "status": "neq.descartado", "order": "interesse.desc", "limit": "40"}).json()
     if rr:
         partes = []
         for x in rr[:15]:
@@ -1347,10 +1357,10 @@ def alertas():
             if o:
                 val = "sigiloso" if o.get("valor_sigiloso") else f"R$ {o.get('valor_estimado') or 0:,.0f}".replace(",", ".")
                 fim = (o.get("data_fim_proposta") or "")[:10]
-                partes.append(f"• <b>{x['score']}</b> · {h((o.get('objeto') or '')[:160])}\n  {h(o.get('orgao_nome'))}/{h(o.get('uf'))} · {val} · até {fim[8:10]}/{fim[5:7]}" + (f" · <a href=\"{h(o.get('link_pncp'))}\">PNCP</a>" if o.get("link_pncp") else ""))
+                partes.append(f"• <b>{x['interesse']}</b> · {h((o.get('objeto') or '')[:160])}\n  {h(o.get('orgao_nome'))}/{h(o.get('uf'))} · {val} · até {fim[8:10]}/{fim[5:7]}" + (f" · <a href=\"{h(o.get('link_pncp'))}\">PNCP</a>" if o.get("link_pncp") else ""))
             elif p:
-                partes.append(f"• <b>{x['score']}</b> · [PCA] {h((p.get('descricao') or '')[:160])}\n  {h((p.get('pca_planos') or {}).get('orgao_nome'))}/{h((p.get('pca_planos') or {}).get('uf'))} · R$ {p.get('valor_total') or 0:,.0f}".replace(",", "."))
-        tg(chat, f"🎯 <b>{len(rr)} oportunidade(s) nova(s) com score ≥ {ALERTA_SCORE}</b>\n\n" + "\n\n".join(partes) + (f"\n\n…e mais {len(rr) - 15} no painel." if len(rr) > 15 else "") + f"\n{PAINEL}/#radar")
+                partes.append(f"• <b>{x['interesse']}</b> · [PCA] {h((p.get('descricao') or '')[:160])}\n  {h((p.get('pca_planos') or {}).get('orgao_nome'))}/{h((p.get('pca_planos') or {}).get('uf'))} · R$ {p.get('valor_total') or 0:,.0f}".replace(",", "."))
+        tg(chat, f"🎯 <b>{len(rr)} oportunidade(s) nova(s) com interesse ≥ {ALERTA_SCORE}</b>\n\n" + "\n\n".join(partes) + (f"\n\n…e mais {len(rr) - 15} no painel." if len(rr) > 15 else "") + f"\n{PAINEL}/#radar")
         ids = ",".join(str(x["id"]) for x in rr)
         requests.patch(f"{SB}/radar", params={"id": f"in.({ids})"}, headers=HDR, timeout=60, data=json.dumps({"notificado_em": agora.isoformat()}))
         enviados += 1
@@ -1380,9 +1390,12 @@ def notificar_fim(modo, resumo, segundos):
     tg(chat, texto)
 
 
+# a ordem importa no modo "tudo": o interesse so e calculado depois que a IA e a analise
+# do edital ja rodaram, e antes do briefing/alertas, que usam a nota para escolher o que mostrar
 ETAPAS = {"editais": editais, "pca": pca, "radar": radar, "ia": ia, "radar_ia": radar_ia, "itens": itens,
-          "vigia": vigia, "docs": docs, "radar_pca_ia": radar_pca_ia, "briefing": briefing, "aprender": aprender,
-          "alertas": alertas, "contratos": contratos, "resultados": resultados, "fornecedores": fornecedores}
+          "vigia": vigia, "docs": docs, "radar_pca_ia": radar_pca_ia, "interesse": interesse,
+          "briefing": briefing, "aprender": aprender, "alertas": alertas,
+          "contratos": contratos, "resultados": resultados, "fornecedores": fornecedores}
 EXTRAS = {"catalogo": catalogo}
 
 if __name__ == "__main__":
