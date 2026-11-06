@@ -6,8 +6,11 @@ on:
   workflow_dispatch:
     inputs:
       modo:
-        description: "editais, pca, radar ou tudo"
+        description: "editais, pca, radar, catalogo, ia ou tudo"
         default: "tudo"
+      max_ia:
+        description: "maximo de editais para a IA classificar"
+        default: "300"
 
 jobs:
   coletar:
@@ -24,3 +27,5 @@ jobs:
           MODO: ${{ github.event.inputs.modo || 'tudo' }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MAX_IA: ${{ github.event.inputs.max_ia || '300' }}
