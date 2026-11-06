@@ -25,20 +25,23 @@ returns jsonb language sql stable set search_path = public as $fn$
            (select min(v) from c) mn,
            (select percentile_cont(0.5) within group (order by v) from c) med,
            (select max(v) from c) mx,
+           (select count(*) from todos) nt, (select min(v) from todos) mnt,
+           (select percentile_cont(0.5) within group (order by v) from todos) medt,
+           (select max(v) from todos) mxt,
            (select count(*) from h) nh,
            (select percentile_cont(0.5) within group (order by d) from h) desc_h
   )
   select jsonb_build_object(
-    'n', n, 'n_total', (select count(*) from todos), 'comparavel', coalesce(p_estimado,0) > 0,
-    'min', mn, 'mediana', med, 'max', mx,
-    'nh', nh, 'desconto_disputa', desc_h,
-    'estimado', p_estimado,
+    'n', n, 'min', mn, 'mediana', med, 'max', mx,
+    'n_total', nt, 'min_todos', mnt, 'mediana_todos', medt, 'max_todos', mxt,
+    'nh', nh, 'desconto_disputa', desc_h, 'estimado', p_estimado,
+    'comparavel', coalesce(p_estimado,0) > 0 and n > 0,
     -- desconto implícito nos contratos de porte parecido (indicação grosseira, usada quando
     -- ainda não há compras homologadas comparáveis)
     'desconto_contratos', case when coalesce(p_estimado,0) > 0 and med > 0 then 1 - med / p_estimado end,
     -- preço provável de fechamento e a folga que sobra em relação à referência
     'fechamento_provavel', case when coalesce(p_estimado,0) > 0 and desc_h is not null then p_estimado * (1 - desc_h)
-                                when coalesce(p_estimado,0) > 0 then med end,
+                                when coalesce(p_estimado,0) > 0 and med > 0 then med end,
     'margem', case when coalesce(p_estimado,0) > 0 and desc_h is not null then p_estimado * desc_h
                    when coalesce(p_estimado,0) > 0 and med > 0 then p_estimado - med end)
   from s;
