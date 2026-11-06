@@ -68,6 +68,7 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .funil{display:flex;flex-wrap:wrap;gap:8px}.funil div{flex:1;min-width:92px;background:var(--pri2);border-radius:10px;padding:8px 10px;text-align:center}.funil b{display:block;font-size:20px;color:var(--pri)}.funil span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
 .tv aside{display:none}.tv main{margin:0;max-width:none;padding:22px 28px}.tv .hero .clk{font-size:78px}
 @media(max-width:860px){.hero{grid-template-columns:1fr;text-align:center}.hero .hr{justify-content:center}.hero .hr div{text-align:center}.hero .clk{font-size:44px}.dg{grid-template-columns:1fr}}
+.aib{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:6px;background:linear-gradient(135deg,#7c3aed,#2563eb);color:#fff;vertical-align:-4px;margin-right:6px;flex:none;box-shadow:0 1px 3px #4c1d9540}.aib svg{width:11px;height:11px;fill:currentColor}.tag .aib{width:15px;height:15px;border-radius:5px;margin:0 5px 0 -4px;vertical-align:-3px}.tag .aib svg{width:9px;height:9px}
 </style>
 </head>
 <body>
@@ -244,11 +245,12 @@ async coletas(){
 
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
 const irPreco=t=>ir('precos',t);
+const AI=(t='Texto gerado por IA (Gemini)')=>`<span class="aib" title="${t}"><svg viewBox="0 0 24 24"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9zM19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9zM5 15l.7 1.8 1.8.7-1.8.7L5 20l-.7-1.8L2.5 17.5l1.8-.7z"/></svg></span>`;
 const precoBtn=(o,t)=>{const ok=o&&o.ia_catalogo_codigo;const a=ok?`onclick="irPreco({tipo:'${o.ia_tipo}',codigo:'${o.ia_catalogo_codigo}',nome:this.dataset.n})" data-n="${esc(o.ia_catalogo_nome)}" title="Item sugerido pela IA: ${esc(o.ia_catalogo_nome)}"`:`onclick="irPreco(this.dataset.t)" data-t="${esc((o&&o.ia_termo?o.ia_termo:(t||'')).slice(0,80))}"`;return `<button class="sec sm" ${a}>Pesquisar preço${ok?' ✦':''}</button>`;};
 const cardOp=(o,ex={})=>`<div class="card oc"><div><div class="h" title="${esc(o.objeto||'')}">${esc(o.objeto||'')}</div><div class="meta">${esc(o.orgao_nome||'')} · ${esc(o.municipio?o.municipio+'/':'')}${esc(o.uf||'')}${o.modalidade?' · '+esc(o.modalidade):''}</div>
- ${o.ia_resumo?`<div class="ia"><b>IA</b>${esc(o.ia_resumo)}</div>`:''}
- <div class="tags">${ex.score!=null?`<span class="tag ok">score ${ex.score}</span>`:''}${ex.perfil?`<span class="tag">${esc(ex.perfil)}</span>`:''}${o.ia_categoria?`<span class="tag">${esc(o.ia_categoria)}</span>`:''}<span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m">encerra ${dt(o.data_fim_proposta)}</span>${o.ia_atencao?`<span class="tag w">${esc(o.ia_atencao)}</span>`:''}</div>
- ${ex.just?`<div class="m just">${esc(ex.just)}</div>`:''}</div>
+ ${o.ia_resumo?`<div class="ia">${AI()}${esc(o.ia_resumo)}</div>`:''}
+ <div class="tags">${ex.score!=null?`<span class="tag ok">score ${ex.score}</span>`:''}${ex.perfil?`<span class="tag">${esc(ex.perfil)}</span>`:''}${o.ia_categoria?`<span class="tag">${AI()}${esc(o.ia_categoria)}</span>`:''}<span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m">encerra ${dt(o.data_fim_proposta)}</span>${o.ia_atencao?`<span class="tag w">${AI()}${esc(o.ia_atencao)}</span>`:''}</div>
+ ${ex.just?`<div class="m just">${AI('Nota e justificativa geradas por IA (Gemini)')}${esc(ex.just)}</div>`:''}</div>
  <div class="acts">${ex.status||''}${precoBtn(o,o.objeto)}<button class="sm" onclick="irProc(${o.id})">Iniciar processo</button>${o.link_pncp?`<a class="l" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">abrir no PNCP ↗</a>`:''}</div></div>`;
 const cardPca=(p,x)=>`<div class="card oc"><div><div class="h">${esc(p?.descricao||'')}</div><div class="meta">${esc(p?.pca_planos?.orgao_nome||'')} · ${esc(p?.pca_planos?.uf||'')}</div><div class="tags"><span class="tag w">PCA · previsão</span><span class="tag ok">score ${x.score??'—'}</span><span class="tag">${esc(x.perfis_busca?.nome||'')}</span><span class="tag">${brl(p?.valor_total)}</span><span class="m">desejada ${dt(p?.data_desejada)}</span></div></div><div class="acts"><select onchange="mudarStatus(${x.id},this.value)">${opts(STATUS,x.status)}</select><button class="sec sm" onclick="irPreco(this.dataset.t)" data-t="${esc((p?.descricao||'').slice(0,80))}">Pesquisar preço</button></div></div>`;
 async function buscarCat(){
