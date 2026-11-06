@@ -528,19 +528,21 @@ function blocosMercado(d){const c=d.__ctx,t=termoDe(c.op);
 async function blocoPreco(t,op,el){if(!el)return;if(!t){el.innerHTML='';return;}
  el.innerHTML='<span class="m">Comparando com contratos já assinados no PNCP…</span>';
  const ref=op?.valor_sigiloso?null:Number(op?.valor_estimado||0)||null;
- const [p,v]=await Promise.all([sb.rpc('precos_referencia',{q:t,p_uf:null,p_estimado:ref}),sb.rpc('vencedores_parecidos',{q:t,p_uf:null,p_limite:10,p_ordem:'valor'})]);
- const P=p.data||{},V=v.data||[];
+ const [p,v]=await Promise.all([sb.rpc('precos_referencia',{q:t,p_uf:null,p_estimado:ref}),
+                                sb.rpc('vencedores_parecidos',{q:t,p_uf:null,p_limite:10,p_ordem:'valor',p_estimado:ref})]);
  if(p.error){el.innerHTML=`<div class="dwarn">Não deu para calcular agora: ${esc(p.error.message)}</div>`;return;}
- const dif=P.margem_mediana,pc=ref&&P.mediana?(1-P.mediana/ref):null;
+ const P=p.data||{},V=v.data||[];
+ const desc=P.desconto_disputa!=null?P.desconto_disputa:P.desconto_contratos;      // disputa real > indicação por contratos
+ const base=P.desconto_disputa!=null?`${P.nh} compra(s) homologada(s): estimado x fechado`:`indicação a partir de ${P.n||0} contrato(s) de porte parecido`;
  el.innerHTML=`<div class="pzg">
   <div class="pzc ref"><span>Referência do edital</span><b>${ref?brl(ref):'sigiloso'}</b><i>o que o órgão estimou pagar</i></div>
-  <div class="pzc"><span>Menor já contratado</span><b>${P.n?brl(P.min):'—'}</b><i>contrato parecido mais barato</i></div>
-  <div class="pzc"><span>Valor típico contratado</span><b>${P.n?brl(P.mediana):'—'}</b><i>mediana de ${P.n||0} contrato(s)</i></div>
-  <div class="pzc ${dif>0?'ok':''}"><span>Espaço de margem</span><b>${dif!=null?brl(dif):'—'}</b><i>${pc!=null?`referência menos o típico (${pct(pc)} abaixo)`:'precisa do valor de referência'}</i></div>
+  <div class="pzc"><span>Desconto típico</span><b>${desc!=null?pct(desc):'—'}</b><i>${desc!=null?base:'ainda sem base de comparação'}</i></div>
+  <div class="pzc"><span>Fechamento provável</span><b>${P.fechamento_provavel!=null?brl(P.fechamento_provavel):'—'}</b><i>por quanto este contrato tende a fechar</i></div>
+  <div class="pzc ${P.margem>0?'ok':''}"><span>Espaço até a referência</span><b>${P.margem!=null?brl(P.margem):'—'}</b><i>folga entre o teto e o preço provável</i></div>
  </div>
- ${P.nh?`<div class="m" style="margin-top:6px">Na disputa, o desconto típico sobre o valor estimado é de <b>${pct(P.desconto_mediano)}</b> (${P.nh} compra(s) homologada(s) comparada(s)).</div>`:''}
+ ${P.n?`<div class="m" style="margin-top:6px">Contratos parecidos ${P.comparavel?'de porte comparável':'(todos os portes)'}: menor ${brl(P.min)} · típico ${brl(P.mediana)} · maior ${brl(P.max)}${P.comparavel&&P.n_total>P.n?` — ${P.n} de ${P.n_total} encontrados ficaram na faixa comparável.`:''}</div>`:''}
  ${V.length?`<table class="tb" style="margin-top:8px"><tr><th>Quem ganhou</th><th>Órgão</th><th>Data</th><th>Valor do contrato</th></tr>${V.map(x=>`<tr><td><b>${esc(x.fornecedor||'')}</b><div class="m">${esc(x.cnpj||'')}</div></td><td class="m">${esc(x.orgao||'')}/${esc(x.uf||'')}</td><td class="m">${dt(x.data+'T12:00')}</td><td>${brl(x.valor)}</td></tr>`).join('')}</table>
- <div class="m" style="margin-top:5px">Do mais barato ao mais caro. Atenção: são contratos inteiros, com quantidades diferentes — use como ordem de grandeza, não como preço unitário. Termo: “${esc(t)}”.</div>`
+ <div class="m" style="margin-top:5px">Do mais barato ao mais caro. São contratos inteiros (quantidades diferentes): use como ordem de grandeza, não como preço unitário. Termo pesquisado: “${esc(t)}”.</div>`
  :'<div class="m" style="margin-top:6px">Ainda sem contratos parecidos na base (o histórico do PNCP entra aos poucos, 10 dias por coleta).</div>'}`;}
 
 const deSel=b=>b.closest('.dac').querySelector('.de')?.value||'';
