@@ -186,22 +186,12 @@ def planos():
     return total
 
 
-def perfis_pca():
-    r = requests.get(f"{SB}/perfis_busca", params={"ativo": "eq.true"}, headers=HDR, timeout=60)
-    r.raise_for_status()
-    return [p for p in r.json() if "pca" in (p["fontes"] or [])]
+PCA_VALOR_MIN = float(os.getenv("PCA_VALOR_MIN", "100000"))
 
 
-def casa(texto, perfis):
-    t = norm(texto)
-    return any(
-        any(norm(w) in t for w in p["palavras_incluir"])
-        and not any(norm(w) in t for w in p["palavras_excluir"])
-        for p in perfis
-    )
-
-
-def processar_plano(plano, perfis):
+def processar_plano(plano):
+    """Le todos os itens do plano. Guarda um resumo por (classificacao, categoria, mes) e,
+    como detalhe, so os itens de valor alto (>= PCA_VALOR_MIN)."""
     cnpj, ano = plano["orgao_cnpj"], plano["ano"]
     base = f"{PNCP}/pncp/v1/orgaos/{cnpj}/pca/{ano}"
     sequenciais, pagina = set(), 1
@@ -211,21 +201,30 @@ def processar_plano(plano, perfis):
         if len(un) < 100:
             break
         pagina += 1
-    itens = []
+    itens, agg = [], {}
     for seq in sorted(sequenciais):
         pagina = 1
         while True:
             lote = get(f"{base}/{seq}/itens", {"pagina": pagina, "tamanhoPagina": PCA_PAGINA}) or []
             for it in lote:
-                texto = " ".join(str(it.get(k) or "") for k in
-                                 ("descricao", "grupoContratacaoNome", "classificacaoSuperiorNome"))
-                if casa(texto, perfis):
+                valor = float(it.get("valorTotal") or 0)
+                dd = str(it.get("dataDesejada") or "")
+                mes = dd[:7] + "-01" if len(dd) >= 7 else "1900-01-01"
+                cod = str(it.get("classificacaoSuperiorCodigo") or "")
+                cat = str(it.get("categoriaItemPcaNome") or "")
+                a = agg.setdefault((cod, cat, mes), {
+                    "plano_id": plano["id"], "classificacao_codigo": cod, "categoria": cat, "mes": mes,
+                    "classificacao_nome": it.get("classificacaoSuperiorNome"),
+                    "grupo_contratacao": it.get("grupoContratacaoNome"), "n_itens": 0, "valor_total": 0.0})
+                a["n_itens"] += 1
+                a["valor_total"] += valor
+                if valor >= PCA_VALOR_MIN:
                     itens.append({
                         "plano_id": plano["id"], "sequencial_pca": seq, "numero_item": it.get("numeroItem"),
                         "descricao": it.get("descricao"), "categoria": it.get("categoriaItemPcaNome"),
                         "unidade_medida": it.get("unidadeFornecimento"), "quantidade": it.get("quantidade"),
                         "valor_unitario": it.get("valorUnitario"), "valor_total": it.get("valorTotal"),
-                        "data_desejada": it.get("dataDesejada"), "codigo_unidade": it.get("codigoUnidade"),
+                        "data_desejada": dd[:10] or None, "codigo_unidade": it.get("codigoUnidade"),
                         "nome_unidade": it.get("nomeUnidade"),
                         "classificacao_codigo": it.get("classificacaoSuperiorCodigo"),
                         "classificacao_nome": it.get("classificacaoSuperiorNome"),
@@ -234,22 +233,24 @@ def processar_plano(plano, perfis):
             if len(lote) < PCA_PAGINA:
                 break
             pagina += 1
-    return plano, itens
+    return plano, itens, list(agg.values())
 
 
-def processar_seguro(plano, perfis):
+def processar_seguro(plano):
     try:
-        return processar_plano(plano, perfis)
+        return processar_plano(plano)
     except RuntimeError as e:
         print(f"[pca] AVISO plano {plano['orgao_cnpj']}/{plano['ano']}: {e}", file=sys.stderr)
-        return plano, None
+        return plano, None, None
+
+
+def apagar(tabela, plano_id):
+    r = requests.delete(f"{SB}/{tabela}", params={"plano_id": f"eq.{plano_id}"}, headers=HDR, timeout=90)
+    if r.status_code >= 300:
+        raise RuntimeError(f"{tabela}: {r.status_code} {r.text[:200]}")
 
 
 def pca():
-    perfis = perfis_pca()
-    if not perfis:
-        print("nenhum perfil ativo com fonte 'pca'")
-        return 0
     n = planos()
     r = requests.get(f"{SB}/pca_planos", headers=HDR, timeout=120, params={
         "select": "id,orgao_cnpj,ano,data_atualizacao,itens_coletados_em",
@@ -261,9 +262,13 @@ def pca():
     print(f"{n} planos listados; {len(pendentes)} para ler os itens")
     total = 0
     with cf.ThreadPoolExecutor(WORKERS) as ex:
-        for plano, itens in ex.map(lambda p: processar_seguro(p, perfis), pendentes):
+        for plano, itens, demanda in ex.map(processar_seguro, pendentes):
             if itens is None:
                 continue  # falhou: fica pendente para a proxima coleta
+            apagar("pca_demanda", plano["id"])
+            apagar("pca_itens", plano["id"])
+            if demanda:
+                upsert("pca_demanda", demanda, "plano_id,classificacao_codigo,categoria,mes")
             if itens:
                 total += upsert("pca_itens", itens, "plano_id,sequencial_pca,numero_item")
             requests.patch(f"{SB}/pca_planos", params={"id": f"eq.{plano['id']}"}, headers=HDR, timeout=60,
@@ -276,6 +281,10 @@ def radar():
     r = requests.post(f"{SB}/rpc/atualizar_radar", headers=HDR, data="{}", timeout=600)
     if r.status_code >= 300:
         raise RuntimeError(f"radar: {r.status_code} {r.text[:300]}")
+    r = requests.post(f"{SB}/rpc/limpar_antigos", headers=HDR, data="{}", timeout=300)
+    if r.status_code >= 300:
+        raise RuntimeError(f"limpar_antigos: {r.status_code} {r.text[:300]}")
+    print(f"[radar] editais antigos removidos: {r.text}")
     return 0
 
 
