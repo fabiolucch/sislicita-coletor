@@ -1219,16 +1219,57 @@ def h(s):
     return (str(s or "")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
+TG_DESC = ("Radar de licitações públicas do SISLICITA. Avisa sobre oportunidades com score alto no radar, "
+           "briefing diário por IA, documentos novos (retificações) nos editais acompanhados, sessões próximas "
+           "dos seus processos e documentos de empresas vencendo. Envie /start para vincular este chat e /status "
+           "para ver se o sistema está operando.")
+TG_CMDS = [{"command": "start", "description": "Vincular este chat e ver o que o bot faz"},
+           {"command": "status", "description": "Situação do sistema agora"},
+           {"command": "ajuda", "description": "O que este bot avisa"}]
+TG_CFG_VERSAO = "2"
+
+
+def tg_api(metodo, **dados):
+    r = requests.post(f"https://api.telegram.org/bot{TG}/{metodo}", json=dados, timeout=30)
+    return r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
+
+
 def tg_chat():
-    cid = os.getenv("TELEGRAM_CHAT_ID", "").strip() or estado("telegram_chat")
+    """Chat do dono: segredo TELEGRAM_CHAT_ID, ou o chat vinculado pelo /start (webhook), ou o ultimo /start via getUpdates."""
+    cid = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    if cid:
+        if estado("telegram_chat") != cid:
+            estado("telegram_chat", cid)
+        return cid
+    cid = estado("telegram_chat")
     if cid:
         return cid
-    r = requests.get(f"https://api.telegram.org/bot{TG}/getUpdates", timeout=30).json()
-    for u in reversed(r.get("result") or []):
-        m = u.get("message") or u.get("channel_post") or {}
-        if m.get("chat", {}).get("id"):
-            return estado("telegram_chat", m["chat"]["id"])
+    info = tg_api("getWebhookInfo").get("result") or {}
+    if not info.get("url"):
+        for u in reversed(tg_api("getUpdates").get("result") or []):
+            m = u.get("message") or {}
+            if m.get("chat", {}).get("id"):
+                return estado("telegram_chat", m["chat"]["id"])
     return None
+
+
+def tg_configurar():
+    """Descricao, comandos e webhook (/api/telegram no Cloudflare) para o bot responder /start e /status na hora."""
+    import secrets
+    sec = estado("telegram_webhook_secret")
+    if not sec:
+        sec = estado("telegram_webhook_secret", secrets.token_urlsafe(32))
+    url = PAINEL + "/api/telegram"
+    info = tg_api("getWebhookInfo").get("result") or {}
+    if info.get("url") != url or estado("telegram_cfg") != TG_CFG_VERSAO:
+        r = tg_api("setWebhook", url=url, secret_token=sec, allowed_updates=["message", "edited_message"], drop_pending_updates=False)
+        print(f"[alertas] webhook: {r.get('description') or r}", flush=True)
+    if estado("telegram_cfg") != TG_CFG_VERSAO:
+        tg_api("setMyDescription", description=TG_DESC[:512], language_code="pt")
+        tg_api("setMyDescription", description=TG_DESC[:512])
+        tg_api("setMyShortDescription", short_description="Alertas de licitações do SISLICITA: oportunidades, briefing, retificações e prazos.")
+        tg_api("setMyCommands", commands=TG_CMDS)
+        estado("telegram_cfg", TG_CFG_VERSAO)
 
 
 def tg(chat, texto):
@@ -1264,7 +1305,8 @@ def alertas():
     if not TG:
         print("[alertas] TELEGRAM_BOT_TOKEN nao configurado; alertas ficam so no painel", flush=True)
         return len(linhas)
-    chat = tg_chat()
+    chat = tg_chat()          # antes do webhook: o getUpdates so funciona sem webhook
+    tg_configurar()
     if not chat:
         print("[alertas] nenhum chat encontrado: envie /start ao seu bot no Telegram", flush=True)
         return 0
