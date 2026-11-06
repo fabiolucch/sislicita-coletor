@@ -2,11 +2,12 @@ name: Coleta PNCP
 
 on:
   schedule:
-    - cron: "17 9,21 * * *"   # 06:17 e 18:17 (horario de Brasilia)
+    - cron: "17 9 * * *"    # 06:17 (Brasilia) - coleta completa
+    - cron: "17 21 * * *"   # 18:17 (Brasilia) - so o essencial, para nao gastar minutos a toa
   workflow_dispatch:
     inputs:
       modo:
-        description: "editais, pca, radar, catalogo, ia, radar_ia, itens, vigia, docs, radar_pca_ia, briefing, aprender, alertas, contratos, resultados, fornecedores ou tudo"
+        description: "editais, pca, radar, catalogo, ia, radar_ia, itens, vigia, docs, radar_pca_ia, interesse, briefing, aprender, alertas, contratos, resultados, fornecedores ou tudo (aceita varios separados por virgula)"
         default: "tudo"
       max_ia:
         description: "maximo de editais para a IA classificar"
@@ -19,7 +20,7 @@ concurrency:
 jobs:
   coletar:
     runs-on: ubuntu-latest
-    timeout-minutes: 340
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,7 +29,8 @@ jobs:
       - run: pip install requests pypdf
       - run: python coletor.py "$MODO"
         env:
-          MODO: ${{ github.event.inputs.modo || 'tudo' }}
+          # a rodada da tarde so atualiza o que muda rapido; a completa roda de manha
+          MODO: ${{ github.event.inputs.modo || (github.event.schedule == '17 21 * * *' && 'editais,radar,ia,interesse,alertas' || 'tudo') }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}

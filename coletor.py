@@ -345,7 +345,22 @@ GKEY = os.getenv("GEMINI_API_KEY", "")
 GMODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 MAX_IA = int(os.getenv("MAX_IA", "300"))
 LOTE_IA = int(os.getenv("LOTE_IA", "15"))
-PAUSA_IA = float(os.getenv("PAUSA_IA", "7"))
+PAUSA_IA = float(os.getenv("PAUSA_IA", "7"))   # so usado se RPM_IA for 0
+RPM_IA = int(os.getenv("RPM_IA", "12"))        # teto de chamadas por minuto (free tier do Gemini: ~15)
+_ult_ia = [0.0]
+
+
+def ritmo():
+    """Espera so o que falta para respeitar RPM_IA. A chamada da IA ja consome a maior
+    parte do intervalo, entao normalmente nao dorme nada."""
+    if RPM_IA <= 0:
+        time.sleep(PAUSA_IA)
+        return
+    intervalo = 60.0 / RPM_IA
+    falta = intervalo - (time.monotonic() - _ult_ia[0])
+    if falta > 0:
+        time.sleep(falta)
+    _ult_ia[0] = time.monotonic()
 
 PROMPT_IA = """Voce analisa objetos de licitacoes publicas brasileiras para uma consultoria que assessora empresas fornecedoras.
 Para CADA item abaixo devolva um objeto JSON com:
@@ -505,7 +520,7 @@ def ia():
                 raise RuntimeError(f"ia patch: {rr.status_code} {rr.text[:200]}")
             feitos += 1
         print(f"[ia] {feitos}/{len(fila)} (modelo {GMODEL})", flush=True)
-        time.sleep(PAUSA_IA)
+        ritmo()
     return feitos
 
 
@@ -614,7 +629,7 @@ def radar_ia():
                                    data=json.dumps({"score": n["score"], "justificativa": n["justificativa"]}))
             total += len(aval)
             print(f"[radar_ia] {p['nome']}: {total} avaliados (modelo {GMODEL})", flush=True)
-            time.sleep(PAUSA_IA)
+            ritmo()
     return total
 
 
@@ -826,7 +841,7 @@ def docs():
         requests.patch(f"{SB}/oportunidades", params={"id": f"eq.{o['id']}"}, headers=HDR, timeout=60,
                        data=json.dumps({"analise_em": datetime.now(timezone.utc).isoformat()}))
         print(f"[docs] {feitos}/{len(fila)} (fonte {fonte}, {len(texto)} caracteres)", flush=True)
-        time.sleep(PAUSA_IA)
+        ritmo()
     return feitos
 
 
@@ -907,7 +922,7 @@ def radar_pca_ia():
                                    params={"perfil_id": "eq." + x["perfil_id"], "pca_item_id": "eq." + str(x["pca_item_id"])},
                                    data=json.dumps({"score": x["score"], "justificativa": x["justificativa"]}))
             total += len(aval)
-            time.sleep(PAUSA_IA)
+            ritmo()
     return total
 
 
@@ -966,7 +981,7 @@ def briefing():
         if rp.status_code >= 300:
             raise RuntimeError(f"briefing: {rp.status_code} {rp.text[:200]}")
         feitos += 1
-        time.sleep(PAUSA_IA)
+        ritmo()
     requests.delete(f"{SB}/briefings", headers=HDR, timeout=60, params={"gerado_em": "lt." + (agora - timedelta(days=30)).isoformat()})
     return feitos
 
@@ -1023,7 +1038,7 @@ def aprender():
                 "prompt_sugerido": str(res["prompt"])[:900], "prompt_sugerido_motivo": str(res.get("motivo") or "")[:400],
                 "prompt_sugerido_em": datetime.now(timezone.utc).isoformat()}))
             feitos += 1
-        time.sleep(PAUSA_IA)
+        ritmo()
     return feitos
 
 
