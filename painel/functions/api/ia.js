@@ -26,6 +26,74 @@ async function gemini(env, prompt, json) {
   throw new Error("limite de uso da IA atingido; tente em alguns minutos");
 }
 
+// Recorte inteligente: manda ao Gemini só os trechos do edital que decidem a participação.
+const TERMOS_RECORTE = [
+  [6, ["habilitacao", "qualificacao tecnica", "qualificacao economico", "atestado de capacidade", "documentos de habilitacao", "regularidade fiscal", "certidao negativa", "balanco patrimonial", "indice de liquidez", "capital social minimo", "registro no conselho", "cnae"]],
+  [5, ["prazo de entrega", "prazo de execucao", "cronograma de entrega", "local de entrega", "prazo de vigencia", "vigencia do contrato", "prorrogacao"]],
+  [5, ["garantia contratual", "garantia da proposta", "garantia do produto", "seguro garantia", "caucao", "retencao"]],
+  [5, ["sancao", "sancoes", "penalidade", "multa", "advertencia", "impedimento de licitar", "declaracao de inidoneidade", "rescisao"]],
+  [4, ["pagamento", "nota fiscal", "liquidacao", "reajuste", "repactuacao", "dotacao orcamentaria"]],
+  [4, ["amostra", "prova de conceito", "visita tecnica", "vistoria", "laudo", "selo de inspecao", "anvisa", "inmetro"]],
+  [4, ["criterio de julgamento", "menor preco", "maior desconto", "tecnica e preco", "modo de disputa", "valor estimado", "valor maximo", "preco de referencia", "orcamento estimado"]],
+  [3, ["exclusiva para microempresa", "me/epp", "microempresa e empresa de pequeno porte", "cota reservada", "beneficio da lei complementar"]],
+  [3, ["objeto", "especificacao tecnica", "descricao do objeto", "quantitativo", "unidade de medida"]],
+  [3, ["subcontratacao", "consorcio", "obrigacoes da contratada", "fiscalizacao", "recebimento provisorio"]],
+];
+const semAcento = s => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+
+function pedacos(linha, alvo) {
+  if (linha.length <= alvo) return [linha];
+  const out = []; let atual = "";
+  for (const fr of linha.split(/(?<=[.;:])\s+/)) {
+    if (atual && atual.length + fr.length > alvo) { out.push(atual); atual = fr; }
+    else atual = (atual + " " + fr).trim();
+  }
+  if (atual) out.push(atual);
+  return out.flatMap(p => p.length <= alvo * 2 ? [p] : p.match(new RegExp(`.{1,${alvo}}`, "gs")) || []);
+}
+
+function blocos(texto, alvo = 900) {
+  const out = []; let buf = [], n = 0;
+  for (const bruta of texto.split("\n")) for (const linha of pedacos(bruta, alvo)) {
+    buf.push(linha); n += linha.length + 1;
+    if (n >= alvo) { out.push(buf.join("\n")); buf = []; n = 0; }
+  }
+  if (buf.length) out.push(buf.join("\n"));
+  return out;
+}
+
+function peso(bloco) {
+  const b = semAcento(bloco);
+  let p = 0;
+  for (const [valor, termos] of TERMOS_RECORTE) {
+    const achou = termos.filter(t => b.includes(t)).length;
+    if (achou) p += valor * Math.min(achou, 3);
+  }
+  if (/^\s*(\d{1,2}(\.\d{1,2})*\s*[-.–)]?\s+|cl[aá]usula\b|anexo\b)/i.test(bloco)) p += 1;
+  if (b.trim().length < 120) p -= 2;
+  return p;
+}
+
+function recortar(texto, limite = 22000, cabeca = 6000) {
+  if (texto.length <= limite) return texto;
+  const inicio = texto.slice(0, cabeca), bl = blocos(texto.slice(cabeca));
+  const ordem = bl.map((b, i) => [peso(b), i]).sort((a, c) => c[0] - a[0]);
+  const orcamento = limite - inicio.length - 200;
+  const escolhidos = new Set(); let usado = 0;
+  for (const [p, i] of ordem) {
+    if (p <= 0 || usado + bl[i].length > orcamento) continue;
+    escolhidos.add(i); usado += bl[i].length + 8;
+  }
+  if (!escolhidos.size) return texto.slice(0, limite);
+  const partes = [inicio]; let anterior = -1;
+  for (const i of [...escolhidos].sort((a, b) => a - b)) {
+    if (i !== anterior + 1) partes.push("[...]");
+    partes.push(bl[i]); anterior = i;
+  }
+  if (anterior < bl.length - 1) partes.push("[...]");
+  return partes.join("\n").slice(0, limite);
+}
+
 export async function onRequestPost({ request, env }) {
   if (!env.GEMINI_API_KEY) return J({ erro: "GEMINI_API_KEY não configurada no Cloudflare" }, 500);
   const auth = request.headers.get("authorization") || "";
@@ -49,7 +117,7 @@ export async function onRequestPost({ request, env }) {
       const [tx] = await get(`edital_textos?oportunidade_id=eq.${id}&select=texto,arquivo`);
       const fonte = tx?.texto ? "edital" : "objeto";
       const corpo = tx?.texto
-        ? `TEXTO DO EDITAL (${tx.arquivo || ""}):\n${tx.texto.slice(0, 120000)}`
+        ? `TEXTO DO EDITAL (${tx.arquivo || ""}):\n${recortar(tx.texto)}`
         : `SÓ O OBJETO (o edital ainda não foi baixado):\n${(op.objeto || "").slice(0, 4000)}\nÓRGÃO: ${op.orgao_nome} (${op.municipio || ""}/${op.uf})\nMODALIDADE: ${op.modalidade || ""}\nVALOR ESTIMADO: ${op.valor_sigiloso ? "sigiloso" : op.valor_estimado}\nPRAZO PARA PROPOSTAS: ${op.data_fim_proposta || ""}`;
       const prompt = `Você analisa editais de licitação pública brasileira para uma consultoria que ajuda empresas fornecedoras a participar.
 Responda SOMENTE um objeto JSON com estes campos (use null ou lista vazia quando não constar; NÃO invente):

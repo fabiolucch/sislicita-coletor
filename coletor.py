@@ -638,7 +638,7 @@ MAX_ITENS = int(os.getenv("MAX_ITENS", "400"))
 MAX_DOCS = int(os.getenv("MAX_DOCS", "40"))
 PNCP_ARQ = "https://pncp.gov.br/pncp-api/v1"
 MAX_TEXTO = 150000          # caracteres guardados por edital
-MAX_PROMPT_TEXTO = 60000    # caracteres enviados ao Gemini
+MAX_PROMPT_TEXTO = int(os.getenv("MAX_PROMPT_TEXTO", "22000"))  # caracteres enviados ao Gemini (apos o recorte)
 
 
 def chave_pncp(o):
@@ -782,6 +782,107 @@ def texto_do_edital(k):
     return "\n\n".join(partes)[:MAX_TEXTO], "; ".join(nomes)[:300], pags
 
 
+# --- recorte inteligente: manda para a IA so os trechos que decidem a participacao ---
+TERMOS_RECORTE = (
+    (6, ("habilitacao", "qualificacao tecnica", "qualificacao economico", "atestado de capacidade",
+         "documentos de habilitacao", "regularidade fiscal", "certidao negativa", "balanco patrimonial",
+         "indice de liquidez", "capital social minimo", "registro no conselho", "cnae")),
+    (5, ("prazo de entrega", "prazo de execucao", "cronograma de entrega", "local de entrega",
+         "prazo de vigencia", "vigencia do contrato", "prorrogacao")),
+    (5, ("garantia contratual", "garantia da proposta", "garantia do produto", "seguro garantia",
+         "caucao", "retencao")),
+    (5, ("sancao", "sancoes", "penalidade", "multa", "advertencia", "impedimento de licitar",
+         "declaracao de inidoneidade", "rescisao")),
+    (4, ("pagamento", "nota fiscal", "liquidacao", "reajuste", "repactuacao", "dotacao orcamentaria")),
+    (4, ("amostra", "prova de conceito", "visita tecnica", "vistoria", "laudo", "registro no ministerio",
+         "selo de inspecao", "sif", "anvisa", "inmetro")),
+    (4, ("criterio de julgamento", "menor preco", "maior desconto", "tecnica e preco", "lance",
+         "modo de disputa", "valor estimado", "valor maximo", "preco de referencia", "orcamento estimado")),
+    (3, ("exclusiva para microempresa", "me/epp", "microempresa e empresa de pequeno porte",
+         "cota reservada", "beneficio da lei complementar")),
+    (3, ("objeto", "especificacao tecnica", "descricao do objeto", "quantitativo", "unidade de medida")),
+    (3, ("subcontratacao", "consorcio", "obrigacoes da contratada", "fiscalizacao", "recebimento provisorio")),
+)
+RE_SECAO = re.compile(r"^\s*(\d{1,2}(\.\d{1,2})*\s*[-.\u2013)]?\s+|cl[a\u00e1]usula\b|anexo\b)", re.I)
+
+
+def _pedacos(linha, alvo):
+    """Linha muito longa (PDF sem quebras) vira varios pedacos, cortando em frases."""
+    if len(linha) <= alvo:
+        return [linha]
+    out, atual = [], ""
+    for fr in re.split(r"(?<=[.;:])\s+", linha):
+        if atual and len(atual) + len(fr) > alvo:
+            out.append(atual)
+            atual = fr
+        else:
+            atual = (atual + " " + fr).strip()
+    if atual:
+        out.append(atual)
+    return [x for p in out for x in ([p] if len(p) <= alvo * 2 else
+                                     [p[i:i + alvo] for i in range(0, len(p), alvo)])]
+
+
+def _blocos(texto, alvo=900):
+    """Quebra o texto em blocos de ~alvo caracteres, respeitando linhas e frases."""
+    out, buf, n = [], [], 0
+    for bruta in texto.splitlines():
+        for linha in _pedacos(bruta, alvo):
+            buf.append(linha)
+            n += len(linha) + 1
+            if n >= alvo:
+                out.append("\n".join(buf))
+                buf, n = [], 0
+    if buf:
+        out.append("\n".join(buf))
+    return out
+
+
+def _peso(bloco):
+    b = norm(bloco)
+    p = 0
+    for valor, termos in TERMOS_RECORTE:
+        achou = sum(1 for t in termos if t in b)
+        if achou:
+            p += valor * min(achou, 3)
+    if RE_SECAO.match(bloco.lstrip()):
+        p += 1
+    if len(b.strip()) < 120:
+        p -= 2
+    return p
+
+
+def recortar(texto, limite=None, cabeca=6000):
+    """Devolve so os trechos do edital que importam para decidir a participacao.
+
+    Mantem o inicio (objeto, modalidade, criterio) e depois os blocos de maior peso,
+    sempre na ordem original, marcando os cortes com [...]."""
+    limite = limite or MAX_PROMPT_TEXTO
+    if len(texto) <= limite:
+        return texto
+    inicio, resto = texto[:cabeca], texto[cabeca:]
+    blocos = _blocos(resto)
+    pontuados = sorted(((_peso(b), i) for i, b in enumerate(blocos)), reverse=True)
+    orcamento = limite - len(inicio) - 200
+    escolhidos, usado = set(), 0
+    for p, i in pontuados:
+        if p <= 0 or usado + len(blocos[i]) > orcamento:
+            continue
+        escolhidos.add(i)
+        usado += len(blocos[i]) + 8
+    if not escolhidos:
+        return texto[:limite]
+    partes, anterior = [inicio], -1
+    for i in sorted(escolhidos):
+        if i != anterior + 1:
+            partes.append("[...]")
+        partes.append(blocos[i])
+        anterior = i
+    if anterior < len(blocos) - 1:
+        partes.append("[...]")
+    return "\n".join(partes)[:limite]
+
+
 PROMPT_DOC = """Voce analisa editais de licitacao publica brasileira para uma consultoria que ajuda empresas fornecedoras a participar.
 Leia o texto abaixo e responda SOMENTE com um objeto JSON com estes campos (use null ou lista vazia quando nao constar no texto; nao invente):
 {
@@ -817,7 +918,7 @@ def docs():
         fonte = "edital" if len(texto) > 800 else "objeto"
         if fonte == "edital":
             upsert("edital_textos", [{"oportunidade_id": o["id"], "arquivo": arquivo, "paginas": pags, "texto": texto}], "oportunidade_id")
-            entrada = texto[:MAX_PROMPT_TEXTO]
+            entrada = recortar(texto)
         else:
             entrada = "OBJETO: " + (o.get("objeto") or "")[:2000]
         try:
@@ -840,7 +941,7 @@ def docs():
             feitos += 1
         requests.patch(f"{SB}/oportunidades", params={"id": f"eq.{o['id']}"}, headers=HDR, timeout=60,
                        data=json.dumps({"analise_em": datetime.now(timezone.utc).isoformat()}))
-        print(f"[docs] {feitos}/{len(fila)} (fonte {fonte}, {len(texto)} caracteres)", flush=True)
+        print(f"[docs] {feitos}/{len(fila)} (fonte {fonte}, {len(texto)} caracteres, {len(entrada)} enviados)", flush=True)
         ritmo()
     return feitos
 
