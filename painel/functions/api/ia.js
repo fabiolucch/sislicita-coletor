@@ -37,7 +37,7 @@ export async function onRequestPost({ request, env }) {
   let b; try { b = await request.json(); } catch { return J({ erro: "JSON inválido" }, 400); }
   const id = parseInt(b.oportunidade_id, 10);
   if (!id) return J({ erro: "informe oportunidade_id" }, 400);
-  const [op] = await get(`oportunidades?id=eq.${id}&select=id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,ia_resumo,ia_termo,link_edital`);
+  const [op] = await get(`oportunidades?id=eq.${id}&select=id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,ia_resumo,ia_termo,link_pncp`);
   if (!op) return J({ erro: "oportunidade não encontrada" }, 404);
   const [an] = await get(`edital_analise?oportunidade_id=eq.${id}&select=dados,resumo,risco,fonte`);
   const resumoEdital = JSON.stringify(an?.dados || {}).slice(0, 6000);
