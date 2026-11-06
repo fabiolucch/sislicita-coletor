@@ -41,6 +41,33 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .pbox{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:14px}.pbox .card{margin:0;text-align:center}.pbox .big{font-size:23px;font-weight:700;color:var(--pri)}.pbox .big.g{color:var(--ok)}
 .res{display:flex;flex-direction:column;gap:6px;margin-bottom:12px}.res button{text-align:left;background:#fff;color:var(--tx);border:1px solid var(--bd);box-shadow:var(--sh)}.res button:hover{border-color:var(--pri);background:var(--pri2)}
 @media(max-width:860px){aside{position:static;width:auto;flex-direction:row;align-items:center;overflow-x:auto;padding:8px;gap:4px}aside #nav{display:flex;gap:4px}aside .logo,aside .gr,aside .user{display:none}aside a{white-space:nowrap;margin:0}aside .sair{margin:0 0 0 auto;white-space:nowrap;width:auto}main{margin:0;padding:16px;min-width:0}body{overflow-x:hidden}.f2{grid-template-columns:1fr!important}table{display:block;overflow-x:auto}.f2{grid-template-columns:1fr}.top{flex-direction:column;align-items:flex-start}}
+.oc{display:grid;grid-template-columns:minmax(0,1fr) 168px;gap:10px 22px;align-items:start}
+.oc .h{font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:14.5px}
+.oc .meta{color:var(--mut);font-size:12.5px;margin-top:3px}
+.oc .ia{background:#f1f5fb;border-left:3px solid var(--pri3);border-radius:6px;padding:7px 11px;font-size:13px;color:#334155;margin:10px 0 0;line-height:1.45}
+.oc .ia b{color:var(--pri3);font-size:11px;letter-spacing:.6px;margin-right:6px}
+.oc .tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:10px}.oc .tags .tag{margin:0}
+.oc .just{margin-top:6px;font-style:italic}
+.oc .acts{display:flex;flex-direction:column;gap:7px;align-items:stretch}.oc .acts button,.oc .acts select{width:100%}.oc .acts a.l{text-align:center;font-size:12.5px}
+@media(max-width:700px){.oc{grid-template-columns:1fr}.oc .acts{flex-direction:row;flex-wrap:wrap}.oc .acts button,.oc .acts select{width:auto;flex:1;min-width:120px}}
+.hero{position:relative;background:linear-gradient(135deg,#0b1220,#14233f 60%,#1b3358);color:#e2e8f0;border-radius:16px;padding:22px 26px;margin-bottom:16px;display:grid;grid-template-columns:1fr auto 1fr;gap:18px;align-items:center;box-shadow:0 8px 24px #0f172a22}
+.hero .hk{font-size:26px;font-weight:700;letter-spacing:.5px;color:#fff}.hero .hs{color:#94a3b8;margin-top:2px}
+.hero .hc{text-align:center}.hero .clk{font-size:54px;font-weight:700;letter-spacing:-1px;line-height:1;color:#f1f5f9;font-variant-numeric:tabular-nums}.hero .dtx{color:#94a3b8;margin-top:6px;text-transform:capitalize}
+.hero .hr{display:flex;gap:22px;justify-content:flex-end}.hero .hr div{text-align:right}.hero .hr b{display:block;font-size:26px;color:#fbbf24;line-height:1.1}.hero .hr span{font-size:11.5px;color:#94a3b8;text-transform:uppercase;letter-spacing:.6px}
+.hero .tvb{position:absolute;top:12px;right:14px;background:#ffffff1a;color:#cbd5e1}.hero .tvb:hover{background:#ffffff2e}
+.kps{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;margin-bottom:16px}
+.kp{background:#fff;border:1px solid var(--bd);border-left:4px solid var(--pri3);border-radius:var(--r);padding:13px 16px;box-shadow:var(--sh);cursor:pointer;transition:.15s}.kp:hover{transform:translateY(-2px);box-shadow:0 6px 16px #0f172a14}
+.kp .m{text-transform:uppercase;letter-spacing:.5px;font-size:11px;font-weight:600}.kp .n{font-size:28px;font-weight:700;color:var(--pri);letter-spacing:-.5px;line-height:1.2}.kp .s{font-size:12px;color:var(--mut)}
+.kp.ok{border-left-color:var(--ok)}.kp.ok .n{color:var(--ok)}.kp.w{border-left-color:var(--warn)}.kp.w .n{color:var(--warn)}.kp.b{border-left-color:var(--bad)}.kp.b .n{color:var(--bad)}
+.dg{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px;margin-bottom:16px}.dg .card{margin:0}.dg h3{margin:0 0 12px;font-size:14px}
+.br{display:grid;grid-template-columns:44px 1fr 48px;gap:10px;align-items:center;padding:3px 0;font-size:13px}.br[onclick]{cursor:pointer}.br[onclick]:hover .bl{color:var(--pri3)}
+.br .bl{font-weight:600;color:var(--tx);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.br .bt{height:9px;background:var(--pri2);border-radius:99px;overflow:hidden}.br .bt i{display:block;height:100%;background:linear-gradient(90deg,#2f5a94,#4f86c6);border-radius:99px}.br .bn{text-align:right;color:var(--mut);font-variant-numeric:tabular-nums}
+.br.wide{grid-template-columns:130px 1fr 48px}
+.cols14{display:flex;gap:5px;align-items:flex-end;height:150px}.cols14 .c{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;font-size:10.5px;color:var(--mut)}.cols14 .c i{display:block;width:100%;background:linear-gradient(180deg,#4f86c6,#2f5a94);border-radius:4px 4px 0 0;min-height:2px}.cols14 .c.fds i{background:#cbd5e1}.cols14 .c b{font-size:11px;color:var(--tx);margin-bottom:2px}
+.sit{list-style:none;margin:0;padding:0}.sit li{display:flex;gap:10px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--bd);cursor:pointer;font-size:13.5px}.sit li:last-child{border:0}.sit i{width:9px;height:9px;border-radius:50%;margin-top:6px;flex:none;background:var(--ok)}.sit i.w{background:var(--warn)}.sit i.b{background:var(--bad)}
+.funil{display:flex;flex-wrap:wrap;gap:8px}.funil div{flex:1;min-width:92px;background:var(--pri2);border-radius:10px;padding:8px 10px;text-align:center}.funil b{display:block;font-size:20px;color:var(--pri)}.funil span{font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px}
+.tv aside{display:none}.tv main{margin:0;max-width:none;padding:22px 28px}.tv .hero .clk{font-size:78px}
+@media(max-width:860px){.hero{grid-template-columns:1fr;text-align:center}.hero .hr{justify-content:center}.hero .hr div{text-align:center}.hero .clk{font-size:44px}.dg{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -74,21 +101,43 @@ async function sair(){await sb.auth.signOut();location.reload();}
 async function iniciar(){const {data}=await sb.auth.getSession();if(!data.session){$('#login').style.display='flex';return;}$('#login').style.display='none';$('#usr').textContent=data.session.user.email;$('#app').style.display='block';ir(location.hash.slice(1)||'home');}
 function ir(t,arg){if(!TELAS[t])t='home';tela=t;window.ARG=arg;location.hash=t;scrollTo(0,0);$('#nav').innerHTML=GRUPOS.map(([g,its])=>`<div class="gr">${g}</div>`+its.map(([k,v,i])=>`<a class="${k===t?'on':''}" onclick="ir('${k}')">${svg(i)}${v}</a>`).join('')).join('');main.innerHTML='<div class="vazio">Carregando…</div>';V[t]().catch(e=>main.innerHTML=`<div class="vazio">Erro: ${esc(e.message)}</div>`);}
 const q=async p=>{const {data,error,count}=await p;if(error)throw error;return {data,count};};
+function modoTV(){document.body.classList.toggle('tv');if(document.body.classList.contains('tv')){document.documentElement.requestFullscreen?.().catch(()=>{});}else if(document.fullscreenElement){document.exitFullscreen();}}
 const prazo=v=>{const d=dias(v);return d==null?'':`<span class="tag ${d<=5?'w':'ok'}">${d>=0?d+' dias':'encerrado'}</span>`;};
 
 const V={
 async home(){
- const now=new Date().toISOString();
- const cnt=(t,f)=>q(f(sb.from(t).select('id',{count:'exact',head:true}))).then(r=>r.count);
- const [ab,rd,pc,cm,top]=await Promise.all([cnt('oportunidades',r=>r.gte('data_fim_proposta',now)),cnt('radar',r=>r.not('oportunidade_id','is',null)),cnt('pca_demanda',r=>r),
+ const agora=new Date().toISOString();
+ const [D,cm,top]=await Promise.all([q(sb.rpc('dashboard_resumo')).then(r=>r.data),
   q(sb.from('contratos_comissao').select('base_valor,percentual,valor_estimado_comissao,valor_recebido')).then(r=>r.data),
-  q(sb.from('radar').select('id,score,status,oportunidades!inner(objeto,orgao_nome,uf,valor_estimado,valor_sigiloso,data_fim_proposta)').gte('oportunidades.data_fim_proposta',now).order('score',{ascending:false}).limit(6)).then(r=>r.data)]);
+  q(sb.from('radar').select('id,score,status,justificativa,perfis_busca(nome),oportunidades!inner(id,objeto,orgao_nome,municipio,uf,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_resumo,ia_categoria,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome)').gte('oportunidades.data_fim_proposta',agora).neq('status','descartado').order('score',{ascending:false}).limit(5)).then(r=>r.data)]);
  const est=cm.reduce((s,c)=>s+(c.base_valor==null?Number(c.valor_estimado_comissao||0):Number(c.base_valor)*Number(c.percentual??1)/100),0),rec=cm.reduce((s,c)=>s+Number(c.valor_recebido||0),0);
- const K=(i,l,v,c='')=>`<div class="card"><div class="ic">${svg(i)}</div><div class="m">${l}</div><div class="kpi ${c}">${v}</div></div>`;
- main.innerHTML=`<div class="top"><div><h2>Bem-vindo ao SISLICITA</h2><p class="sub">Garimpe oportunidades, conheça os preços de mercado e acompanhe suas comissões.</p></div><div><button onclick="ir('precos')">Pesquisar preços</button></div></div>
- <div class="grid">${K('list','Editais abertos',ab.toLocaleString('pt-BR'))}${K('radar','No radar (editais)',rd.toLocaleString('pt-BR'))}${K('cal','Linhas de PCA (previsão)',pc.toLocaleString('pt-BR'))}${K('coin','Comissão estimada',brl(est))}${K('coin','Comissão recebida',brl(rec),'g')}</div>
+ const n=v=>Number(v||0).toLocaleString('pt-BR');
+ const ago=iso=>{const m=Math.max(0,Math.round((Date.now()-new Date(iso))/6e4));return m<60?m+' min':m<1440?Math.round(m/60)+' h':Math.round(m/1440)+' d';};
+ const KP=(c,l,v,s,go)=>`<div class="kp ${c}" onclick="${go}"><div class="m">${l}</div><div class="n">${v}</div><div class="s">${s}</div></div>`;
+ const bars=(arr,k,v,click,cls='')=>{const mx=Math.max(1,...arr.map(x=>x[v]));return arr.length?arr.map(x=>`<div class="br ${cls}" ${click?`onclick="${click(x)}"`:''}><span class="bl" title="${esc(x[k])}">${esc(x[k])}</span><span class="bt"><i style="width:${Math.max(3,x[v]/mx*100)}%"></i></span><span class="bn">${n(x[v])}</span></div>`).join(''):'<div class="m">Sem dados ainda.</div>';};
+ const dd=[...Array(14)].map((_,i)=>{const d=new Date();d.setDate(d.getDate()+i);const f=(D.por_dia||[]).find(x=>x.d===d.toLocaleDateString('sv-SE'));return {d,n:f?f.n:0};}),mxd=Math.max(1,...dd.map(x=>x.n));
+ const PS={preparando:'Preparando',habilitacao:'Habilitação',proposta:'Proposta',disputa:'Disputa',recurso:'Recurso',ganho:'Ganho',perdido:'Perdido',desistiu:'Desistiu'};
+ const pr=D.proc||{},emAnd=['preparando','habilitacao','proposta','disputa','recurso'].reduce((s,k)=>s+(pr[k]||0),0);
+ const u=D.ultima,sit=[];
+ if(D.sessoes7)sit.push(['w',`${D.sessoes7} sessão(ões) de processo nos próximos 7 dias`,"ir('processos')"]);
+ if(D.radar_novo)sit.push(['',`${n(D.radar_novo)} oportunidade(s) novas no radar para analisar`,"ir('radar')"]);
+ if(D.abertos7)sit.push(['w',`${n(D.abertos7)} edital(is) encerram em até 7 dias`,"ir('oportunidades')"]);
+ if(D.ia_pend)sit.push(['w',`${n(D.ia_pend)} edital(is) do radar aguardando classificação por IA`,"ir('coletas')"]);
+ if(u)sit.push([u.status==='ok'?'':'b',`Última coleta: ${esc(u.fonte)} · ${esc(u.status)} · há ${ago(u.em)}`,"ir('coletas')"]);
+ if(!sit.length)sit.push(['','Nenhuma pendência no momento',"ir('radar')"]);
+ main.innerHTML=`<div class="hero"><div><div class="hk">SISLICITA</div><div class="hs">Radar de licitações públicas</div></div><div class="hc"><div class="clk" id="clk">--:--</div><div class="dtx" id="dtx"></div></div>
+ <div class="hr"><div><b>${n(D.abertos)}</b><span>editais abertos</span></div><div><b>${n(D.abertos7)}</b><span>encerram em 7 dias</span></div><div><b>${brl(D.valor_aberto)}</b><span>valor estimado</span></div></div><button class="sm tvb" onclick="modoTV()">Modo TV</button></div>
+ <div class="kps">${KP('','No radar',n(D.radar),`${n(D.radar_novo)} novos`,"ir('radar')")}${KP(D.abertos7?'w':'','Encerram em 7 dias',n(D.abertos7),'editais abertos',"ir('oportunidades')")}${KP('','Classificados por IA',n(D.ia_feitos),`${n(D.ia_pend)} do radar pendentes`,"ir('coletas')")}${KP('','Linhas de PCA',n(D.pca),'previsão de compras',"ir('pca')")}${KP(emAnd?'ok':'','Processos em andamento',n(emAnd),`${D.sessoes7||0} sessão(ões) em 7 dias`,"ir('processos')")}${KP('ok','Comissão estimada',brl(est),`recebida: ${brl(rec)}`,"ir('comissoes')")}</div>
+ <div class="dg"><div class="card"><h3>Situação</h3><ul class="sit">${sit.map(x=>`<li onclick="${x[2]}"><i class="${x[0]}"></i><span>${x[1]}</span></li>`).join('')}</ul></div>
+ <div class="card"><h3>Encerramentos nos próximos 14 dias</h3><div class="cols14">${dd.map(x=>`<div class="c ${[0,6].includes(x.d.getDay())?'fds':''}"><b>${x.n||''}</b><i style="height:${Math.max(2,x.n/mxd*100)}%"></i><span>${String(x.d.getDate()).padStart(2,'0')}/${String(x.d.getMonth()+1).padStart(2,'0')}</span></div>`).join('')}</div></div>
+ <div class="card"><h3>Editais abertos por UF <span class="m">(clique para filtrar)</span></h3>${bars(D.por_uf||[],'uf','n',x=>`ir('oportunidades',{uf:'${x.uf}'})`)}</div>
+ <div class="card"><h3>Por categoria (IA)</h3>${bars(D.por_cat||[],'cat','n',null,'wide')}</div>
+ <div class="card"><h3>Perfis de busca <span class="m">(oportunidades no radar)</span></h3>${bars((D.por_perfil||[]).map(p=>({...p,nome:p.nome+' · média '+(p.media??'—')})),'nome','n',x=>`ir('radar',{perfil:'${x.id}'})`,'wide')}</div>
+ <div class="card"><h3>Funil de processos</h3><div class="funil">${Object.keys(PS).map(k=>`<div><b>${pr[k]||0}</b><span>${PS[k]}</span></div>`).join('')}</div></div></div>
  <h3 style="margin:6px 0 10px;font-size:15px">Melhores oportunidades abertas</h3>
- ${top.length?top.map(x=>{const o=x.oportunidades;return `<div class="card"><div class="row"><div><div class="t">${esc((o.objeto||'').slice(0,200))}</div><div class="m">${esc(o.orgao_nome)} · ${esc(o.uf)}</div><span class="tag ok">score ${x.score??'—'}</span><span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}</div><button class="sec sm" onclick="irPreco(this.dataset.t)" data-t="${esc((o.objeto||'').slice(0,80))}">Pesquisar preço</button></div></div>`}).join(''):'<div class="card vazio">Nenhuma oportunidade no radar ainda.</div>'}`;},
+ ${top.length?top.map(x=>cardOp(x.oportunidades,{score:x.score,perfil:x.perfis_busca?.nome,just:x.justificativa})).join(''):'<div class="card vazio">Nenhuma oportunidade no radar ainda.</div>'}`;
+ const tk=()=>{const c=$('#clk');if(!c)return;const d=new Date();c.textContent=d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});$('#dtx').textContent=d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});};
+ tk();clearInterval(window.__tk);window.__tk=setInterval(tk,15000);clearInterval(window.__h);window.__h=setInterval(()=>{if(tela==='home')V.home().catch(()=>{});},60000);},
 
 async precos(){
  main.innerHTML=`<div class="top"><div><h2>Pesquisa de preços</h2><p class="sub">Preços praticados em contratações públicas (Compras.gov.br): mínimo, mediana e média para embasar a proposta.</p></div></div>
@@ -122,35 +171,30 @@ async processos(){
  $('#fe').onchange=$('#fs2').onchange=listarProc;await listarProc();},
 
 async radar(){
+ const A0=window.ARG||{};window.ARG=null;
  const perfis=(await q(sb.from('perfis_busca').select('id,nome').order('nome'))).data;
  main.innerHTML=`<div class="top"><div><h2>Radar de oportunidades</h2><p class="sub">Editais e previsões que combinam com os seus perfis, ordenados por score.</p></div></div><div class="bar"><select id="fp"><option value="">Todos os perfis</option>${perfis.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select>
  <select id="fs"><option value="">Status (todos)</option>${opts(STATUS)}</select><select id="ff"><option value="">Edital + PCA</option><option value="e">Só editais</option><option value="p">Só PCA</option></select>
  <select id="fu"><option value="">UF (todas)</option>${opts(UFS)}</select><input id="fq" type="search" placeholder="Buscar no objeto…"></div><div id="lista"></div>`;
  const carregar=async()=>{
-  let r=sb.from('radar').select('id,score,status,observacoes,perfil_id,perfis_busca(nome),oportunidades(id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_catalogo_codigo,ia_catalogo_nome),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))').order('score',{ascending:false}).limit(120);
+  let r=sb.from('radar').select('id,score,status,justificativa,observacoes,perfil_id,perfis_busca(nome),oportunidades(id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))').order('score',{ascending:false}).limit(120);
   if($('#fp').value)r=r.eq('perfil_id',$('#fp').value);if($('#fs').value)r=r.eq('status',$('#fs').value);
   if($('#ff').value==='e')r=r.not('oportunidade_id','is',null);if($('#ff').value==='p')r=r.not('pca_item_id','is',null);
   let rows=(await q(r)).data;const uf=$('#fu').value,t=$('#fq').value.toLowerCase();
   rows=rows.filter(x=>{const o=x.oportunidades,p=x.pca_itens;const u=o?o.uf:p?.pca_planos?.uf;const tx=(o?o.objeto:p?.descricao||'').toLowerCase();return(!uf||u===uf)&&(!t||tx.includes(t));});
   $('#lista').innerHTML=rows.length?rows.map(x=>{const o=x.oportunidades,p=x.pca_itens;
-   const titulo=o?o.objeto:p?.descricao,org=o?o.orgao_nome:p?.pca_planos?.orgao_nome,uf=o?o.uf:p?.pca_planos?.uf;
-   return `<div class="card"><div class="row"><div><div class="t">${esc((titulo||'').slice(0,220))}</div><div class="m">${esc(org)} · ${esc(uf)}${o?' · '+esc(o.municipio||''):''}</div>${o?iaBox(o):''}
-   <span class="tag ${o?'':'w'}">${o?'Edital · '+esc(o.modalidade||''):'PCA · previsão'}</span><span class="tag">${esc(x.perfis_busca?.nome)}</span><span class="tag ok">score ${x.score??'—'}</span>
-   ${o?`<span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m"> encerra ${dt(o.data_fim_proposta)}</span>`:`<span class="tag">${brl(p?.valor_total)}</span><span class="m"> desejada ${dt(p?.data_desejada)}</span>`}
-   ${o?.link_pncp?` <a class="l" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">abrir no PNCP ↗</a>`:''} ${precoBtn(o,titulo)}${o?` <button class="sm" onclick="irProc(${o.id})">Iniciar processo</button>`:''}</div>
-   <select style="width:150px" onchange="mudarStatus(${x.id},this.value)">${opts(STATUS,x.status)}</select></div></div>`;}).join(''):'<div class="vazio">Nada por aqui ainda. Rode a coleta e o radar, ou ajuste os filtros.</div>';};
- ['fp','fs','ff','fu'].forEach(i=>$('#'+i).onchange=carregar);let tm;$('#fq').oninput=()=>{clearTimeout(tm);tm=setTimeout(carregar,300);};await carregar();},
+   return o?cardOp(o,{score:x.score,perfil:x.perfis_busca?.nome,just:x.justificativa,status:`<select onchange="mudarStatus(${x.id},this.value)">${opts(STATUS,x.status)}</select>`}):cardPca(p,x);}).join(''):'<div class="vazio">Nada por aqui ainda. Rode a coleta e o radar, ou ajuste os filtros.</div>';};
+ ['fp','fs','ff','fu'].forEach(i=>$('#'+i).onchange=carregar);let tm;$('#fq').oninput=()=>{clearTimeout(tm);tm=setTimeout(carregar,300);};if(A0.perfil)$('#fp').value=A0.perfil;await carregar();},
 
 async oportunidades(){
  main.innerHTML=`<div class="top"><div><h2>Editais abertos</h2><p class="sub">Todas as contratações com propostas abertas no PNCP.</p></div></div><div class="bar"><input id="fq" type="search" placeholder="Buscar no objeto (ex.: carne bovina)…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select>
  <input id="vmin" type="number" placeholder="Valor mín."><input id="vmax" type="number" placeholder="Valor máx."><label style="margin:0;align-self:center"><input id="ab" type="checkbox" checked style="width:auto"> só abertos</label><button onclick="pg=0;go()">Buscar</button></div><div id="lista"></div><div class="pg" id="pg"></div>`;
- window.pg=0;window.go=async()=>{const N=30;let r=sb.from('oportunidades').select('id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,situacao,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_catalogo_codigo,ia_catalogo_nome',{count:'exact'}).order('data_fim_proposta',{ascending:true}).range(pg*N,pg*N+N-1);
+ window.pg=0;window.go=async()=>{const N=30;let r=sb.from('oportunidades').select('id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,situacao,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome',{count:'exact'}).order('data_fim_proposta',{ascending:true}).range(pg*N,pg*N+N-1);
   const t=$('#fq').value.trim();if(t)r=r.textSearch('objeto_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)r=r.eq('uf',$('#fu').value);
   if($('#vmin').value)r=r.gte('valor_estimado',$('#vmin').value);if($('#vmax').value)r=r.lte('valor_estimado',$('#vmax').value);if($('#ab').checked)r=r.gte('data_fim_proposta',new Date().toISOString());
-  const {data,count}=await q(r);$('#lista').innerHTML=data.length?data.map(o=>`<div class="card"><div class="t">${esc((o.objeto||'').slice(0,240))}</div><div class="m">${esc(o.orgao_nome)} · ${esc(o.uf)} · ${esc(o.municipio||'')}</div>${iaBox(o)}
-  <span class="tag">${esc(o.modalidade)}</span><span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m"> encerra ${dt(o.data_fim_proposta)}</span> <a class="l" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">PNCP ↗</a> ${precoBtn(o,o.objeto)} <button class="sm" onclick="irProc(${o.id})">Iniciar processo</button></div>`).join(''):'<div class="vazio">Sem resultados.</div>';
+  const {data,count}=await q(r);$('#lista').innerHTML=data.length?data.map(o=>cardOp(o)).join(''):'<div class="vazio">Sem resultados.</div>';
   $('#pg').innerHTML=`<button class="sec" ${pg?'':'disabled'} onclick="pg--;go()">‹</button><span class="m">${count??0} resultados · pág. ${pg+1}</span><button class="sec" ${(pg+1)*N>=(count||0)?'disabled':''} onclick="pg++;go()">›</button>`;};
- $('#fq').onkeydown=e=>{if(e.key==='Enter'){pg=0;go();}};await go();},
+ $('#fq').onkeydown=e=>{if(e.key==='Enter'){pg=0;go();}};if(window.ARG&&window.ARG.uf){$('#fu').value=window.ARG.uf;window.ARG=null;}await go();},
 
 async pca(){
  main.innerHTML=`<div class="top"><div><h2>PCA — previsão de contratações</h2><p class="sub">Demanda planejada pelos órgãos, em todas as áreas. O resumo agrupa por categoria e mês; itens de valor alto aparecem em detalhe. É a chance de chegar antes do edital.</p></div></div><div class="bar"><input id="fq" type="search" placeholder="Filtrar categoria ou grupo (ex.: alimentos, informática)…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select><select id="ft"><option value="r">Resumo por categoria</option><option value="i">Itens de valor alto</option></select><button onclick="go()">Buscar</button></div><div id="lista"></div>`;
@@ -180,8 +224,9 @@ async comissoes(){
 
 async perfis(){
  const {data}=await q(sb.from('perfis_busca').select('*').order('nome'));const A=v=>(v||[]).join(', ');
- main.innerHTML=`<div class="top"><div><h2>Perfis de busca</h2><p class="sub">Defina o que procurar (palavras separadas por vírgula). Mudanças valem na próxima coleta.</p></div></div>
+ main.innerHTML=`<div class="top"><div><h2>Perfis de busca</h2><p class="sub">Filtros fixos (UF, valor, prazo, palavras) fazem a primeira peneira; o prompt de IA, opcional, dá nota aos editais que passarem. Mudanças valem na próxima coleta.</p></div></div>
  ${data.map(p=>`<div class="card" id="p${p.id}"><div class="row"><div class="t">${esc(p.nome)}</div><label style="margin:0"><input type="checkbox" style="width:auto" data-k="ativo" ${p.ativo?'checked':''}> ativo</label></div>
+ <label>Prompt de IA (opcional): descreva o que este perfil procura</label><textarea rows="3" data-k="prompt" placeholder="Ex.: empresa que vende carne congelada para churrasco, atende SP e MG, contratos de 50 a 500 mil; não quero merenda escolar">${esc(p.prompt||'')}</textarea>
  <div class="f2"><div><label>Palavras a incluir</label><textarea rows="2" data-k="palavras_incluir">${esc(A(p.palavras_incluir))}</textarea></div><div><label>Palavras a excluir</label><textarea rows="2" data-k="palavras_excluir">${esc(A(p.palavras_excluir))}</textarea></div>
  <div><label>UFs (vazio = todas)</label><input data-k="ufs" value="${esc(A(p.ufs))}"></div><div><label>Modalidades (vazio = todas)</label><input data-k="modalidades" value="${esc(A(p.modalidades))}"></div>
  <div><label>Valor mínimo</label><input type="number" data-k="valor_min" value="${p.valor_min??''}"></div><div><label>Valor máximo</label><input type="number" data-k="valor_max" value="${p.valor_max??''}"></div>
@@ -199,8 +244,13 @@ async coletas(){
 
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
 const irPreco=t=>ir('precos',t);
-const iaBox=o=>o.ia_resumo?`<div class="m" style="margin:4px 0">🤖 ${esc(o.ia_resumo)}</div>${o.ia_categoria?`<span class="tag">${esc(o.ia_categoria)}</span>`:''}${o.ia_atencao?`<span class="tag w">${esc(o.ia_atencao)}</span>`:''}`:'';
-const precoBtn=(o,t)=>{const ok=o&&o.ia_catalogo_codigo;const a=ok?`onclick="irPreco({tipo:'${o.ia_tipo}',codigo:'${o.ia_catalogo_codigo}',nome:this.dataset.n})" data-n="${esc(o.ia_catalogo_nome)}" title="Item sugerido pela IA"`:`onclick="irPreco(this.dataset.t)" data-t="${esc((t||'').slice(0,80))}"`;return `<button class="sec sm" style="margin-left:8px" ${a}>Pesquisar preço${ok?' ✦':''}</button>`;};
+const precoBtn=(o,t)=>{const ok=o&&o.ia_catalogo_codigo;const a=ok?`onclick="irPreco({tipo:'${o.ia_tipo}',codigo:'${o.ia_catalogo_codigo}',nome:this.dataset.n})" data-n="${esc(o.ia_catalogo_nome)}" title="Item sugerido pela IA: ${esc(o.ia_catalogo_nome)}"`:`onclick="irPreco(this.dataset.t)" data-t="${esc((o&&o.ia_termo?o.ia_termo:(t||'')).slice(0,80))}"`;return `<button class="sec sm" ${a}>Pesquisar preço${ok?' ✦':''}</button>`;};
+const cardOp=(o,ex={})=>`<div class="card oc"><div><div class="h" title="${esc(o.objeto||'')}">${esc(o.objeto||'')}</div><div class="meta">${esc(o.orgao_nome||'')} · ${esc(o.municipio?o.municipio+'/':'')}${esc(o.uf||'')}${o.modalidade?' · '+esc(o.modalidade):''}</div>
+ ${o.ia_resumo?`<div class="ia"><b>IA</b>${esc(o.ia_resumo)}</div>`:''}
+ <div class="tags">${ex.score!=null?`<span class="tag ok">score ${ex.score}</span>`:''}${ex.perfil?`<span class="tag">${esc(ex.perfil)}</span>`:''}${o.ia_categoria?`<span class="tag">${esc(o.ia_categoria)}</span>`:''}<span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m">encerra ${dt(o.data_fim_proposta)}</span>${o.ia_atencao?`<span class="tag w">${esc(o.ia_atencao)}</span>`:''}</div>
+ ${ex.just?`<div class="m just">${esc(ex.just)}</div>`:''}</div>
+ <div class="acts">${ex.status||''}${precoBtn(o,o.objeto)}<button class="sm" onclick="irProc(${o.id})">Iniciar processo</button>${o.link_pncp?`<a class="l" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">abrir no PNCP ↗</a>`:''}</div></div>`;
+const cardPca=(p,x)=>`<div class="card oc"><div><div class="h">${esc(p?.descricao||'')}</div><div class="meta">${esc(p?.pca_planos?.orgao_nome||'')} · ${esc(p?.pca_planos?.uf||'')}</div><div class="tags"><span class="tag w">PCA · previsão</span><span class="tag ok">score ${x.score??'—'}</span><span class="tag">${esc(x.perfis_busca?.nome||'')}</span><span class="tag">${brl(p?.valor_total)}</span><span class="m">desejada ${dt(p?.data_desejada)}</span></div></div><div class="acts"><select onchange="mudarStatus(${x.id},this.value)">${opts(STATUS,x.status)}</select><button class="sec sm" onclick="irPreco(this.dataset.t)" data-t="${esc((p?.descricao||'').slice(0,80))}">Pesquisar preço</button></div></div>`;
 async function buscarCat(){
  const t=norm($('#pq').value).replace(/[^A-Z0-9 ]/g,' ').trim();if(!t)return;
  let r=sb.from('catalogo').select('tipo,codigo,nome,grupo,classe').eq('tipo',$('#pt').value).limit(25);
@@ -265,7 +315,7 @@ async function updCom(id,v){const {data:c,error}=await sb.from('contratos_comiss
 async function novaCom(){if(!$('#cn').value)return alert('Informe a empresa');const bv=$('#cv').value===''?null:Number($('#cv').value),p=Number($('#cp').value||1);
  const {error}=await sb.from('contratos_comissao').insert({empresa_nome:$('#cn').value,empresa_cnpj:$('#cc').value||null,base_tipo:$('#cb').value,base_valor:bv,percentual:p,valor_estimado_comissao:bv==null?null:bv*p/100});if(error)alert(error.message);else ir('comissoes');}
 async function salvarPerfil(id){const c=$('#p'+id);const arr=v=>v.split(',').map(s=>s.trim()).filter(Boolean),num=v=>v===''?null:Number(v);const g=k=>c.querySelector(`[data-k=${k}]`);
- const v={ativo:g('ativo').checked,palavras_incluir:arr(g('palavras_incluir').value),palavras_excluir:arr(g('palavras_excluir').value),ufs:arr(g('ufs').value.toUpperCase()),modalidades:arr(g('modalidades').value),valor_min:num(g('valor_min').value),valor_max:num(g('valor_max').value),dias_min_abertura:Number(g('dias_min_abertura').value),score_minimo:Number(g('score_minimo').value)};
+ const v={ativo:g('ativo').checked,palavras_incluir:arr(g('palavras_incluir').value),palavras_excluir:arr(g('palavras_excluir').value),ufs:arr(g('ufs').value.toUpperCase()),modalidades:arr(g('modalidades').value),valor_min:num(g('valor_min').value),valor_max:num(g('valor_max').value),dias_min_abertura:Number(g('dias_min_abertura').value),score_minimo:Number(g('score_minimo').value),prompt:g('prompt').value.trim()||null};
  const {error}=await sb.from('perfis_busca').update(v).eq('id',id);alert(error?error.message:'Perfil salvo.');}
 async function novoPerfil(){const n=prompt('Nome do novo perfil:');if(!n)return;const {error}=await sb.from('perfis_busca').insert({nome:n});if(error)alert(error.message);else ir('perfis');}
 $('#lg').innerHTML=$('#lg2').innerHTML=svg('doc');$('#lg').firstChild.style.cssText=$('#lg2').firstChild.style.cssText='width:22px;height:22px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round';
