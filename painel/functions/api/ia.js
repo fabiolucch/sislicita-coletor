@@ -67,6 +67,20 @@ export async function onRequestPost({ request, env }) {
       const prompt = `Explique para um consultor, em até 6 tópicos curtos, os principais riscos e pontos de atenção desta licitação para um fornecedor (prazos, exigências, garantias, amostra, pagamento, direcionamento). Se não houver dados suficientes, diga o que verificar no edital. Responda SOMENTE JSON: {"nivel":"alto|medio|baixo|indefinido","topicos":["..."]}\n${ctx}`;
       return J({ ok: true, ...(await gemini(env, prompt, true)) });
     }
+    if (b.acao === "pergunta") {
+      const perg = String(b.pergunta || "").slice(0, 500).trim();
+      if (!perg) return J({ erro: "escreva a pergunta" }, 400);
+      const [tx] = await get(`edital_textos?oportunidade_id=eq.${id}&select=texto,arquivo`);
+      if (!tx?.texto) return J({ erro: "o texto deste edital ainda não foi baixado (roda na etapa docs da coleta)" }, 404);
+      const prompt = `Responda à pergunta de um consultor de licitações usando SOMENTE o texto do edital abaixo. Seja direto (até 6 frases), cite o item/cláusula quando houver e diga claramente se o edital não trata do assunto. Não dê parecer jurídico definitivo.\nResponda SOMENTE JSON: {"resposta":"","trechos":["citações curtas (até 200 caracteres) do edital que sustentam a resposta"],"encontrado":true}\nPERGUNTA: ${perg}\n\nEDITAL (${tx.arquivo || ""}):\n${tx.texto.slice(0, 120000)}`;
+      return J({ ok: true, ...(await gemini(env, prompt, true)) });
+    }
+    if (b.acao === "proposta") {
+      const [emp] = b.empresa_id ? await get(`empresas?id=eq.${parseInt(b.empresa_id, 10)}&select=*`) : [];
+      const itens = await get(`oportunidade_itens?oportunidade_id=eq.${id}&select=numero_item,descricao,quantidade,unidade,valor_unitario&order=numero_item&limit=40`);
+      const prompt = `Monte um RASCUNHO de kit de proposta para esta licitação, em português do Brasil, para a empresa abaixo. Use campos entre colchetes para o que a empresa precisa preencher (ex.: [preço unitário], [marca]). Não invente preços. Inclua:\n1) Proposta comercial (identificação da empresa, órgão, número do processo se houver, tabela de itens com quantidade e unidade, validade da proposta de 60 dias ou a exigida no edital, prazo de entrega e condições de pagamento conforme o edital, local, data e assinatura).\n2) Declarações usuais da Lei 14.133/2021 que o edital costuma pedir (cumprimento dos requisitos de habilitação, inexistência de fato impeditivo, não emprego de menor (art. 7º, XXXIII, CF), enquadramento ME/EPP se aplicável, reserva de cargos para PCD e reabilitados, cumprimento das normas de saúde e segurança). Avise que a lista final deve ser conferida no edital.\nResponda SOMENTE JSON: {"proposta":"texto em markdown","declaracoes":"texto em markdown","conferir":["pontos do edital a confirmar antes de enviar"]}\n${ctx}\nEMPRESA: ${JSON.stringify(emp || {}).slice(0, 1000)}\nITENS: ${JSON.stringify(itens).slice(0, 5000)}`;
+      return J({ ok: true, ...(await gemini(env, prompt, true)) });
+    }
     return J({ erro: "ação inválida" }, 400);
   } catch (e) {
     return J({ erro: String(e.message || e) }, 502);
