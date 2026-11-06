@@ -1354,6 +1354,23 @@ def alertas():
     return enviados
 
 
+def notificar_fim(modo, resumo, segundos):
+    """Avisa no Telegram que a coleta terminou (se o bot ja estiver configurado e com chat vinculado)."""
+    if not TG:
+        return
+    chat = tg_chat()
+    if not chat:
+        return
+    ok = [f"✅ {h(n)}: {q} registro(s)" for n, q, erro in resumo if erro is None]
+    ko = [f"❌ {h(n)}: {h(erro)}" for n, q, erro in resumo if erro is not None]
+    mins = round(segundos / 60, 1)
+    rotulo = "coleta completa" if modo == "tudo" else h(modo.replace(",", ", "))
+    texto = f"🏁 <b>Coleta concluída</b> · {rotulo} · {mins} min\n" + ("\n".join(ok) if ok else "(nenhuma etapa concluida)")
+    if ko:
+        texto += "\n\n<b>Com erro:</b>\n" + "\n".join(ko)
+    tg(chat, texto)
+
+
 ETAPAS = {"editais": editais, "pca": pca, "radar": radar, "ia": ia, "radar_ia": radar_ia, "itens": itens,
           "vigia": vigia, "docs": docs, "radar_pca_ia": radar_pca_ia, "briefing": briefing, "aprender": aprender,
           "alertas": alertas, "contratos": contratos, "resultados": resultados, "fornecedores": fornecedores}
@@ -1364,14 +1381,22 @@ if __name__ == "__main__":
     etapas = list(ETAPAS) if modo == "tudo" else [m.strip() for m in modo.split(",") if m.strip()]  # aceita varias: "contratos,resultados"
     ETAPAS = {**ETAPAS, **EXTRAS}
     falhou = False
+    resumo = []
+    inicio = time.time()
     for nome in etapas:
         id_ = log_inicio(nome)
         try:
             n = ETAPAS[nome]()
             log_fim(id_, n, "ok")
             print(f"[{nome}] ok: {n} registros")
+            resumo.append((nome, n, None))
         except Exception as e:  # registra e segue para a proxima etapa
             falhou = True
             log_fim(id_, 0, "erro", str(e)[:500])
             print(f"[{nome}] ERRO: {e}", file=sys.stderr)
+            resumo.append((nome, 0, str(e)[:200]))
+    try:
+        notificar_fim(modo, resumo, time.time() - inicio)
+    except Exception as e:
+        print(f"[fim] aviso no Telegram falhou: {e}", file=sys.stderr)
     sys.exit(1 if falhou else 0)
