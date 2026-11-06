@@ -322,8 +322,132 @@ def catalogo():
     return total
 
 
+# ------------------------------------------------------------------ ia (Gemini)
+GEM = "https://generativelanguage.googleapis.com/v1beta"
+GKEY = os.getenv("GEMINI_API_KEY", "")
+GMODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+MAX_IA = int(os.getenv("MAX_IA", "300"))
+LOTE_IA = int(os.getenv("LOTE_IA", "15"))
+PAUSA_IA = float(os.getenv("PAUSA_IA", "7"))
+
+PROMPT_IA = """Voce analisa objetos de licitacoes publicas brasileiras para uma consultoria que assessora empresas fornecedoras.
+Para CADA item abaixo devolva um objeto JSON com:
+- id: o mesmo id recebido
+- tipo: "M" (fornecimento de material/bem), "S" (servico comum) ou "O" (obra, engenharia ou outro)
+- categoria: area em 1 a 3 palavras (ex.: alimentos, informatica, limpeza, saude, veiculos)
+- termo_catalogo: nome generico e curto do principal item ou servico, como aparece em catalogos de compras (ex.: CARNE BOVINA, CADEIRA ESCRITORIO, SERVICO DE LIMPEZA); vazio se nao der para identificar
+- resumo: no maximo 2 frases simples dizendo o que o orgao quer comprar, sem inventar nada que nao esteja no texto
+- atencao: ponto de atencao para um fornecedor que seja visivel no texto (ex.: registro de precos, credenciamento, exige amostra, lote unico) ou vazio
+Responda SOMENTE com um array JSON, sem texto extra.
+
+ITENS:
+"""
+
+
+def gemini(prompt, modelo):
+    url = f"{GEM}/models/{modelo}:generateContent"
+    corpo = {"contents": [{"parts": [{"text": prompt}]}],
+             "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json"}}
+    for espera in (0, 30, 60, 120):
+        time.sleep(espera)
+        r = requests.post(url, headers={"x-goog-api-key": GKEY, "Content-Type": "application/json"},
+                          data=json.dumps(corpo), timeout=120)
+        if r.status_code == 429 or r.status_code >= 500:
+            print(f"[ia] HTTP {r.status_code}, aguardando...", flush=True)
+            continue
+        if r.status_code >= 300:
+            raise RuntimeError(f"gemini {r.status_code}: {r.text[:300]}")
+        j = r.json()
+        try:
+            return json.loads(j["candidates"][0]["content"]["parts"][0]["text"])
+        except Exception:
+            raise RuntimeError("gemini: resposta fora do formato: " + json.dumps(j)[:300])
+    return None  # limite esgotado
+
+
+def escolher_modelo():
+    r = requests.get(f"{GEM}/models", headers={"x-goog-api-key": GKEY}, params={"pageSize": 200}, timeout=60)
+    if r.status_code >= 300:
+        raise RuntimeError(f"gemini models {r.status_code}: {r.text[:200]}")
+    nomes = [m["name"].split("/")[-1] for m in r.json().get("models", [])
+             if "generateContent" in m.get("supportedGenerationMethods", []) and "flash-lite" in m["name"]
+             and "preview" not in m["name"] and "tts" not in m["name"]]
+    if not nomes:
+        raise RuntimeError("nenhum modelo flash-lite encontrado para a chave")
+    return sorted(nomes)[-1]
+
+
+def casar_catalogo(tipo, termo):
+    palavras = [w for w in re.sub(r"[^A-Z0-9 ]", " ", norm(termo or "").upper()).split() if len(w) > 2]
+    for n in (len(palavras), 2):
+        usa = palavras[:n]
+        if not usa:
+            return None
+        filtros = [("nome_busca", "ilike.*" + w + "*") for w in usa]
+        r = requests.get(f"{SB}/catalogo", headers=HDR, timeout=60,
+                         params=[("select", "codigo,nome"), ("tipo", "eq." + tipo), ("limit", "30")] + filtros)
+        if r.status_code < 300 and r.json():
+            return sorted(r.json(), key=lambda x: len(x["nome"]))[0]
+    return None
+
+
+def ia():
+    global GMODEL
+    if not GKEY:
+        raise RuntimeError("GEMINI_API_KEY nao configurada")
+    r = requests.get(f"{SB}/radar", headers=HDR, timeout=120, params={
+        "select": "oportunidade_id,oportunidades(id,objeto,ia_processado_em,data_fim_proposta)",
+        "oportunidade_id": "not.is.null", "limit": "5000"})
+    r.raise_for_status()
+    agora = datetime.now(timezone.utc).isoformat()
+    vistos, fila = set(), []
+    for x in r.json():
+        o = x.get("oportunidades")
+        if o and o["id"] not in vistos and not o.get("ia_processado_em") and (o.get("data_fim_proposta") or "") >= agora:
+            vistos.add(o["id"])
+            fila.append(o)
+    print(f"[ia] pendentes no radar: {len(fila)}; processando ate {MAX_IA}", flush=True)
+    fila = fila[:MAX_IA]
+    feitos = 0
+    for i in range(0, len(fila), LOTE_IA):
+        lote = fila[i:i + LOTE_IA]
+        texto = PROMPT_IA + "\n".join(f"[{o['id']}] {(o['objeto'] or '')[:700]}" for o in lote)
+        try:
+            res = gemini(texto, GMODEL)
+        except RuntimeError as e:
+            if " 404" in str(e) and i == 0:
+                GMODEL = escolher_modelo()
+                print(f"[ia] modelo padrao indisponivel; usando {GMODEL}", flush=True)
+                res = gemini(texto, GMODEL)
+            else:
+                raise
+        if res is None:
+            print("[ia] limite de uso atingido; encerrando por hoje", flush=True)
+            break
+        por_id = {str(x.get("id")): x for x in res if isinstance(x, dict)}
+        for o in lote:
+            x = por_id.get(str(o["id"]))
+            if not x:
+                continue
+            tipo = x.get("tipo") if x.get("tipo") in ("M", "S", "O") else "O"
+            cat = casar_catalogo(tipo, x.get("termo_catalogo")) if tipo in ("M", "S") else None
+            patch = {"ia_categoria": (x.get("categoria") or "")[:60], "ia_resumo": (x.get("resumo") or "")[:600],
+                     "ia_tipo": tipo, "ia_termo": (x.get("termo_catalogo") or "")[:120],
+                     "ia_atencao": (x.get("atencao") or "")[:300],
+                     "ia_catalogo_codigo": cat["codigo"] if cat else None, "ia_catalogo_nome": cat["nome"] if cat else None,
+                     "ia_processado_em": agora}
+            rr = requests.patch(f"{SB}/oportunidades", headers={**HDR, "Prefer": "return=minimal"},
+                                params={"id": "eq." + str(o["id"])}, data=json.dumps(patch), timeout=60)
+            if rr.status_code >= 300:
+                raise RuntimeError(f"ia patch: {rr.status_code} {rr.text[:200]}")
+            feitos += 1
+        print(f"[ia] {feitos}/{len(fila)} (modelo {GMODEL})", flush=True)
+        time.sleep(PAUSA_IA)
+    return feitos
+
+
 ETAPAS = {"editais": editais, "pca": pca, "radar": radar}
-EXTRAS = {"catalogo": catalogo}
+EXTRAS = {"catalogo": catalogo, "ia": ia}
 
 if __name__ == "__main__":
     modo = sys.argv[1] if len(sys.argv) > 1 else "tudo"
