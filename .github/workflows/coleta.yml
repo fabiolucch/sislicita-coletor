@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       modo:
-        description: "editais, pca, radar, catalogo, ia ou tudo"
+        description: "editais, pca, radar, catalogo, ia, radar_ia, itens, docs, radar_pca_ia, briefing, aprender ou tudo"
         default: "tudo"
       max_ia:
         description: "maximo de editais para a IA classificar"
@@ -21,7 +21,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install requests
+      - run: pip install requests pypdf
       - run: python coletor.py "$MODO"
         env:
           MODO: ${{ github.event.inputs.modo || 'tudo' }}

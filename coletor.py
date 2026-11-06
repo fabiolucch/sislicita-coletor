@@ -5,12 +5,14 @@ Variaveis: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (obrigatorias).
 Opcionais: MODALIDADES, WORKERS, ANOS_PCA, MAX_PLANOS, PCA_PAGINA.
 """
 import concurrent.futures as cf
+import io
 import json
 import os
 import re
 import sys
 import time
 import unicodedata
+import zipfile
 from datetime import datetime, timedelta, timezone
 
 import requests
@@ -186,7 +188,7 @@ def planos():
     return total
 
 
-PCA_VALOR_MIN = float(os.getenv("PCA_VALOR_MIN", "100000"))
+PCA_VALOR_MIN = float(os.getenv("PCA_VALOR_MIN", "30000"))
 
 
 def processar_plano(plano):
@@ -583,7 +585,7 @@ def radar_ia():
                     requests.patch(f"{SB}/radar", headers={**HDR, "Prefer": "return=minimal"}, timeout=60,
                                    params={"perfil_id": "eq." + p["id"], "oportunidade_id": "eq." + str(o["id"]),
                                            "status": "eq.novo"},
-                                   data=json.dumps({"status": "descartado", "score": sc, "justificativa": just}))
+                                   data=json.dumps({"status": "descartado", "score": sc, "justificativa": just, "observacoes": "auto-ia"}))
             if aval:
                 upsert("avaliacoes_ia", aval, "perfil_id,oportunidade_id")
             if novos:
@@ -601,7 +603,417 @@ def radar_ia():
     return total
 
 
-ETAPAS = {"editais": editais, "pca": pca, "radar": radar, "ia": ia, "radar_ia": radar_ia}
+# ------------------------------------------------------------------ itens e documentos dos editais (PNCP)
+MAX_ITENS = int(os.getenv("MAX_ITENS", "400"))
+MAX_DOCS = int(os.getenv("MAX_DOCS", "40"))
+PNCP_ARQ = "https://pncp.gov.br/pncp-api/v1"
+MAX_TEXTO = 150000          # caracteres guardados por edital
+MAX_PROMPT_TEXTO = 60000    # caracteres enviados ao Gemini
+
+
+def chave_pncp(o):
+    m = re.match(r"^(\d{14})-\d+-(\d+)/(\d{4})$", o.get("numero_controle_pncp") or "")
+    return (m.group(1), m.group(3), int(m.group(2))) if m else None
+
+
+def radar_abertos(campos):
+    """Editais abertos que estao no radar (sem repeticao), do maior para o menor score."""
+    r = requests.get(f"{SB}/radar", headers=HDR, timeout=120, params={
+        "select": "score,oportunidades(" + campos + ")", "oportunidade_id": "not.is.null",
+        "status": "neq.descartado", "order": "score.desc", "limit": "5000"})
+    r.raise_for_status()
+    agora = datetime.now(timezone.utc).isoformat()
+    vistos, saida = set(), []
+    for x in r.json():
+        o = x.get("oportunidades")
+        if o and o["id"] not in vistos and (o.get("data_fim_proposta") or "") >= agora:
+            vistos.add(o["id"])
+            saida.append(o)
+    return saida
+
+
+def itens():
+    fila = [o for o in radar_abertos("id,numero_controle_pncp,data_fim_proposta,itens_em") if not o.get("itens_em")][:MAX_ITENS]
+    print(f"[itens] {len(fila)} editais para ler os itens", flush=True)
+
+    def um(o):
+        try:
+            k = chave_pncp(o)
+            if not k:
+                return o, []
+            lista = get(f"{PNCP}/pncp/v1/orgaos/{k[0]}/compras/{k[1]}/{k[2]}/itens",
+                        params={"pagina": 1, "tamanhoPagina": 200}) or []
+            rows = []
+            for i, x in enumerate(lista, 1):
+                rows.append({"oportunidade_id": o["id"], "numero_item": i, "descricao": (x.get("descricao") or "")[:600],
+                             "tipo": x.get("materialOuServico"), "quantidade": x.get("quantidade"),
+                             "unidade": x.get("unidadeMedida"), "valor_unitario": x.get("valorUnitarioEstimado"),
+                             "valor_total": x.get("valorTotal"), "criterio": x.get("criterioJulgamentoNome"),
+                             "beneficio": x.get("tipoBeneficioNome"), "sigiloso": x.get("orcamentoSigiloso"),
+                             "situacao": x.get("situacaoCompraItemNome")})
+            return o, rows
+        except Exception as e:  # noqa: BLE001
+            print(f"[itens] falha em {o.get('id')}: {e}", flush=True)
+            return o, None
+
+    total = 0
+    with cf.ThreadPoolExecutor(WORKERS) as ex:
+        for o, rows in ex.map(um, fila):
+            if rows is None:
+                continue
+            if rows:
+                total += upsert("oportunidade_itens", rows, "oportunidade_id,numero_item")
+            requests.patch(f"{SB}/oportunidades", params={"id": f"eq.{o['id']}"}, headers=HDR, timeout=60,
+                           data=json.dumps({"itens_em": datetime.now(timezone.utc).isoformat()}))
+    return total
+
+
+def baixar(url, limite=30_000_000):
+    r = requests.get(url, headers=UA, timeout=180, stream=True)
+    if r.status_code != 200:
+        return None
+    buf = bytearray()
+    for ch in r.iter_content(1 << 16):
+        buf += ch
+        if len(buf) > limite:
+            return None
+    return bytes(buf)
+
+
+def texto_pdf(b):
+    from pypdf import PdfReader
+    rd = PdfReader(io.BytesIO(b))
+    partes = []
+    for pg in rd.pages[:150]:
+        try:
+            partes.append(pg.extract_text() or "")
+        except Exception:  # noqa: BLE001
+            partes.append("")
+    return "\n".join(partes), len(rd.pages)
+
+
+def texto_docx(b):
+    with zipfile.ZipFile(io.BytesIO(b)) as z:
+        xml = z.read("word/document.xml").decode("utf-8", "ignore")
+    return re.sub(r"<[^>]+>", "", xml.replace("</w:p>", "\n")), 0
+
+
+def extrair(nome, b):
+    n = (nome or "").lower()
+    try:
+        if b[:4] == b"%PDF" or n.endswith(".pdf"):
+            return texto_pdf(b)
+        if n.endswith(".docx"):
+            return texto_docx(b)
+        if n.endswith((".txt", ".htm", ".html")):
+            return b.decode("utf-8", "ignore"), 0
+    except Exception as e:  # noqa: BLE001
+        print(f"[docs] nao consegui ler {nome}: {e}", flush=True)
+    return "", 0
+
+
+def pontos_nome(n):
+    n = norm(n)
+    return (3 if "edital" in n else 0) + (2 if "termo" in n or "referencia" in n else 0) + (1 if "anexo" in n else 0)
+
+
+def texto_do_edital(k):
+    """Baixa os arquivos do edital (Edital e Termo de Referencia) e devolve (texto, nomes, paginas)."""
+    arqs = get(f"{PNCP}/pncp/v1/orgaos/{k[0]}/compras/{k[1]}/{k[2]}/arquivos") or []
+    pref = [a for a in arqs if a.get("statusAtivo", True) and norm(a.get("tipoDocumentoNome") or "") in ("edital", "termo de referencia", "projeto basico")]
+    pref.sort(key=lambda a: 0 if norm(a.get("tipoDocumentoNome") or "") == "edital" else 1)
+    partes, nomes, pags = [], [], 0
+    for a in pref[:3]:
+        url = a.get("url") or a.get("uri")
+        b = baixar(url) if url else None
+        if not b:
+            continue
+        if b[:2] == b"PK" and not (a.get("titulo") or "").lower().endswith(".docx"):
+            try:
+                with zipfile.ZipFile(io.BytesIO(b)) as z:
+                    ents = sorted([i for i in z.infolist() if i.filename.lower().endswith((".pdf", ".docx", ".txt"))],
+                                  key=lambda i: -pontos_nome(i.filename))[:4]
+                    for i in ents:
+                        t, p = extrair(i.filename, z.read(i))
+                        if t.strip():
+                            partes.append(t)
+                            nomes.append(i.filename)
+                            pags += p
+            except zipfile.BadZipFile:
+                pass
+        else:
+            t, p = extrair(a.get("titulo"), b)
+            if t.strip():
+                partes.append(t)
+                nomes.append(a.get("titulo") or "")
+                pags += p
+        if sum(len(x) for x in partes) > MAX_TEXTO:
+            break
+    return "\n\n".join(partes)[:MAX_TEXTO], "; ".join(nomes)[:300], pags
+
+
+PROMPT_DOC = """Voce analisa editais de licitacao publica brasileira para uma consultoria que ajuda empresas fornecedoras a participar.
+Leia o texto abaixo e responda SOMENTE com um objeto JSON com estes campos (use null ou lista vazia quando nao constar no texto; nao invente):
+{
+ "resumo": "ate 3 frases: o que se contrata, criterio de julgamento e principais condicoes",
+ "habilitacao": {"juridica": [], "fiscal_trabalhista": [], "tecnica": [], "economico_financeira": []},
+ "exige_amostra": true ou false, "exige_visita_tecnica": true ou false, "exclusivo_me_epp": true ou false,
+ "criterio_julgamento": "", "prazo_entrega": "", "local_entrega": "", "vigencia": "", "garantia": "", "pagamento": "",
+ "riscos": [{"nivel": "alto" ou "medio" ou "baixo", "tema": "", "descricao": ""}],
+ "risco_geral": numero de 0 a 100 (100 = muito arriscado ou restritivo para um fornecedor)
+}
+Cada item de habilitacao deve ser curto (ate 120 caracteres), por exemplo "Atestado de capacidade tecnica compativel com o objeto".
+Em riscos considere prazo de entrega curto, exigencia desproporcional, amostra, garantia alta, pagamento longo, possivel direcionamento e multas elevadas.
+Se o texto for apenas o objeto resumido, analise so o que ele permite e deixe o resto vazio.
+
+TEXTO:
+"""
+
+
+def docs():
+    if not GKEY:
+        raise RuntimeError("GEMINI_API_KEY nao configurada")
+    fila = [o for o in radar_abertos("id,numero_controle_pncp,data_fim_proposta,analise_em,objeto") if not o.get("analise_em")][:MAX_DOCS]
+    print(f"[docs] {len(fila)} editais para analisar", flush=True)
+    feitos = 0
+    for o in fila:
+        texto, arquivo, pags = "", "", 0
+        try:
+            k = chave_pncp(o)
+            if k:
+                texto, arquivo, pags = texto_do_edital(k)
+        except Exception as e:  # noqa: BLE001
+            print(f"[docs] falha ao baixar {o['id']}: {e}", flush=True)
+        fonte = "edital" if len(texto) > 800 else "objeto"
+        if fonte == "edital":
+            upsert("edital_textos", [{"oportunidade_id": o["id"], "arquivo": arquivo, "paginas": pags, "texto": texto}], "oportunidade_id")
+            entrada = texto[:MAX_PROMPT_TEXTO]
+        else:
+            entrada = "OBJETO: " + (o.get("objeto") or "")[:2000]
+        try:
+            res = gemini_auto(PROMPT_DOC + entrada)
+        except RuntimeError as e:
+            print(f"[docs] IA falhou em {o['id']}: {e}", flush=True)
+            res = {}
+        if res is None:
+            print("[docs] limite de uso atingido; encerrando por hoje", flush=True)
+            break
+        if isinstance(res, list):
+            res = res[0] if res and isinstance(res[0], dict) else {}
+        try:
+            risco = max(0, min(100, int(float(res.get("risco_geral")))))
+        except (TypeError, ValueError):
+            risco = None
+        if res:
+            upsert("edital_analise", [{"oportunidade_id": o["id"], "dados": res, "risco": risco,
+                                       "resumo": (res.get("resumo") or "")[:700], "fonte": fonte}], "oportunidade_id")
+            feitos += 1
+        requests.patch(f"{SB}/oportunidades", params={"id": f"eq.{o['id']}"}, headers=HDR, timeout=60,
+                       data=json.dumps({"analise_em": datetime.now(timezone.utc).isoformat()}))
+        print(f"[docs] {feitos}/{len(fila)} (fonte {fonte}, {len(texto)} caracteres)", flush=True)
+        time.sleep(PAUSA_IA)
+    return feitos
+
+
+# ------------------------------------------------------------------ radar do PCA por prompt de IA
+MAX_PCA_IA = int(os.getenv("MAX_PCA_IA", "150"))
+
+
+def radar_pca_ia():
+    if not GKEY:
+        raise RuntimeError("GEMINI_API_KEY nao configurada")
+    r = requests.get(f"{SB}/perfis_busca", headers=HDR, timeout=60, params={"select": "*", "ativo": "eq.true"})
+    r.raise_for_status()
+    perfis = [p for p in r.json() if (p.get("prompt") or "").strip() and "pca" in (p.get("fontes") or [])]
+    restante, total = MAX_PCA_IA, 0
+    hoje = datetime.now(timezone.utc).date().isoformat()
+    for p in perfis:
+        if restante <= 0:
+            break
+        params = {"select": "id,descricao,valor_total,data_desejada,pca_planos!inner(uf,orgao_nome)",
+                  "or": f"(data_desejada.is.null,data_desejada.gte.{hoje})", "order": "valor_total.desc.nullslast", "limit": "5000"}
+        if p.get("ufs"):
+            params["pca_planos.uf"] = "in.(" + ",".join(p["ufs"]) + ")"
+        rr = requests.get(f"{SB}/pca_itens", headers=HDR, params=params, timeout=180)
+        rr.raise_for_status()
+        av = requests.get(f"{SB}/avaliacoes_pca", headers=HDR, timeout=120,
+                          params={"select": "pca_item_id", "perfil_id": "eq." + p["id"], "limit": "100000"})
+        av.raise_for_status()
+        ja = {x["pca_item_id"] for x in av.json()}
+        excl = [norm(w) for w in (p.get("palavras_excluir") or []) if w]
+        incl = [norm(w) for w in (p.get("palavras_incluir") or []) if w]
+        fila = []
+        for i in rr.json():
+            if i["id"] in ja:
+                continue
+            v = i.get("valor_total")
+            if v is not None and ((p.get("valor_min") is not None and v < p["valor_min"]) or (p.get("valor_max") is not None and v > p["valor_max"])):
+                continue
+            txt = norm(i.get("descricao"))
+            if any(w in txt for w in excl):
+                continue
+            i["_pri"] = 0 if any(w in txt for w in incl) else 1
+            fila.append(i)
+        fila.sort(key=lambda i: i["_pri"])
+        fila = fila[:restante]
+        restante -= len(fila)
+        minimo = p.get("score_minimo") or 60
+        print(f"[radar_pca_ia] {p['nome']}: {len(fila)} itens a avaliar", flush=True)
+        for n in range(0, len(fila), LOTE_RIA):
+            lote = fila[n:n + LOTE_RIA]
+            linhas = [f"[{i['id']}] ({(i.get('pca_planos') or {}).get('uf')}; R$ {i.get('valor_total') or 0:,.0f}) {(i.get('descricao') or '')[:400]}" for i in lote]
+            res = gemini_auto(PROMPT_RIA.replace("{perfil}", p["prompt"].strip()[:1500]).replace("licitacao abaixo", "item de plano de contratacao abaixo") + "\n".join(linhas))
+            if res is None:
+                print("[radar_pca_ia] limite de uso atingido", flush=True)
+                return total
+            por = {str(x.get("id")): x for x in res if isinstance(x, dict)}
+            aval, novos = [], []
+            for i in lote:
+                x = por.get(str(i["id"]))
+                if not x:
+                    continue
+                try:
+                    sc = max(0, min(100, int(float(x.get("score")))))
+                except (TypeError, ValueError):
+                    continue
+                just = (x.get("justificativa") or "")[:200]
+                aval.append({"perfil_id": p["id"], "pca_item_id": i["id"], "score": sc, "justificativa": just})
+                if sc >= minimo:
+                    novos.append({"perfil_id": p["id"], "pca_item_id": i["id"], "score": sc, "justificativa": just})
+            if aval:
+                upsert("avaliacoes_pca", aval, "perfil_id,pca_item_id")
+            if novos:
+                rp = requests.post(f"{SB}/radar", headers={**HDR, "Prefer": "resolution=ignore-duplicates,return=minimal"},
+                                   data=json.dumps(novos), timeout=120)
+                if rp.status_code >= 300:
+                    raise RuntimeError(f"radar_pca_ia insert: {rp.status_code} {rp.text[:200]}")
+                for x in novos:
+                    requests.patch(f"{SB}/radar", headers={**HDR, "Prefer": "return=minimal"}, timeout=60,
+                                   params={"perfil_id": "eq." + x["perfil_id"], "pca_item_id": "eq." + str(x["pca_item_id"])},
+                                   data=json.dumps({"score": x["score"], "justificativa": x["justificativa"]}))
+            total += len(aval)
+            time.sleep(PAUSA_IA)
+    return total
+
+
+# ------------------------------------------------------------------ briefing diario
+PROMPT_BRIEF = """Voce e analista de uma consultoria de licitacoes publicas (comissao sobre contratos). Escreva o briefing do dia em portugues, direto e util.
+PERFIL: {perfil}
+RESUMO: {n_radar} oportunidades abertas no radar, {n_novas} ainda nao analisadas, {n_7d} encerram em ate 7 dias.
+Abaixo estao as melhores oportunidades (id, score, orgao/UF, valor, dias para encerrar, objeto, resumo, risco). Responda SOMENTE com JSON:
+{"titulo": "frase curta", "resumo": "3 a 5 frases sobre o panorama e o que priorizar hoje", "destaques": [{"id": 0, "motivo": "uma frase"}], "alertas": ["frases curtas sobre prazos, riscos ou lacunas"]}
+Escolha no maximo 5 destaques, usando apenas ids da lista.
+
+OPORTUNIDADES:
+"""
+
+
+def briefing():
+    if not GKEY:
+        raise RuntimeError("GEMINI_API_KEY nao configurada")
+    r = requests.get(f"{SB}/perfis_busca", headers=HDR, timeout=60, params={"select": "id,nome,prompt,palavras_incluir", "ativo": "eq.true"})
+    r.raise_for_status()
+    agora = datetime.now(timezone.utc)
+    feitos = 0
+    for p in r.json():
+        rr = requests.get(f"{SB}/radar", headers=HDR, timeout=120, params={
+            "select": "score,status,oportunidades(id,objeto,orgao_nome,uf,valor_estimado,valor_sigiloso,data_fim_proposta,ia_resumo,ia_atencao,edital_analise(risco))",
+            "perfil_id": "eq." + p["id"], "oportunidade_id": "not.is.null", "status": "neq.descartado",
+            "order": "score.desc", "limit": "400"})
+        rr.raise_for_status()
+        ab = [x for x in rr.json() if x.get("oportunidades") and (x["oportunidades"].get("data_fim_proposta") or "") >= agora.isoformat()]
+        if not ab:
+            continue
+        n7 = sum(1 for x in ab if (x["oportunidades"]["data_fim_proposta"] or "") <= (agora + timedelta(days=7)).isoformat())
+        novas = sum(1 for x in ab if x["status"] == "novo")
+        linhas = []
+        for x in ab[:12]:
+            o = x["oportunidades"]
+            d = max(0, (datetime.fromisoformat(o["data_fim_proposta"]) - agora).days)
+            risco = (o.get("edital_analise") or {}).get("risco") if isinstance(o.get("edital_analise"), dict) else None
+            val = "sigiloso" if o.get("valor_sigiloso") else f"R$ {o.get('valor_estimado') or 0:,.0f}"
+            linhas.append(f"[{o['id']}] score {x['score']} | {o.get('orgao_nome')}/{o.get('uf')} | {val} | {d} dias | {(o.get('objeto') or '')[:220]} | {(o.get('ia_resumo') or '')[:160]} | risco {risco if risco is not None else 'n/d'}")
+        perfil = (p.get("prompt") or ", ".join(p.get("palavras_incluir") or []) or p["nome"])[:600]
+        texto = PROMPT_BRIEF.replace("{perfil}", perfil).replace("{n_radar}", str(len(ab))).replace("{n_novas}", str(novas)).replace("{n_7d}", str(n7)) + "\n".join(linhas)
+        res = gemini_auto(texto)
+        if res is None:
+            print("[briefing] limite de uso atingido", flush=True)
+            break
+        if isinstance(res, list):
+            res = res[0] if res and isinstance(res[0], dict) else {}
+        if not res:
+            continue
+        ids = {x["oportunidades"]["id"] for x in ab}
+        dest = [d for d in (res.get("destaques") or []) if isinstance(d, dict) and d.get("id") in ids][:5]
+        rp = requests.post(f"{SB}/briefings", headers={**HDR, "Prefer": "return=minimal"}, timeout=60, data=json.dumps({
+            "perfil_id": p["id"], "titulo": (res.get("titulo") or p["nome"])[:160], "resumo": (res.get("resumo") or "")[:1500],
+            "destaques": dest, "alertas": [str(a)[:200] for a in (res.get("alertas") or [])][:6]}))
+        if rp.status_code >= 300:
+            raise RuntimeError(f"briefing: {rp.status_code} {rp.text[:200]}")
+        feitos += 1
+        time.sleep(PAUSA_IA)
+    requests.delete(f"{SB}/briefings", headers=HDR, timeout=60, params={"gerado_em": "lt." + (agora - timedelta(days=30)).isoformat()})
+    return feitos
+
+
+# ------------------------------------------------------------------ aprendizado: sugere ajuste no prompt do perfil
+PROMPT_APR = """Voce ajuda a afinar o prompt de busca de oportunidades de licitacao de uma consultoria.
+PROMPT ATUAL: {prompt}
+
+Oportunidades que o usuario ACOMPANHOU (interessantes):
+{pos}
+
+Oportunidades que o usuario DESCARTOU (nao interessantes):
+{neg}
+
+Compare os dois grupos e proponha um prompt melhorado (mesmo formato: texto livre descrevendo o que o perfil procura e o que nao interessa, ate 600 caracteres). Responda SOMENTE com JSON: {"prompt": "...", "motivo": "ate 2 frases explicando o que mudou e por que"}.
+Se nao houver padrao claro, repita o prompt atual e diga isso no motivo."""
+
+
+def aprender():
+    if not GKEY:
+        raise RuntimeError("GEMINI_API_KEY nao configurada")
+    r = requests.get(f"{SB}/perfis_busca", headers=HDR, timeout=60, params={"select": "*", "ativo": "eq.true"})
+    r.raise_for_status()
+    feitos = 0
+    for p in r.json():
+        if not (p.get("prompt") or "").strip():
+            continue
+        em = p.get("prompt_sugerido_em")
+        if em and datetime.fromisoformat(em) > datetime.now(timezone.utc) - timedelta(days=7):
+            continue
+        rr = requests.get(f"{SB}/radar", headers=HDR, timeout=120, params={
+            "select": "status,observacoes,oportunidades(objeto),pca_itens(descricao)", "perfil_id": "eq." + p["id"], "limit": "1000"})
+        rr.raise_for_status()
+        pos, neg = [], []
+        for x in rr.json():
+            txt = ((x.get("oportunidades") or {}).get("objeto") or (x.get("pca_itens") or {}).get("descricao") or "")[:200]
+            if not txt:
+                continue
+            if x["status"] in ("analisando", "em_abordagem", "participando", "ganho"):
+                pos.append(txt)
+            elif x["status"] == "descartado" and x.get("observacoes") != "auto-ia":
+                neg.append(txt)
+        if len(pos) + len(neg) < 5:
+            continue
+        texto = (PROMPT_APR.replace("{prompt}", p["prompt"]).replace("{pos}", "\n".join("- " + t for t in pos[:15]) or "(nenhuma)")
+                 .replace("{neg}", "\n".join("- " + t for t in neg[:15]) or "(nenhuma)"))
+        res = gemini_auto(texto)
+        if res is None:
+            break
+        if isinstance(res, list):
+            res = res[0] if res and isinstance(res[0], dict) else {}
+        if res.get("prompt"):
+            requests.patch(f"{SB}/perfis_busca", params={"id": f"eq.{p['id']}"}, headers=HDR, timeout=60, data=json.dumps({
+                "prompt_sugerido": str(res["prompt"])[:900], "prompt_sugerido_motivo": str(res.get("motivo") or "")[:400],
+                "prompt_sugerido_em": datetime.now(timezone.utc).isoformat()}))
+            feitos += 1
+        time.sleep(PAUSA_IA)
+    return feitos
+
+
+ETAPAS = {"editais": editais, "pca": pca, "radar": radar, "ia": ia, "radar_ia": radar_ia, "itens": itens,
+          "docs": docs, "radar_pca_ia": radar_pca_ia, "briefing": briefing, "aprender": aprender}
 EXTRAS = {"catalogo": catalogo}
 
 if __name__ == "__main__":
