@@ -65,3 +65,15 @@ grant execute on function public.precos_referencia(text, text, numeric) to authe
 grant execute on function public.vencedores_parecidos(text, text, int, text, numeric) to authenticated;
 
 select 'ok6_precos';
+
+-- resultados_compras passa a encher de verdade (o endpoint /contratacoes/atualizacao
+-- so aceita 50 itens por pagina; com 500 devolvia HTTP 400 e a etapa trazia 0).
+-- Retencao ajustada para o volume real:
+create or replace function public.limpar_mercado() returns void language sql security definer set search_path = public as $fn$
+  delete from contratos_pncp where publicado_em < now() - interval '180 days';
+  delete from resultados_compras where atualizado_em < now() - interval '180 days';
+  -- compra antiga que nunca teve homologado nao serve para calcular desconto
+  delete from resultados_compras where atualizado_em < now() - interval '60 days' and valor_homologado is null;
+  delete from alertas where criado_em < now() - interval '90 days';
+  delete from edital_textos t using oportunidades o where o.id = t.oportunidade_id and o.data_fim_proposta < now() - interval '30 days';
+$fn$;

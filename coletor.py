@@ -38,7 +38,10 @@ def get(url, params=None, tentativas=7):
             r = requests.get(url, params=params, headers=UA, timeout=90)
             if r.status_code == 200:
                 return r.json()
-            if r.status_code in (204, 400, 404):
+            if r.status_code == 400:
+                print(f"[get] 400 em {url} {params}: {r.text[:160]}", flush=True)
+                return None
+            if r.status_code in (204, 404):
                 return None
             ult = f"HTTP {r.status_code}: {r.text[:120]!r}"
         except (requests.RequestException, ValueError) as e:
@@ -1103,7 +1106,8 @@ def resultados():
         s = d.strftime("%Y%m%d")
         rows = []
         for m in RESULT_MODALIDADES:
-            for c in paginas(f"{PNCP}/consulta/v1/contratacoes/atualizacao", {"dataInicial": s, "dataFinal": s, "codigoModalidadeContratacao": m}):
+            # este endpoint aceita no maximo 50 por pagina (acima disso devolve HTTP 400)
+            for c in paginas(f"{PNCP}/consulta/v1/contratacoes/atualizacao", {"dataInicial": s, "dataFinal": s, "codigoModalidadeContratacao": m}, 50):
                 # guarda o que vier: o homologado so e publicado depois da disputa, e o desconto
                 # (coluna gerada) fica nulo ate os dois valores existirem na mesma compra
                 if not ((c.get("valorTotalEstimado") or 0) > 0 or (c.get("valorTotalHomologado") or 0) > 0):
