@@ -95,7 +95,7 @@ async precos(){
  <div class="bar"><select id="pt"><option value="M">Material</option><option value="S">Serviço</option></select><input id="pq" class="grow" type="search" placeholder="Nome do item no catálogo (ex.: CARNE BOVINA, ARROZ, CADEIRA, LIMPEZA)…"><button onclick="buscarCat()">Buscar no catálogo</button></div>
  <div id="cat"></div><div id="pr"></div>`;
  $('#pq').onkeydown=e=>{if(e.key==='Enter')buscarCat();};
- if(window.ARG){$('#pq').value=String(window.ARG).split(/\s+/).slice(0,3).join(' ');window.ARG=null;await buscarCat();}},
+ if(window.ARG&&typeof window.ARG==='object'){const a=window.ARG;window.ARG=null;$('#pt').value=a.tipo;$('#pq').value=a.nome;await calcPreco(a.tipo,a.codigo,a.nome);}else if(window.ARG){$('#pq').value=String(window.ARG).split(/\s+/).slice(0,3).join(' ');window.ARG=null;await buscarCat();}},
 
 async empresas(){
  const {data}=await q(sb.from('empresas').select('*').order('propria',{ascending:false}).order('nome'));
@@ -127,28 +127,28 @@ async radar(){
  <select id="fs"><option value="">Status (todos)</option>${opts(STATUS)}</select><select id="ff"><option value="">Edital + PCA</option><option value="e">Só editais</option><option value="p">Só PCA</option></select>
  <select id="fu"><option value="">UF (todas)</option>${opts(UFS)}</select><input id="fq" type="search" placeholder="Buscar no objeto…"></div><div id="lista"></div>`;
  const carregar=async()=>{
-  let r=sb.from('radar').select('id,score,status,observacoes,perfil_id,perfis_busca(nome),oportunidades(id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))').order('score',{ascending:false}).limit(120);
+  let r=sb.from('radar').select('id,score,status,observacoes,perfil_id,perfis_busca(nome),oportunidades(id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_catalogo_codigo,ia_catalogo_nome),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))').order('score',{ascending:false}).limit(120);
   if($('#fp').value)r=r.eq('perfil_id',$('#fp').value);if($('#fs').value)r=r.eq('status',$('#fs').value);
   if($('#ff').value==='e')r=r.not('oportunidade_id','is',null);if($('#ff').value==='p')r=r.not('pca_item_id','is',null);
   let rows=(await q(r)).data;const uf=$('#fu').value,t=$('#fq').value.toLowerCase();
   rows=rows.filter(x=>{const o=x.oportunidades,p=x.pca_itens;const u=o?o.uf:p?.pca_planos?.uf;const tx=(o?o.objeto:p?.descricao||'').toLowerCase();return(!uf||u===uf)&&(!t||tx.includes(t));});
   $('#lista').innerHTML=rows.length?rows.map(x=>{const o=x.oportunidades,p=x.pca_itens;
    const titulo=o?o.objeto:p?.descricao,org=o?o.orgao_nome:p?.pca_planos?.orgao_nome,uf=o?o.uf:p?.pca_planos?.uf;
-   return `<div class="card"><div class="row"><div><div class="t">${esc((titulo||'').slice(0,220))}</div><div class="m">${esc(org)} · ${esc(uf)}${o?' · '+esc(o.municipio||''):''}</div>
+   return `<div class="card"><div class="row"><div><div class="t">${esc((titulo||'').slice(0,220))}</div><div class="m">${esc(org)} · ${esc(uf)}${o?' · '+esc(o.municipio||''):''}</div>${o?iaBox(o):''}
    <span class="tag ${o?'':'w'}">${o?'Edital · '+esc(o.modalidade||''):'PCA · previsão'}</span><span class="tag">${esc(x.perfis_busca?.nome)}</span><span class="tag ok">score ${x.score??'—'}</span>
    ${o?`<span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m"> encerra ${dt(o.data_fim_proposta)}</span>`:`<span class="tag">${brl(p?.valor_total)}</span><span class="m"> desejada ${dt(p?.data_desejada)}</span>`}
-   ${o?.link_pncp?` <a class="l" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">abrir no PNCP ↗</a>`:''} <button class="sec sm" onclick="irPreco(this.dataset.t)" data-t="${esc((titulo||'').slice(0,80))}">Pesquisar preço</button>${o?` <button class="sm" onclick="irProc(${o.id})">Iniciar processo</button>`:''}</div>
+   ${o?.link_pncp?` <a class="l" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">abrir no PNCP ↗</a>`:''} ${precoBtn(o,titulo)}${o?` <button class="sm" onclick="irProc(${o.id})">Iniciar processo</button>`:''}</div>
    <select style="width:150px" onchange="mudarStatus(${x.id},this.value)">${opts(STATUS,x.status)}</select></div></div>`;}).join(''):'<div class="vazio">Nada por aqui ainda. Rode a coleta e o radar, ou ajuste os filtros.</div>';};
  ['fp','fs','ff','fu'].forEach(i=>$('#'+i).onchange=carregar);let tm;$('#fq').oninput=()=>{clearTimeout(tm);tm=setTimeout(carregar,300);};await carregar();},
 
 async oportunidades(){
  main.innerHTML=`<div class="top"><div><h2>Editais abertos</h2><p class="sub">Todas as contratações com propostas abertas no PNCP.</p></div></div><div class="bar"><input id="fq" type="search" placeholder="Buscar no objeto (ex.: carne bovina)…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select>
  <input id="vmin" type="number" placeholder="Valor mín."><input id="vmax" type="number" placeholder="Valor máx."><label style="margin:0;align-self:center"><input id="ab" type="checkbox" checked style="width:auto"> só abertos</label><button onclick="pg=0;go()">Buscar</button></div><div id="lista"></div><div class="pg" id="pg"></div>`;
- window.pg=0;window.go=async()=>{const N=30;let r=sb.from('oportunidades').select('id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,situacao',{count:'exact'}).order('data_fim_proposta',{ascending:true}).range(pg*N,pg*N+N-1);
+ window.pg=0;window.go=async()=>{const N=30;let r=sb.from('oportunidades').select('id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,situacao,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_catalogo_codigo,ia_catalogo_nome',{count:'exact'}).order('data_fim_proposta',{ascending:true}).range(pg*N,pg*N+N-1);
   const t=$('#fq').value.trim();if(t)r=r.textSearch('objeto_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)r=r.eq('uf',$('#fu').value);
   if($('#vmin').value)r=r.gte('valor_estimado',$('#vmin').value);if($('#vmax').value)r=r.lte('valor_estimado',$('#vmax').value);if($('#ab').checked)r=r.gte('data_fim_proposta',new Date().toISOString());
-  const {data,count}=await q(r);$('#lista').innerHTML=data.length?data.map(o=>`<div class="card"><div class="t">${esc((o.objeto||'').slice(0,240))}</div><div class="m">${esc(o.orgao_nome)} · ${esc(o.uf)} · ${esc(o.municipio||'')}</div>
-  <span class="tag">${esc(o.modalidade)}</span><span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m"> encerra ${dt(o.data_fim_proposta)}</span> <a class="l" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">PNCP ↗</a> <button class="sec sm" style="margin-left:8px" onclick="irPreco(this.dataset.t)" data-t="${esc((o.objeto||'').slice(0,80))}">Pesquisar preço</button> <button class="sm" onclick="irProc(${o.id})">Iniciar processo</button></div>`).join(''):'<div class="vazio">Sem resultados.</div>';
+  const {data,count}=await q(r);$('#lista').innerHTML=data.length?data.map(o=>`<div class="card"><div class="t">${esc((o.objeto||'').slice(0,240))}</div><div class="m">${esc(o.orgao_nome)} · ${esc(o.uf)} · ${esc(o.municipio||'')}</div>${iaBox(o)}
+  <span class="tag">${esc(o.modalidade)}</span><span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m"> encerra ${dt(o.data_fim_proposta)}</span> <a class="l" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">PNCP ↗</a> ${precoBtn(o,o.objeto)} <button class="sm" onclick="irProc(${o.id})">Iniciar processo</button></div>`).join(''):'<div class="vazio">Sem resultados.</div>';
   $('#pg').innerHTML=`<button class="sec" ${pg?'':'disabled'} onclick="pg--;go()">‹</button><span class="m">${count??0} resultados · pág. ${pg+1}</span><button class="sec" ${(pg+1)*N>=(count||0)?'disabled':''} onclick="pg++;go()">›</button>`;};
  $('#fq').onkeydown=e=>{if(e.key==='Enter'){pg=0;go();}};await go();},
 
@@ -199,6 +199,8 @@ async coletas(){
 
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
 const irPreco=t=>ir('precos',t);
+const iaBox=o=>o.ia_resumo?`<div class="m" style="margin:4px 0">🤖 ${esc(o.ia_resumo)}</div>${o.ia_categoria?`<span class="tag">${esc(o.ia_categoria)}</span>`:''}${o.ia_atencao?`<span class="tag w">${esc(o.ia_atencao)}</span>`:''}`:'';
+const precoBtn=(o,t)=>{const ok=o&&o.ia_catalogo_codigo;const a=ok?`onclick="irPreco({tipo:'${o.ia_tipo}',codigo:'${o.ia_catalogo_codigo}',nome:this.dataset.n})" data-n="${esc(o.ia_catalogo_nome)}" title="Item sugerido pela IA"`:`onclick="irPreco(this.dataset.t)" data-t="${esc((t||'').slice(0,80))}"`;return `<button class="sec sm" style="margin-left:8px" ${a}>Pesquisar preço${ok?' ✦':''}</button>`;};
 async function buscarCat(){
  const t=norm($('#pq').value).replace(/[^A-Z0-9 ]/g,' ').trim();if(!t)return;
  let r=sb.from('catalogo').select('tipo,codigo,nome,grupo,classe').eq('tipo',$('#pt').value).limit(25);
