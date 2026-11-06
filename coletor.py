@@ -1104,7 +1104,9 @@ def resultados():
         rows = []
         for m in RESULT_MODALIDADES:
             for c in paginas(f"{PNCP}/consulta/v1/contratacoes/atualizacao", {"dataInicial": s, "dataFinal": s, "codigoModalidadeContratacao": m}):
-                if not (c.get("valorTotalHomologado") or 0) > 0 or not (c.get("valorTotalEstimado") or 0) > 0:
+                # guarda o que vier: o homologado so e publicado depois da disputa, e o desconto
+                # (coluna gerada) fica nulo ate os dois valores existirem na mesma compra
+                if not ((c.get("valorTotalEstimado") or 0) > 0 or (c.get("valorTotalHomologado") or 0) > 0):
                     continue
                 u = c.get("unidadeOrgao") or {}
                 rows.append({"compra": c.get("numeroControlePNCP"), "orgao_nome": (c.get("orgaoEntidade") or {}).get("razaoSocial"),
@@ -1114,7 +1116,8 @@ def resultados():
                              "atualizado_em": ts(c.get("dataAtualizacaoGlobal") or c.get("dataAtualizacao"))})
         if rows:
             total += upsert("resultados_compras", rows, "compra")
-        print(f"[resultados] {s}: {len(rows)} homologadas", flush=True)
+        nh = sum(1 for r in rows if (r.get("valor_homologado") or 0) > 0 and (r.get("valor_estimado") or 0) > 0)
+        print(f"[resultados] {s}: {len(rows)} compras ({nh} com estimado e homologado)", flush=True)
         mn = estado("resultados_min")
         if not mn or s < mn:
             estado("resultados_min", s)

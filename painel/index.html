@@ -64,6 +64,34 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .stit i{width:9px;height:9px;border-radius:50%;flex:none;margin-top:5px}
 .stit b{display:block;font-size:12.5px;font-weight:600;color:#1e293b}.stit span{display:block;font-size:11px;color:var(--mut);margin-top:1px;line-height:1.35}
 .stit.on b::after{content:' ✓';color:var(--pri3)}
+.det h5{margin:0 0 4px;font-size:12px;color:#334155;font-weight:600}
+.dsum{display:flex;gap:14px;align-items:flex-start;background:#f8fafc;border:1px solid var(--bd);border-radius:10px;padding:12px 14px}
+.dscore{flex:none;width:58px;text-align:center;border-radius:10px;padding:8px 0;background:#dcfce7;color:#15803d}
+.dscore.medio{background:#fef3c7;color:#b45309}.dscore.alto{background:#fee2e2;color:#b91c1c}
+.dscore b{display:block;font-size:22px;line-height:1}.dscore span{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px}
+.dtop{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.dtop b{font-size:13.5px}.dtop .tag{margin:0}
+.dres{margin:6px 0 0;line-height:1.5;color:#334155;font-size:13px}
+.dkv{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:8px}
+.dkv>div{background:#f8fafc;border:1px solid #eef2f7;border-radius:8px;padding:7px 11px}
+.dkv span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);font-weight:600}
+.dkv b{font-size:13px;color:#1e293b;font-weight:600}.dkv b.bw{color:#b45309}.dkv b.bo{color:#15803d}.dkv b.bn{color:var(--mut);font-weight:500}
+.drk{display:grid;gap:7px}
+.dr{border-left:3px solid #94a3b8;background:#f8fafc;border-radius:0 8px 8px 0;padding:7px 11px}
+.dr.alto{border-left-color:#dc2626;background:#fef2f2}.dr.medio{border-left-color:#d97706;background:#fffbeb}.dr.baixo{border-left-color:#16a34a;background:#f0fdf4}
+.dr b{display:block;font-size:12.5px;color:#1e293b}.dr span{font-size:12.5px;color:#475569;line-height:1.45}
+.dex{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
+.dex ul{margin:0;padding-left:17px;line-height:1.5;font-size:12.5px}
+.dfoot{margin-top:8px}
+.dac{margin-top:14px;border-top:1px dashed var(--bd);padding-top:9px}
+.dac summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--pri3);list-style:none}
+.dac summary::-webkit-details-marker{display:none}.dac summary::before{content:'▸ '}.dac[open] summary::before{content:'▾ '}
+.dwarn{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:9px 12px;font-size:12.5px}
+.pzg{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:9px}
+.pzc{background:#f8fafc;border:1px solid var(--bd);border-radius:10px;padding:9px 12px}
+.pzc.ref{border-left:3px solid var(--pri3)}.pzc.ok{border-left:3px solid var(--ok);background:#f0fdf4}
+.pzc span{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--mut);font-weight:600}
+.pzc b{display:block;font-size:19px;font-weight:700;color:var(--pri);letter-spacing:-.3px;line-height:1.25}
+.pzc.ok b{color:var(--ok)}.pzc i{display:block;font-style:normal;font-size:11px;color:var(--mut);margin-top:1px;line-height:1.35}
 .toastw{position:fixed;right:18px;bottom:18px;z-index:90;display:flex;flex-direction:column;gap:8px}
 .toast{background:#1e293b;color:#f1f5f9;border-radius:10px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px #0008;display:flex;align-items:center;gap:12px;animation:tsin .18s ease-out}
 .toast button{background:#ffffff1f;padding:5px 10px;font-size:12px;white-space:nowrap}.toast button:hover{background:#ffffff38}
@@ -473,19 +501,78 @@ async function blocoMercado(t,uf,alvo,lim=6){const el=typeof alvo==='string'?$(a
  <div class="m" style="margin-top:6px">Termo pesquisado: “${esc(t)}”. Fonte: contratos e compras homologadas publicados no PNCP.</div>`;}
 async function cadForn(j){const x=JSON.parse(j);if(!confirm('Cadastrar '+x.n+' como empresa (cliente em prospecção)?'))return;const {error}=await sb.from('empresas').insert({nome:x.n,cnpj:x.c,telefone:x.t||null,email:x.e||null,uf:x.u||null,observacoes:`Fornecedor do PNCP: ${x.k} contrato(s) no período. Prospecção.`});alert(error?('Erro: '+error.message):'Empresa cadastrada. Veja em Empresas.');}
 const gcal=p=>{if(!p.data_sessao)return'';const d=new Date(p.data_sessao),f=x=>x.toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,''),e=new Date(d.getTime()+2*36e5);return `<a class="gh" target="_blank" rel="noopener" href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent('Sessão: '+(p.titulo||'').slice(0,80))}&dates=${f(d)}/${f(e)}&details=${encodeURIComponent((p.empresas?.nome||'')+' · '+(p.orgao||'')+(p.link_pncp?'\n'+p.link_pncp:''))}">📅 Google Agenda</a>`;};
-async function detalhes(btn,id){const card=btn.closest('.oc'),d=card.querySelector('.det');if(!d.hidden){d.hidden=true;btn.innerHTML=ic('det')+'Detalhes';return;}d.hidden=false;btn.innerHTML=ic('det')+'Ocultar';d.innerHTML='<span class="m">Carregando…</span>';
- const [an,it,em]=await Promise.all([sb.from('edital_analise').select('*').eq('oportunidade_id',id).maybeSingle(),sb.from('oportunidade_itens').select('*').eq('oportunidade_id',id).order('numero_item').limit(15),sb.from('empresas').select('id,nome,propria').order('propria',{ascending:false}).order('nome')]);
- const a=an.data,x=a?.dados||{},h=x.habilitacao||{},its=it.data||[],emps=em.data||[];
- const sim=v=>v===true?'sim':v===false?'não':'—';
- d.innerHTML=(a?`<div>${AI('Análise do edital gerada por IA (Gemini)')}${a.risco!=null?`<span class="tag ${a.risco>=66?'b':a.risco>=36?'w':'ok'}">risco ${a.risco}/100</span>`:''}<span class="tag">${a.fonte==='edital'?'lido do edital':'só pelo objeto'}</span> ${esc(a.resumo||'')}</div>
- <div class="tags" style="margin-top:6px"><span class="tag">amostra: ${sim(x.exige_amostra)}</span><span class="tag">visita técnica: ${sim(x.exige_visita_tecnica)}</span><span class="tag">exclusivo ME/EPP: ${sim(x.exclusivo_me_epp)}</span>${x.criterio_julgamento?`<span class="tag">${esc(x.criterio_julgamento)}</span>`:''}${x.prazo_entrega?`<span class="tag">entrega: ${esc(x.prazo_entrega)}</span>`:''}${x.pagamento?`<span class="tag">pagamento: ${esc(x.pagamento)}</span>`:''}${x.garantia?`<span class="tag">garantia: ${esc(x.garantia)}</span>`:''}</div>
- <div class="f2" style="margin-top:4px"><div><h4>Habilitação jurídica / fiscal</h4>${lista([...(h.juridica||[]),...(h.fiscal_trabalhista||[])])}</div><div><h4>Técnica / econômico-financeira</h4>${lista([...(h.tecnica||[]),...(h.economico_financeira||[])])}</div></div>
- ${(x.riscos||[]).length?`<h4>Riscos nas cláusulas</h4><ul>${x.riscos.map(r=>`<li><span class="tag ${NIV[r.nivel]||''}">${esc(r.nivel)}</span> <b>${esc(r.tema||'')}</b> ${esc(r.descricao||'')}</li>`).join('')}</ul>`:''}`:'<div class="m">O edital ainda não foi analisado (a análise roda na coleta, para editais do radar).</div>')
- +(its.length?`<h4>Itens (${its.length}${its.length===15?'+':''})</h4><table>${its.map(i=>`<tr><td>${i.numero_item}</td><td>${esc((i.descricao||'').slice(0,110))}</td><td>${i.quantidade??''} ${esc(i.unidade||'')}</td><td>${i.valor_unitario!=null?brl2(i.valor_unitario):'sigiloso'}</td></tr>`).join('')}</table>`:'')
- +`<div class="row2"><button class="sec sm" onclick="runIA(this,'risco',${id})">Riscos (IA)</button><button class="sec sm" onclick="runIA(this,'termos',${id})">Termos de busca (IA)</button><select class="de" style="width:190px">${emps.map(e=>`<option value="${e.id}">${esc(e.nome)}${e.propria?' (minha)':''}</option>`).join('')||'<option value="">sem empresas</option>'}</select><button class="sec sm" onclick="runIA(this,'checklist',${id},{empresa_id:this.parentNode.querySelector('.de').value})">Checklist da empresa (IA)</button><button class="sec sm" onclick="runIA(this,'abordagem',${id},{empresa_id:this.parentNode.querySelector('.de').value,canal:'whatsapp'})">Mensagem WhatsApp (IA)</button><button class="sec sm" onclick="runIA(this,'abordagem',${id},{empresa_id:this.parentNode.querySelector('.de').value,canal:'email'})">E-mail (IA)</button><button class="sec sm" onclick="runIA(this,'proposta',${id},{empresa_id:this.parentNode.querySelector('.de').value})">Kit de proposta (IA)</button></div>
- <div class="ask"><input placeholder="Pergunte ao edital (ex.: aceita atestado de outro estado? qual o prazo de entrega?)" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button class="sm" onclick="runIA(this,'pergunta',${id},{pergunta:this.previousElementSibling.value})">${AI()}Perguntar</button></div>
- <div class="iaout" hidden></div><h4>Mercado: desconto típico e quem já vende isso</h4><div class="mk"></div>`;
- const op=(await sb.from('oportunidades').select('objeto,ia_termo,uf').eq('id',id).maybeSingle()).data;blocoMercado(termoDe(op),null,d.querySelector('.mk'),5);}
+async function detalhes(btn,id){const card=btn.closest('.oc'),d=card.querySelector('.det');
+ if(!d.hidden){d.hidden=true;btn.innerHTML=ic('det')+'Detalhes';return;}
+ d.hidden=false;btn.innerHTML=ic('det')+'Ocultar';d.innerHTML='<div class="m">Carregando…</div>';
+ const [an,it,em,opr]=await Promise.all([
+  sb.from('edital_analise').select('*').eq('oportunidade_id',id).maybeSingle(),
+  sb.from('oportunidade_itens').select('*').eq('oportunidade_id',id).order('numero_item').limit(15),
+  sb.from('empresas').select('id,nome,propria').order('propria',{ascending:false}).order('nome'),
+  sb.from('oportunidades').select('objeto,ia_termo,uf,valor_estimado,valor_sigiloso').eq('id',id).maybeSingle()]);
+ d.__ctx={id,its:it.data||[],emps:em.data||[],op:opr.data};
+ pintarDet(d,an.data);
+ if(!an.data)analisarAgora(d);                         // ainda sem análise: roda a IA na hora
+ else blocosMercado(d);}
+
+async function analisarAgora(d){const c=d.__ctx,b=d.querySelector('.danl');
+ if(b)b.innerHTML='<div class="m">Lendo o edital com a IA… isso leva alguns segundos.</div>';
+ try{const j=await iaApi('analisar',c.id);pintarDet(d,{dados:j.dados,risco:j.risco,resumo:j.resumo,fonte:j.fonte});}
+ catch(e){if(b)b.innerHTML=`<div class="dwarn">Não deu para analisar agora: ${esc(e.message)} · <a class="l" style="cursor:pointer" onclick="analisarAgora(this.closest('.det'))">tentar de novo</a></div>`;}
+ blocosMercado(d);}
+
+function blocosMercado(d){const c=d.__ctx,t=termoDe(c.op);
+ blocoPreco(t,c.op,d.querySelector('.pz'));
+ blocoMercado(t,null,d.querySelector('.mk'),5);}
+
+// Referência do edital x o que o governo realmente pagou em contratos parecidos = espaço de margem.
+async function blocoPreco(t,op,el){if(!el)return;if(!t){el.innerHTML='';return;}
+ el.innerHTML='<span class="m">Comparando com contratos já assinados no PNCP…</span>';
+ const ref=op?.valor_sigiloso?null:Number(op?.valor_estimado||0)||null;
+ const [p,v]=await Promise.all([sb.rpc('precos_referencia',{q:t,p_uf:null,p_estimado:ref}),sb.rpc('vencedores_parecidos',{q:t,p_uf:null,p_limite:10,p_ordem:'valor'})]);
+ const P=p.data||{},V=v.data||[];
+ if(p.error){el.innerHTML=`<div class="dwarn">Não deu para calcular agora: ${esc(p.error.message)}</div>`;return;}
+ const dif=P.margem_mediana,pc=ref&&P.mediana?(1-P.mediana/ref):null;
+ el.innerHTML=`<div class="pzg">
+  <div class="pzc ref"><span>Referência do edital</span><b>${ref?brl(ref):'sigiloso'}</b><i>o que o órgão estimou pagar</i></div>
+  <div class="pzc"><span>Menor já contratado</span><b>${P.n?brl(P.min):'—'}</b><i>contrato parecido mais barato</i></div>
+  <div class="pzc"><span>Valor típico contratado</span><b>${P.n?brl(P.mediana):'—'}</b><i>mediana de ${P.n||0} contrato(s)</i></div>
+  <div class="pzc ${dif>0?'ok':''}"><span>Espaço de margem</span><b>${dif!=null?brl(dif):'—'}</b><i>${pc!=null?`referência menos o típico (${pct(pc)} abaixo)`:'precisa do valor de referência'}</i></div>
+ </div>
+ ${P.nh?`<div class="m" style="margin-top:6px">Na disputa, o desconto típico sobre o valor estimado é de <b>${pct(P.desconto_mediano)}</b> (${P.nh} compra(s) homologada(s) comparada(s)).</div>`:''}
+ ${V.length?`<table class="tb" style="margin-top:8px"><tr><th>Quem ganhou</th><th>Órgão</th><th>Data</th><th>Valor do contrato</th></tr>${V.map(x=>`<tr><td><b>${esc(x.fornecedor||'')}</b><div class="m">${esc(x.cnpj||'')}</div></td><td class="m">${esc(x.orgao||'')}/${esc(x.uf||'')}</td><td class="m">${dt(x.data+'T12:00')}</td><td>${brl(x.valor)}</td></tr>`).join('')}</table>
+ <div class="m" style="margin-top:5px">Do mais barato ao mais caro. Atenção: são contratos inteiros, com quantidades diferentes — use como ordem de grandeza, não como preço unitário. Termo: “${esc(t)}”.</div>`
+ :'<div class="m" style="margin-top:6px">Ainda sem contratos parecidos na base (o histórico do PNCP entra aos poucos, 10 dias por coleta).</div>'}`;}
+
+const deSel=b=>b.closest('.dac').querySelector('.de')?.value||'';
+const NVL={alto:'Risco alto',medio:'Risco médio',baixo:'Risco baixo'};
+
+function pintarDet(d,a){const c=d.__ctx,x=a?.dados||{},h=x.habilitacao||{},its=c.its,emps=c.emps,id=c.id;
+ const r=a?.risco,nv=r==null?null:(r>=66?'alto':r>=36?'medio':'baixo');
+ const kv=(rot,v)=>v?`<div><span>${rot}</span><b>${esc(v)}</b></div>`:'';
+ const kb=(rot,v,alertaSeSim)=>v==null?'':`<div><span>${rot}</span><b class="${v?(alertaSeSim?'bw':'bo'):'bn'}">${v?'Sim':'Não'}</b></div>`;
+ const cond=[kv('Critério de julgamento',x.criterio_julgamento),kv('Prazo de entrega',x.prazo_entrega),kv('Local de entrega',x.local_entrega),kv('Vigência',x.vigencia),kv('Pagamento',x.pagamento),kv('Garantia exigida',x.garantia),
+  kb('Exige amostra',x.exige_amostra,true),kb('Exige visita técnica',x.exige_visita_tecnica,true),kb('Exclusivo ME/EPP',x.exclusivo_me_epp,false)].join('');
+ const riscos=x.riscos||[],exJF=[...(h.juridica||[]),...(h.fiscal_trabalhista||[])],exTE=[...(h.tecnica||[]),...(h.economico_financeira||[])];
+ d.innerHTML=`<div class="danl">`+(a?`<div class="dsum">${r!=null?`<div class="dscore ${nv}"><b>${r}</b><span>risco</span></div>`:''}
+  <div><div class="dtop">${AI('Análise do edital gerada por IA (Gemini)')}<b>${r!=null?NVL[nv]:'Análise do edital'}</b><span class="tag ${a.fonte==='edital'?'ok':'w'}">${a.fonte==='edital'?'lido do edital completo':'lido só pelo objeto'}</span></div>
+  <p class="dres">${esc(a.resumo||x.resumo||'')}</p>
+  ${x.oportunidade?`<p class="dres"><b>Vale a pena? </b>${esc(x.oportunidade)}</p>`:''}
+  ${x.perfil_fornecedor?`<p class="dres m"><b>Quem atende isso: </b>${esc(x.perfil_fornecedor)}</p>`:''}</div></div>
+  ${cond?`<h4>Condições principais</h4><div class="dkv">${cond}</div>`:''}
+  ${riscos.length?`<h4>Pontos de atenção</h4><div class="drk">${riscos.map(z=>`<div class="dr ${esc(z.nivel||'medio')}"><b>${esc(z.tema||'Atenção')}</b><span>${esc(z.descricao||'')}</span></div>`).join('')}</div>`:''}
+  ${(exJF.length||exTE.length)?`<h4>Exigências para participar</h4><div class="dex"><div><h5>Jurídica, fiscal e trabalhista</h5>${lista(exJF)}</div><div><h5>Técnica e econômico-financeira</h5>${lista(exTE)}</div></div>`:''}
+  <div class="dfoot"><a class="l" style="cursor:pointer" onclick="analisarAgora(this.closest('.det'))">analisar de novo</a></div>`
+  :'<div class="m">Lendo o edital com a IA… isso leva alguns segundos.</div>')+`</div>`
+ +(its.length?`<h4>Itens (${its.length}${its.length===15?'+':''})</h4><table class="tb">${its.map(i=>`<tr><td>${i.numero_item}</td><td>${esc((i.descricao||'').slice(0,110))}</td><td>${i.quantidade??''} ${esc(i.unidade||'')}</td><td>${i.valor_unitario!=null?brl2(i.valor_unitario):'sigiloso'}</td></tr>`).join('')}</table>`:'')
+ +`<h4>Pergunte ao edital</h4><div class="ask"><input placeholder="Ex.: aceita atestado de outro estado? qual o prazo de entrega?" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button class="sm" onclick="runIA(this,'pergunta',${id},{pergunta:this.previousElementSibling.value})">${AI()}Perguntar</button></div>
+ <div class="iaout" hidden></div>
+ <h4>Preço: referência, quanto já foi pago e margem</h4><div class="pz"></div>
+ <h4>Quem já vende isso para o governo</h4><div class="mk"></div>
+ <div class="dfoot"><button class="gh" onclick="runIA(this,'termos',${id})">${ic('preco')}Sugerir termos para pesquisar preço (IA)</button></div>
+ <details class="dac"><summary>Materiais para levar a uma empresa (IA)</summary>`
+ +(emps.length?`<div class="row2"><span class="m">Empresa:</span><select class="de" style="width:210px">${emps.map(e=>`<option value="${e.id}">${esc(e.nome)}${e.propria?' (minha)':''}</option>`).join('')}</select></div>
+  <div class="row2"><button class="sec sm" onclick="runIA(this,'checklist',${id},{empresa_id:deSel(this)})">Documentos que faltam para ela participar</button><button class="sec sm" onclick="runIA(this,'proposta',${id},{empresa_id:deSel(this)})">Rascunho de proposta e declarações</button><button class="sec sm" onclick="runIA(this,'abordagem',${id},{empresa_id:deSel(this),canal:'whatsapp'})">Mensagem de WhatsApp</button><button class="sec sm" onclick="runIA(this,'abordagem',${id},{empresa_id:deSel(this),canal:'email'})">E-mail de abordagem</button></div>`
+  :`<div class="m">Cadastre uma empresa em <a class="l" style="cursor:pointer" onclick="ir('empresas')">Empresas</a> para gerar o checklist de habilitação dela, rascunho de proposta e mensagens de abordagem.</div>`)+`</details>`;}
 async function checkProc(btn,op,emp){return runIA(btn,'checklist',op,{empresa_id:emp});}
 const DOCT=['Contrato social / estatuto','Cartão CNPJ','CND Federal (RFB/PGFN)','CND Estadual','CND Municipal','Certidão FGTS (CRF)','CNDT (trabalhista)','Balanço patrimonial','Certidão de falência','Atestado de capacidade técnica','Registro em conselho (CREA/CRA/etc.)','Alvará / licença sanitária','Outro'];
 async function addDoc(eid,btn){const b=btn.closest('.docs'),t=b.querySelector('.dt').value,n=b.querySelector('.dn').value.trim(),v=b.querySelector('.dv').value||null;const {error}=await sb.from('empresa_docs').insert({empresa_id:eid,tipo:t,numero:n||null,validade:v});if(error)return alert('Erro: '+error.message);ir('empresas');}

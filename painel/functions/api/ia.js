@@ -44,6 +44,41 @@ export async function onRequestPost({ request, env }) {
   const ctx = `OBJETO: ${(op.objeto || "").slice(0, 1200)}\nÓRGÃO: ${op.orgao_nome} (${op.municipio || ""}/${op.uf})\nMODALIDADE: ${op.modalidade || ""}\nVALOR ESTIMADO: ${op.valor_sigiloso ? "sigiloso" : op.valor_estimado}\nPRAZO PROPOSTAS: ${op.data_fim_proposta || ""}\nANÁLISE DO EDITAL (JSON): ${resumoEdital}`;
 
   try {
+    if (b.acao === "analisar") {
+      // Análise completa do edital sob demanda (a coleta também faz isso, mas só para editais do radar).
+      const [tx] = await get(`edital_textos?oportunidade_id=eq.${id}&select=texto,arquivo`);
+      const fonte = tx?.texto ? "edital" : "objeto";
+      const corpo = tx?.texto
+        ? `TEXTO DO EDITAL (${tx.arquivo || ""}):\n${tx.texto.slice(0, 120000)}`
+        : `SÓ O OBJETO (o edital ainda não foi baixado):\n${(op.objeto || "").slice(0, 4000)}\nÓRGÃO: ${op.orgao_nome} (${op.municipio || ""}/${op.uf})\nMODALIDADE: ${op.modalidade || ""}\nVALOR ESTIMADO: ${op.valor_sigiloso ? "sigiloso" : op.valor_estimado}\nPRAZO PARA PROPOSTAS: ${op.data_fim_proposta || ""}`;
+      const prompt = `Você analisa editais de licitação pública brasileira para uma consultoria que ajuda empresas fornecedoras a participar.
+Responda SOMENTE um objeto JSON com estes campos (use null ou lista vazia quando não constar; NÃO invente):
+{
+ "resumo": "até 3 frases: o que se contrata, critério de julgamento e principais condições",
+ "habilitacao": {"juridica": [], "fiscal_trabalhista": [], "tecnica": [], "economico_financeira": []},
+ "exige_amostra": true ou false, "exige_visita_tecnica": true ou false, "exclusivo_me_epp": true ou false,
+ "criterio_julgamento": "", "prazo_entrega": "", "local_entrega": "", "vigencia": "", "garantia": "", "pagamento": "",
+ "riscos": [{"nivel": "alto" ou "medio" ou "baixo", "tema": "", "descricao": ""}],
+ "risco_geral": número de 0 a 100 (100 = muito arriscado ou restritivo para um fornecedor),
+ "oportunidade": "1 ou 2 frases: por que vale (ou não vale) a pena para um fornecedor deste setor",
+ "perfil_fornecedor": "1 frase: que tipo de empresa tem condições de atender"
+}
+Cada item de habilitação deve ser curto (até 120 caracteres).
+Em riscos considere prazo curto, exigência desproporcional, amostra, garantia alta, pagamento longo, possível direcionamento e multas elevadas.
+${fonte === "objeto" ? 'Você recebeu apenas o objeto resumido: analise só o que ele permite, deixe o resto vazio e inclua em riscos um item {"nivel":"medio","tema":"Edital não lido","descricao":"Confirme exigências e prazos no edital completo no PNCP."}.' : ""}
+
+${corpo}`;
+      const res = await gemini(env, prompt, true);
+      const d = Array.isArray(res) ? (res[0] || {}) : (res || {});
+      let risco = parseInt(d.risco_geral, 10);
+      risco = isNaN(risco) ? null : Math.max(0, Math.min(100, risco));
+      await fetch(`${SB}/rest/v1/edital_analise?on_conflict=oportunidade_id`, {
+        method: "POST",
+        headers: { ...H, "content-type": "application/json", prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify([{ oportunidade_id: id, dados: d, risco, resumo: (d.resumo || "").slice(0, 700), fonte }]),
+      });
+      return J({ ok: true, dados: d, risco, resumo: d.resumo || "", fonte });
+    }
     if (b.acao === "checklist") {
       const eid = parseInt(b.empresa_id, 10);
       if (!eid) return J({ erro: "informe empresa_id" }, 400);
