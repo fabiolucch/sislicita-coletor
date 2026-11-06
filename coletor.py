@@ -1012,8 +1012,309 @@ def aprender():
     return feitos
 
 
+# ------------------------------------------------------------------ estado das coletas incrementais
+def estado(chave, valor=None):
+    if valor is None:
+        r = requests.get(f"{SB}/coleta_estado", headers=HDR, timeout=60, params={"chave": "eq." + chave, "select": "valor"})
+        r.raise_for_status()
+        return r.json()[0]["valor"] if r.json() else None
+    upsert("coleta_estado", [{"chave": chave, "valor": str(valor), "atualizado_em": datetime.now(timezone.utc).isoformat()}], "chave")
+    return valor
+
+
+def janelas(chave, dias_hist, passo):
+    """Datas (AAAAMMDD) a coletar: o que falta ate hoje e mais 'passo' dias de historico para tras."""
+    hoje = datetime.now(timezone.utc).date()
+    mx, mn = estado(chave + "_max"), estado(chave + "_min")
+    mx = datetime.strptime(mx, "%Y%m%d").date() if mx else hoje - timedelta(days=2)
+    mn = datetime.strptime(mn, "%Y%m%d").date() if mn else mx
+    dias = []
+    d = mx - timedelta(days=1)                      # 1 dia de sobreposicao para publicacoes atrasadas
+    while d <= hoje:
+        dias.append(d)
+        d += timedelta(days=1)
+    limite = hoje - timedelta(days=dias_hist)
+    d = mn - timedelta(days=1)
+    while d >= limite and len([x for x in dias if x < mn]) < passo:
+        dias.append(d)
+        d -= timedelta(days=1)
+    return dias, chave
+
+
+def paginas(url, params, tam=500):
+    """Le todas as paginas de uma consulta do PNCP (em paralelo depois da primeira)."""
+    p1 = get(url, {**params, "pagina": 1, "tamanhoPagina": tam})
+    if not p1:
+        return []
+    dados = list(p1.get("data") or [])
+    tot = p1.get("totalPaginas") or 1
+    if tot > 1:
+        with cf.ThreadPoolExecutor(WORKERS) as ex:
+            for j in ex.map(lambda n: get(url, {**params, "pagina": n, "tamanhoPagina": tam}) or {}, range(2, tot + 1)):
+                dados += j.get("data") or []
+    return dados
+
+
+# ------------------------------------------------------------------ contratos assinados (quem ganha o que)
+CONTRATOS_DIAS = int(os.getenv("CONTRATOS_DIAS", "180"))
+CONTRATOS_PASSO = int(os.getenv("CONTRATOS_PASSO", "10"))
+
+
+def contratos():
+    dias, _ = janelas("contratos", CONTRATOS_DIAS, CONTRATOS_PASSO)
+    total, feitos = 0, []
+    for d in sorted(set(dias), reverse=True):
+        s = d.strftime("%Y%m%d")
+        lista = paginas(f"{PNCP}/consulta/v1/contratos", {"dataInicial": s, "dataFinal": s})
+        rows = []
+        for c in lista:
+            u, o = c.get("unidadeOrgao") or {}, c.get("orgaoEntidade") or {}
+            rows.append({"numero_controle_pncp": c.get("numeroControlePNCP"), "compra": c.get("numeroControlePncpCompra"),
+                         "orgao_cnpj": o.get("cnpj"), "orgao_nome": o.get("razaoSocial"), "uf": u.get("ufSigla"),
+                         "municipio": u.get("municipioNome"), "esfera": o.get("esferaId"),
+                         "tipo": (c.get("tipoContrato") or {}).get("nome"), "categoria": (c.get("categoriaProcesso") or {}).get("nome"),
+                         "fornecedor_ni": c.get("niFornecedor"), "fornecedor_nome": c.get("nomeRazaoSocialFornecedor"),
+                         "tipo_pessoa": c.get("tipoPessoa"), "objeto": (c.get("objetoContrato") or "")[:1500],
+                         "valor_global": c.get("valorGlobal"), "valor_inicial": c.get("valorInicial"),
+                         "data_assinatura": c.get("dataAssinatura"), "vigencia_fim": c.get("dataVigenciaFim"),
+                         "publicado_em": ts(c.get("dataPublicacaoPncp"))})
+        rows = [r for r in rows if r["numero_controle_pncp"]]
+        if rows:
+            total += upsert("contratos_pncp", rows, "numero_controle_pncp")
+        feitos.append(d)
+        print(f"[contratos] {s}: {len(rows)}", flush=True)
+        mn = estado("contratos_min")
+        if not mn or s < mn:
+            estado("contratos_min", s)
+    estado("contratos_max", datetime.now(timezone.utc).date().strftime("%Y%m%d"))
+    requests.post(f"{SB}/rpc/limpar_mercado", headers=HDR, data="{}", timeout=600)
+    return total
+
+
+# ------------------------------------------------------------------ compras homologadas (desconto vencedor)
+RESULT_MODALIDADES = os.getenv("RESULT_MODALIDADES", "4,5,6,7").split(",")
+MODAL_NOME = {"4": "Concorrência eletrônica", "5": "Concorrência presencial", "6": "Pregão eletrônico", "7": "Pregão presencial", "8": "Dispensa"}
+
+
+def resultados():
+    dias, _ = janelas("resultados", 365, int(os.getenv("RESULTADOS_PASSO", "10")))
+    total = 0
+    for d in sorted(set(dias), reverse=True):
+        s = d.strftime("%Y%m%d")
+        rows = []
+        for m in RESULT_MODALIDADES:
+            for c in paginas(f"{PNCP}/consulta/v1/contratacoes/atualizacao", {"dataInicial": s, "dataFinal": s, "codigoModalidadeContratacao": m}):
+                if not (c.get("valorTotalHomologado") or 0) > 0 or not (c.get("valorTotalEstimado") or 0) > 0:
+                    continue
+                u = c.get("unidadeOrgao") or {}
+                rows.append({"compra": c.get("numeroControlePNCP"), "orgao_nome": (c.get("orgaoEntidade") or {}).get("razaoSocial"),
+                             "uf": u.get("ufSigla"), "municipio": u.get("municipioNome"), "modalidade": MODAL_NOME.get(m, m),
+                             "srp": c.get("srp"), "objeto": (c.get("objetoCompra") or "")[:1500],
+                             "valor_estimado": c.get("valorTotalEstimado"), "valor_homologado": c.get("valorTotalHomologado"),
+                             "atualizado_em": ts(c.get("dataAtualizacaoGlobal") or c.get("dataAtualizacao"))})
+        if rows:
+            total += upsert("resultados_compras", rows, "compra")
+        print(f"[resultados] {s}: {len(rows)} homologadas", flush=True)
+        mn = estado("resultados_min")
+        if not mn or s < mn:
+            estado("resultados_min", s)
+    estado("resultados_max", datetime.now(timezone.utc).date().strftime("%Y%m%d"))
+    return total
+
+
+# ------------------------------------------------------------------ fornecedores: agrega contratos e completa cadastro (BrasilAPI)
+MAX_ENRIQ = int(os.getenv("MAX_ENRIQ", "400"))
+
+
+def fornecedores():
+    r = requests.post(f"{SB}/rpc/atualizar_fornecedores", headers=HDR, data="{}", timeout=900)
+    if r.status_code >= 300:
+        raise RuntimeError(f"atualizar_fornecedores: {r.status_code} {r.text[:200]}")
+    r = requests.get(f"{SB}/prospects", headers=HDR, timeout=120, params={
+        "select": "id,cnpj", "enriquecido_em": "is.null", "cnpj": "not.is.null",
+        "order": "qtd_contratos_gov.desc.nullslast", "limit": str(MAX_ENRIQ)})
+    r.raise_for_status()
+    feitos = 0
+    for p in r.json():
+        for espera in (0, 5, 20):
+            time.sleep(espera)
+            try:
+                b = requests.get(f"https://brasilapi.com.br/api/cnpj/v1/{p['cnpj']}", headers=UA, timeout=40)
+            except requests.RequestException:
+                continue
+            if b.status_code != 429:
+                break
+        dados = {"enriquecido_em": datetime.now(timezone.utc).isoformat()}
+        if b.status_code == 200:
+            j = b.json()
+            tel = (j.get("ddd_telefone_1") or "").strip()
+            dados.update({"razao_social": j.get("razao_social"), "nome_fantasia": j.get("nome_fantasia") or None,
+                          "cnae_principal": str(j.get("cnae_fiscal") or "") or None, "cnae_descricao": j.get("cnae_fiscal_descricao"),
+                          "cnaes_secundarios": [str(x.get("codigo")) for x in (j.get("cnaes_secundarios") or []) if x.get("codigo")][:30],
+                          "uf": j.get("uf"), "municipio": j.get("municipio"), "porte": j.get("porte") or j.get("descricao_porte"),
+                          "situacao_cadastral": j.get("descricao_situacao_cadastral"), "telefone": tel or None,
+                          "email": (j.get("email") or "").lower() or None})
+        requests.patch(f"{SB}/prospects", params={"id": f"eq.{p['id']}"}, headers=HDR, timeout=60, data=json.dumps(dados))
+        feitos += 1
+        time.sleep(0.6)
+    return feitos
+
+
+# ------------------------------------------------------------------ vigia: arquivos novos (retificacoes, esclarecimentos) nos editais do radar
+MAX_VIGIA = int(os.getenv("MAX_VIGIA", "300"))
+PROMPT_VIG = """Um edital de licitacao recebeu um documento novo no PNCP (titulo: {titulo}; tipo: {tipo}).
+Resuma em ate 3 frases, em portugues, o que esse documento muda ou esclarece para um fornecedor (prazos, exigencias, valores, data da sessao).
+Responda SOMENTE JSON: {{"resumo": "...", "impacto": "alto|medio|baixo"}}
+
+TEXTO:
+"""
+
+
+def vigia():
+    fila = radar_abertos("id,numero_controle_pncp,data_fim_proposta,objeto,arquivos_ids,link_pncp")[:MAX_VIGIA]
+    novos = 0
+    for o in fila:
+        k = chave_pncp(o)
+        if not k:
+            continue
+        try:
+            arqs = get(f"{PNCP}/pncp/v1/orgaos/{k[0]}/compras/{k[1]}/{k[2]}/arquivos") or []
+        except RuntimeError:
+            continue
+        ids = sorted({a.get("sequencialDocumento") for a in arqs if a.get("sequencialDocumento") is not None})
+        antes = o.get("arquivos_ids")
+        patch = {"arquivos_ids": ids, "vigia_em": datetime.now(timezone.utc).isoformat()}
+        if antes is not None:
+            diff = [a for a in arqs if a.get("sequencialDocumento") not in set(antes)]
+            if diff:
+                a = sorted(diff, key=lambda x: x.get("sequencialDocumento") or 0)[-1]
+                resumo, impacto = "", ""
+                if GKEY:
+                    try:
+                        b = baixar(a.get("url") or a.get("uri"))
+                        t = extrair(a.get("titulo"), b)[0] if b else ""
+                        if len(t) > 200:
+                            res = gemini_auto(PROMPT_VIG.format(titulo=a.get("titulo"), tipo=a.get("tipoDocumentoNome")) + t[:20000])
+                            if isinstance(res, dict):
+                                resumo, impacto = res.get("resumo") or "", res.get("impacto") or ""
+                    except Exception as e:  # noqa: BLE001
+                        print(f"[vigia] resumo falhou {o['id']}: {e}", flush=True)
+                titulos = "; ".join(f"{x.get('tipoDocumentoNome') or ''} {x.get('titulo') or ''}".strip() for x in diff)[:300]
+                upsert("alertas", [{"tipo": "retificacao", "ref": f"{o['id']}:{max(ids)}",
+                                    "titulo": f"Documento novo no edital: {(o.get('objeto') or '')[:120]}",
+                                    "texto": (f"[{impacto}] " if impacto else "") + (resumo or titulos), "link": o.get("link_pncp")}], "tipo,ref")
+                patch["analise_em"] = None          # reanalisa o edital com o documento novo
+                novos += 1
+        requests.patch(f"{SB}/oportunidades", params={"id": f"eq.{o['id']}"}, headers=HDR, timeout=60, data=json.dumps(patch))
+    return novos
+
+
+# ------------------------------------------------------------------ alertas no Telegram
+TG = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
+ALERTA_SCORE = int(os.getenv("ALERTA_SCORE", "80"))
+PAINEL = os.getenv("PAINEL_URL", "https://sislicita.pages.dev")
+
+
+def h(s):
+    return (str(s or "")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def tg_chat():
+    cid = os.getenv("TELEGRAM_CHAT_ID", "").strip() or estado("telegram_chat")
+    if cid:
+        return cid
+    r = requests.get(f"https://api.telegram.org/bot{TG}/getUpdates", timeout=30).json()
+    for u in reversed(r.get("result") or []):
+        m = u.get("message") or u.get("channel_post") or {}
+        if m.get("chat", {}).get("id"):
+            return estado("telegram_chat", m["chat"]["id"])
+    return None
+
+
+def tg(chat, texto):
+    for parte in [texto[i:i + 3900] for i in range(0, len(texto), 3900)]:
+        r = requests.post(f"https://api.telegram.org/bot{TG}/sendMessage", timeout=30,
+                          json={"chat_id": chat, "text": parte, "parse_mode": "HTML", "disable_web_page_preview": True})
+        if r.status_code == 429:
+            time.sleep(int((r.json().get("parameters") or {}).get("retry_after", 5)) + 1)
+            r = requests.post(f"https://api.telegram.org/bot{TG}/sendMessage", timeout=30,
+                              json={"chat_id": chat, "text": parte, "parse_mode": "HTML", "disable_web_page_preview": True})
+        if r.status_code >= 300:
+            raise RuntimeError(f"Telegram {r.status_code}: {r.text[:200]}")
+        time.sleep(1)
+
+
+def alertas():
+    agora = datetime.now(timezone.utc)
+    # alertas gerados aqui (sessoes proximas e documentos vencendo) tambem aparecem no painel
+    pr = requests.get(f"{SB}/processos", headers=HDR, timeout=60, params={
+        "select": "id,titulo,orgao,data_sessao,empresas(nome)", "status": "not.in.(ganho,perdido,desistiu)",
+        "data_sessao": f"gte.{agora.isoformat()}", "and": f"(data_sessao.lte.{(agora + timedelta(days=2)).isoformat()})"}).json()
+    linhas = [{"tipo": "sessao", "ref": f"{p['id']}:{p['data_sessao'][:16]}", "titulo": f"Sessão em breve: {(p.get('titulo') or '')[:120]}",
+               "texto": f"{(p.get('empresas') or {}).get('nome', '')} · {p.get('orgao') or ''} · {datetime.fromisoformat(p['data_sessao']).astimezone(timezone(timedelta(hours=-3))).strftime('%d/%m %H:%M')}",
+               "link": PAINEL + "/#processos"} for p in pr if isinstance(p, dict)]
+    dv = requests.get(f"{SB}/empresa_docs", headers=HDR, timeout=60, params={
+        "select": "id,tipo,validade,empresas(nome)", "validade": f"lte.{(agora + timedelta(days=15)).date()}"}).json()
+    linhas += [{"tipo": "doc_vencendo", "ref": f"{d['id']}:{d['validade']}", "titulo": f"Documento {'vencido' if d['validade'] < str(agora.date()) else 'vencendo'}: {d['tipo']}",
+                "texto": f"{(d.get('empresas') or {}).get('nome', '')} · validade {datetime.strptime(d['validade'], '%Y-%m-%d').strftime('%d/%m/%Y')}",
+                "link": PAINEL + "/#empresas"} for d in dv if isinstance(d, dict) and d.get("validade")]
+    if linhas:
+        requests.post(f"{SB}/alertas", params={"on_conflict": "tipo,ref"}, headers={**HDR, "Prefer": "resolution=ignore-duplicates,return=minimal"},
+                      data=json.dumps(linhas), timeout=60)
+    if not TG:
+        print("[alertas] TELEGRAM_BOT_TOKEN nao configurado; alertas ficam so no painel", flush=True)
+        return len(linhas)
+    chat = tg_chat()
+    if not chat:
+        print("[alertas] nenhum chat encontrado: envie /start ao seu bot no Telegram", flush=True)
+        return 0
+    enviados = 0
+    if not estado("telegram_inicio"):
+        # primeira vez: marca o que ja existe como visto, para nao inundar o Telegram
+        requests.patch(f"{SB}/radar", params={"notificado_em": "is.null"}, headers=HDR, timeout=120, data=json.dumps({"notificado_em": agora.isoformat()}))
+        requests.patch(f"{SB}/alertas", params={"enviado_em": "is.null"}, headers=HDR, timeout=60, data=json.dumps({"enviado_em": agora.isoformat()}))
+        requests.patch(f"{SB}/briefings", params={"enviado_em": "is.null"}, headers=HDR, timeout=60, data=json.dumps({"enviado_em": agora.isoformat()}))
+        tg(chat, f"✅ <b>SISLICITA conectado</b>\nVocê vai receber aqui: oportunidades com score ≥ {ALERTA_SCORE}, briefing diário, documentos novos em editais do radar, sessões próximas e documentos vencendo.\n{PAINEL}")
+        estado("telegram_inicio", agora.isoformat())
+        return 1
+    # 1) briefings novos
+    for b in requests.get(f"{SB}/briefings", headers=HDR, timeout=60, params={"select": "id,titulo,resumo,alertas,perfis_busca(nome)", "enviado_em": "is.null", "order": "id"}).json():
+        t = f"🧭 <b>Briefing · {h((b.get('perfis_busca') or {}).get('nome'))}</b>\n<b>{h(b.get('titulo'))}</b>\n{h(b.get('resumo'))}"
+        if b.get("alertas"):
+            t += "\n" + "\n".join("⚠️ " + h(a) for a in b["alertas"])
+        tg(chat, t)
+        requests.patch(f"{SB}/briefings", params={"id": f"eq.{b['id']}"}, headers=HDR, timeout=60, data=json.dumps({"enviado_em": agora.isoformat()}))
+        enviados += 1
+    # 2) oportunidades novas com score alto
+    rr = requests.get(f"{SB}/radar", headers=HDR, timeout=120, params={
+        "select": "id,score,justificativa,perfis_busca(nome),oportunidades(objeto,orgao_nome,uf,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp),pca_itens(descricao,valor_total,pca_planos(orgao_nome,uf))",
+        "notificado_em": "is.null", "score": f"gte.{ALERTA_SCORE}", "status": "neq.descartado", "order": "score.desc", "limit": "40"}).json()
+    if rr:
+        partes = []
+        for x in rr[:15]:
+            o, p = x.get("oportunidades"), x.get("pca_itens")
+            if o:
+                val = "sigiloso" if o.get("valor_sigiloso") else f"R$ {o.get('valor_estimado') or 0:,.0f}".replace(",", ".")
+                fim = (o.get("data_fim_proposta") or "")[:10]
+                partes.append(f"• <b>{x['score']}</b> · {h((o.get('objeto') or '')[:160])}\n  {h(o.get('orgao_nome'))}/{h(o.get('uf'))} · {val} · até {fim[8:10]}/{fim[5:7]}" + (f" · <a href=\"{h(o.get('link_pncp'))}\">PNCP</a>" if o.get("link_pncp") else ""))
+            elif p:
+                partes.append(f"• <b>{x['score']}</b> · [PCA] {h((p.get('descricao') or '')[:160])}\n  {h((p.get('pca_planos') or {}).get('orgao_nome'))}/{h((p.get('pca_planos') or {}).get('uf'))} · R$ {p.get('valor_total') or 0:,.0f}".replace(",", "."))
+        tg(chat, f"🎯 <b>{len(rr)} oportunidade(s) nova(s) com score ≥ {ALERTA_SCORE}</b>\n\n" + "\n\n".join(partes) + (f"\n\n…e mais {len(rr) - 15} no painel." if len(rr) > 15 else "") + f"\n{PAINEL}/#radar")
+        ids = ",".join(str(x["id"]) for x in rr)
+        requests.patch(f"{SB}/radar", params={"id": f"in.({ids})"}, headers=HDR, timeout=60, data=json.dumps({"notificado_em": agora.isoformat()}))
+        enviados += 1
+    # 3) demais alertas (documentos novos, sessoes, documentos vencendo)
+    ic = {"retificacao": "📄", "sessao": "⏰", "doc_vencendo": "🗂️"}
+    for a in requests.get(f"{SB}/alertas", headers=HDR, timeout=60, params={"select": "*", "enviado_em": "is.null", "order": "id", "limit": "30"}).json():
+        tg(chat, f"{ic.get(a['tipo'], '🔔')} <b>{h(a.get('titulo'))}</b>\n{h(a.get('texto'))}" + (f"\n{h(a.get('link'))}" if a.get("link") else ""))
+        requests.patch(f"{SB}/alertas", params={"id": f"eq.{a['id']}"}, headers=HDR, timeout=60, data=json.dumps({"enviado_em": agora.isoformat()}))
+        enviados += 1
+    return enviados
+
+
 ETAPAS = {"editais": editais, "pca": pca, "radar": radar, "ia": ia, "radar_ia": radar_ia, "itens": itens,
-          "docs": docs, "radar_pca_ia": radar_pca_ia, "briefing": briefing, "aprender": aprender}
+          "vigia": vigia, "docs": docs, "radar_pca_ia": radar_pca_ia, "briefing": briefing, "aprender": aprender,
+          "alertas": alertas, "contratos": contratos, "resultados": resultados, "fornecedores": fornecedores}
 EXTRAS = {"catalogo": catalogo}
 
 if __name__ == "__main__":

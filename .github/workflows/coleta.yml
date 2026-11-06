@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       modo:
-        description: "editais, pca, radar, catalogo, ia, radar_ia, itens, docs, radar_pca_ia, briefing, aprender ou tudo"
+        description: "editais, pca, radar, catalogo, ia, radar_ia, itens, vigia, docs, radar_pca_ia, briefing, aprender, alertas, contratos, resultados, fornecedores ou tudo"
         default: "tudo"
       max_ia:
         description: "maximo de editais para a IA classificar"
@@ -32,4 +32,6 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MAX_IA: ${{ github.event.inputs.max_ia || '300' }}
