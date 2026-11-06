@@ -43,6 +43,8 @@ def get(url, params=None, tentativas=7):
                 return None
             if r.status_code in (204, 404):
                 return None
+            if r.status_code == 429:                       # limite de requisicoes do PNCP
+                time.sleep(min(10 + i * 15, 60))
             ult = f"HTTP {r.status_code}: {r.text[:120]!r}"
         except (requests.RequestException, ValueError) as e:
             ult = f"{type(e).__name__}: {str(e)[:120]}"
@@ -1044,7 +1046,7 @@ def janelas(chave, dias_hist, passo):
     return dias, chave
 
 
-def paginas(url, params, tam=500):
+def paginas(url, params, tam=500, par=None):
     """Le todas as paginas de uma consulta do PNCP (em paralelo depois da primeira)."""
     p1 = get(url, {**params, "pagina": 1, "tamanhoPagina": tam})
     if not p1:
@@ -1052,7 +1054,7 @@ def paginas(url, params, tam=500):
     dados = list(p1.get("data") or [])
     tot = p1.get("totalPaginas") or 1
     if tot > 1:
-        with cf.ThreadPoolExecutor(WORKERS) as ex:
+        with cf.ThreadPoolExecutor(par or WORKERS) as ex:
             for j in ex.map(lambda n: get(url, {**params, "pagina": n, "tamanhoPagina": tam}) or {}, range(2, tot + 1)):
                 dados += j.get("data") or []
     return dados
@@ -1100,14 +1102,14 @@ MODAL_NOME = {"4": "Concorrência eletrônica", "5": "Concorrência presencial",
 
 
 def resultados():
-    dias, _ = janelas("resultados", 365, int(os.getenv("RESULTADOS_PASSO", "10")))
+    dias, _ = janelas("resultados", 180, int(os.getenv("RESULTADOS_PASSO", "3")))
     total = 0
     for d in sorted(set(dias), reverse=True):
         s = d.strftime("%Y%m%d")
         rows = []
         for m in RESULT_MODALIDADES:
             # este endpoint aceita no maximo 50 por pagina (acima disso devolve HTTP 400)
-            for c in paginas(f"{PNCP}/consulta/v1/contratacoes/atualizacao", {"dataInicial": s, "dataFinal": s, "codigoModalidadeContratacao": m}, 50):
+            for c in paginas(f"{PNCP}/consulta/v1/contratacoes/atualizacao", {"dataInicial": s, "dataFinal": s, "codigoModalidadeContratacao": m}, 50, 1):
                 # guarda o que vier: o homologado so e publicado depois da disputa, e o desconto
                 # (coluna gerada) fica nulo ate os dois valores existirem na mesma compra
                 if not ((c.get("valorTotalEstimado") or 0) > 0 or (c.get("valorTotalHomologado") or 0) > 0):
