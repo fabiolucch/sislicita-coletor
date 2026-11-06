@@ -11,7 +11,7 @@ import re
 import sys
 import time
 import unicodedata
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -335,7 +335,8 @@ Para CADA item abaixo devolva um objeto JSON com:
 - id: o mesmo id recebido
 - tipo: "M" (fornecimento de material/bem), "S" (servico comum) ou "O" (obra, engenharia ou outro)
 - categoria: area em 1 a 3 palavras (ex.: alimentos, informatica, limpeza, saude, veiculos)
-- termo_catalogo: nome generico e curto do principal item ou servico, como aparece em catalogos de compras (ex.: CARNE BOVINA, CADEIRA ESCRITORIO, SERVICO DE LIMPEZA); vazio se nao der para identificar
+- termo_catalogo: nome do principal item ou servico, o MAIS ESPECIFICO possivel, como aparece em catalogos de compras (ex.: CARNE BOVINA, CADEIRA ESCRITORIO, SERVICO DE LIMPEZA; nunca termos amplos como GENEROS ALIMENTICIOS ou MATERIAL DE CONSTRUCAO); vazio se nao der para identificar
+- generico: true se o objeto reune muitos itens diferentes (cesta basica, generos alimenticios variados, material de construcao diversos, merenda, kits) e portanto nao tem um item unico de catalogo; senao false
 - resumo: no maximo 2 frases simples dizendo o que o orgao quer comprar, sem inventar nada que nao esteja no texto
 - atencao: ponto de atencao para um fornecedor que seja visivel no texto (ex.: registro de precos, credenciamento, exige amostra, lote unico) ou vazio
 Responda SOMENTE com um array JSON, sem texto extra.
@@ -377,22 +378,62 @@ def escolher_modelo():
     return sorted(nomes)[-1]
 
 
-def casar_catalogo(tipo, termo):
-    palavras = [w for w in re.sub(r"[^A-Z0-9 ]", " ", norm(termo or "").upper()).split() if len(w) > 2]
-    for n in (len(palavras), 2):
-        usa = palavras[:n]
-        if not usa:
-            return None
-        filtros = [("nome_busca", "ilike.*" + w + "*") for w in usa]
+def gemini_auto(prompt):
+    global GMODEL
+    try:
+        return gemini(prompt, GMODEL)
+    except RuntimeError as e:
+        if " 404" in str(e):
+            GMODEL = escolher_modelo()
+            print(f"[ia] modelo padrao indisponivel; usando {GMODEL}", flush=True)
+            return gemini(prompt, GMODEL)
+        raise
+
+
+def candidatos_catalogo(tipo, termo):
+    palavras = [w for w in re.sub(r"[^A-Z0-9 ]", " ", norm(termo or "").upper()).split() if len(w) > 2][:4]
+    for n in range(len(palavras), 0, -1):
+        filtros = [("nome_busca", "ilike.*" + w + "*") for w in palavras[:n]]
         r = requests.get(f"{SB}/catalogo", headers=HDR, timeout=60,
-                         params=[("select", "codigo,nome"), ("tipo", "eq." + tipo), ("limit", "30")] + filtros)
+                         params=[("select", "codigo,nome"), ("tipo", "eq." + tipo), ("limit", "40")] + filtros)
         if r.status_code < 300 and r.json():
-            return sorted(r.json(), key=lambda x: len(x["nome"]))[0]
-    return None
+            return sorted(r.json(), key=lambda x: len(x["nome"]))[:12]
+    return []
+
+
+PROMPT_ESC = """Para cada licitacao abaixo escolha, entre as opcoes do catalogo de compras, o item que representa o objeto principal.
+Se nenhuma opcao representar bem o objeto (item amplo demais, produto diferente ou apenas parte do objeto), responda codigo 0.
+Responda SOMENTE com um array JSON de objetos {"id": ..., "codigo": ...}.
+
+LICITACOES:
+"""
+
+
+def escolher_catalogo(itens):
+    """itens: lista de (oportunidade, candidatos). Devolve {id: candidato escolhido}."""
+    linhas = []
+    for o, cands in itens:
+        ops = " | ".join(f"{c['codigo']}={c['nome']}" for c in cands)
+        linhas.append(f"[{o['id']}] OBJETO: {(o['objeto'] or '')[:300]}\n   OPCOES: {ops}")
+    res = gemini_auto(PROMPT_ESC + "\n".join(linhas))
+    escolhidos = {}
+    if not res:
+        return escolhidos
+    por_cod = {o["id"]: {str(c["codigo"]): c for c in cands} for o, cands in itens}
+    for x in res:
+        if not isinstance(x, dict):
+            continue
+        try:
+            oid = int(x.get("id"))
+        except (TypeError, ValueError):
+            continue
+        c = por_cod.get(oid, {}).get(str(x.get("codigo")))
+        if c:
+            escolhidos[oid] = c
+    return escolhidos
 
 
 def ia():
-    global GMODEL
     if not GKEY:
         raise RuntimeError("GEMINI_API_KEY nao configurada")
     r = requests.get(f"{SB}/radar", headers=HDR, timeout=120, params={
@@ -412,29 +453,34 @@ def ia():
     for i in range(0, len(fila), LOTE_IA):
         lote = fila[i:i + LOTE_IA]
         texto = PROMPT_IA + "\n".join(f"[{o['id']}] {(o['objeto'] or '')[:700]}" for o in lote)
-        try:
-            res = gemini(texto, GMODEL)
-        except RuntimeError as e:
-            if " 404" in str(e) and i == 0:
-                GMODEL = escolher_modelo()
-                print(f"[ia] modelo padrao indisponivel; usando {GMODEL}", flush=True)
-                res = gemini(texto, GMODEL)
-            else:
-                raise
+        res = gemini_auto(texto)
         if res is None:
             print("[ia] limite de uso atingido; encerrando por hoje", flush=True)
             break
         por_id = {str(x.get("id")): x for x in res if isinstance(x, dict)}
+        info, para_escolher = {}, []
         for o in lote:
             x = por_id.get(str(o["id"]))
             if not x:
                 continue
             tipo = x.get("tipo") if x.get("tipo") in ("M", "S", "O") else "O"
-            cat = casar_catalogo(tipo, x.get("termo_catalogo")) if tipo in ("M", "S") else None
+            generico = bool(x.get("generico"))
+            info[o["id"]] = (x, tipo, generico)
+            if tipo in ("M", "S") and not generico and x.get("termo_catalogo"):
+                cands = candidatos_catalogo(tipo, x.get("termo_catalogo"))
+                if cands:
+                    para_escolher.append((o, cands))
+        escolhidos = escolher_catalogo(para_escolher) if para_escolher else {}
+        for o in lote:
+            if o["id"] not in info:
+                continue
+            x, tipo, generico = info[o["id"]]
+            cat = escolhidos.get(o["id"])
             patch = {"ia_categoria": (x.get("categoria") or "")[:60], "ia_resumo": (x.get("resumo") or "")[:600],
                      "ia_tipo": tipo, "ia_termo": (x.get("termo_catalogo") or "")[:120],
-                     "ia_atencao": (x.get("atencao") or "")[:300],
-                     "ia_catalogo_codigo": cat["codigo"] if cat else None, "ia_catalogo_nome": cat["nome"] if cat else None,
+                     "ia_atencao": (x.get("atencao") or "")[:300], "ia_generico": generico,
+                     "ia_catalogo_codigo": cat["codigo"] if cat else None,
+                     "ia_catalogo_nome": cat["nome"] if cat else None,
                      "ia_processado_em": agora}
             rr = requests.patch(f"{SB}/oportunidades", headers={**HDR, "Prefer": "return=minimal"},
                                 params={"id": "eq." + str(o["id"])}, data=json.dumps(patch), timeout=60)
@@ -446,8 +492,117 @@ def ia():
     return feitos
 
 
-ETAPAS = {"editais": editais, "pca": pca, "radar": radar}
-EXTRAS = {"catalogo": catalogo, "ia": ia}
+# ------------------------------------------------------------------ radar_ia (perfis com prompt)
+MAX_RADAR_IA = int(os.getenv("MAX_RADAR_IA", "200"))
+LOTE_RIA = int(os.getenv("LOTE_RIA", "20"))
+
+PROMPT_RIA = """Voce e analista de licitacoes publicas brasileiras. Uma consultoria procura oportunidades para este perfil:
+
+PERFIL: {perfil}
+
+Para CADA licitacao abaixo avalie a aderencia ao perfil de 0 a 100 (0 = nada a ver, 50 = possivel, 80 ou mais = encaixa bem) e justifique em uma frase curta (ate 140 caracteres), baseada somente no texto.
+Responda SOMENTE com um array JSON de objetos {"id": ..., "score": ..., "justificativa": ...}.
+
+LICITACOES:
+"""
+
+
+def radar_ia():
+    if not GKEY:
+        raise RuntimeError("GEMINI_API_KEY nao configurada")
+    r = requests.get(f"{SB}/perfis_busca", headers=HDR, timeout=60, params={"select": "*", "ativo": "eq.true"})
+    r.raise_for_status()
+    perfis = [p for p in r.json() if (p.get("prompt") or "").strip() and "edital" in (p.get("fontes") or ["edital"])]
+    restante, total = MAX_RADAR_IA, 0
+    agora = datetime.now(timezone.utc)
+    for p in perfis:
+        if restante <= 0:
+            break
+        limite = (agora + timedelta(days=p.get("dias_min_abertura") or 0)).isoformat()
+        params = {"select": "id,objeto,uf,modalidade,valor_estimado,valor_sigiloso",
+                  "situacao": "eq.Divulgada no PNCP", "data_fim_proposta": "gte." + limite,
+                  "order": "coletado_em.desc", "limit": "10000"}
+        if p.get("ufs"):
+            params["uf"] = "in.(" + ",".join(p["ufs"]) + ")"
+        rr = requests.get(f"{SB}/oportunidades", headers=HDR, params=params, timeout=180)
+        rr.raise_for_status()
+        av = requests.get(f"{SB}/avaliacoes_ia", headers=HDR, timeout=120,
+                          params={"select": "oportunidade_id", "perfil_id": "eq." + p["id"], "limit": "100000"})
+        av.raise_for_status()
+        ja = {x["oportunidade_id"] for x in av.json()}
+        excl = [norm(w) for w in (p.get("palavras_excluir") or []) if w]
+        incl = [norm(w) for w in (p.get("palavras_incluir") or []) if w]
+        fila = []
+        for o in rr.json():
+            if o["id"] in ja:
+                continue
+            v = o.get("valor_estimado")
+            if not o.get("valor_sigiloso") and v is not None:
+                if p.get("valor_min") is not None and v < p["valor_min"]:
+                    continue
+                if p.get("valor_max") is not None and v > p["valor_max"]:
+                    continue
+            if p.get("modalidades") and o.get("modalidade") not in p["modalidades"]:
+                continue
+            txt = norm(o.get("objeto"))
+            if any(w in txt for w in excl):
+                continue
+            o["_pri"] = 0 if any(w in txt for w in incl) else 1
+            fila.append(o)
+        fila.sort(key=lambda o: o["_pri"])
+        fila = fila[:restante]
+        restante -= len(fila)
+        minimo = p.get("score_minimo") or 60
+        print(f"[radar_ia] {p['nome']}: {len(fila)} a avaliar (score minimo {minimo})", flush=True)
+        for i in range(0, len(fila), LOTE_RIA):
+            lote = fila[i:i + LOTE_RIA]
+            linhas = []
+            for o in lote:
+                val = "valor sigiloso" if o.get("valor_sigiloso") else f"R$ {o.get('valor_estimado') or 0:,.0f}"
+                linhas.append(f"[{o['id']}] ({o.get('uf')}; {val}) {(o.get('objeto') or '')[:600]}")
+            res = gemini_auto(PROMPT_RIA.replace("{perfil}", p["prompt"].strip()[:1500]) + "\n".join(linhas))
+            if res is None:
+                print("[radar_ia] limite de uso atingido; encerrando por hoje", flush=True)
+                return total
+            por = {str(x.get("id")): x for x in res if isinstance(x, dict)}
+            aval, novos = [], []
+            for o in lote:
+                x = por.get(str(o["id"]))
+                if not x:
+                    continue
+                try:
+                    sc = max(0, min(100, int(float(x.get("score")))))
+                except (TypeError, ValueError):
+                    continue
+                just = (x.get("justificativa") or "")[:200]
+                aval.append({"perfil_id": p["id"], "oportunidade_id": o["id"], "score": sc, "justificativa": just})
+                alvo = {"perfil_id": p["id"], "oportunidade_id": o["id"], "score": sc, "justificativa": just}
+                if sc >= minimo:
+                    novos.append(alvo)
+                else:  # reprova casamento antigo por palavras-chave, se ainda nao foi trabalhado
+                    requests.patch(f"{SB}/radar", headers={**HDR, "Prefer": "return=minimal"}, timeout=60,
+                                   params={"perfil_id": "eq." + p["id"], "oportunidade_id": "eq." + str(o["id"]),
+                                           "status": "eq.novo"},
+                                   data=json.dumps({"status": "descartado", "score": sc, "justificativa": just}))
+            if aval:
+                upsert("avaliacoes_ia", aval, "perfil_id,oportunidade_id")
+            if novos:
+                rp = requests.post(f"{SB}/radar", headers={**HDR, "Prefer": "resolution=ignore-duplicates,return=minimal"},
+                                   data=json.dumps(novos), timeout=120)
+                if rp.status_code >= 300:
+                    raise RuntimeError(f"radar_ia insert: {rp.status_code} {rp.text[:200]}")
+                for n in novos:
+                    requests.patch(f"{SB}/radar", headers={**HDR, "Prefer": "return=minimal"}, timeout=60,
+                                   params={"perfil_id": "eq." + n["perfil_id"], "oportunidade_id": "eq." + str(n["oportunidade_id"])},
+                                   data=json.dumps({"score": n["score"], "justificativa": n["justificativa"]}))
+            total += len(aval)
+            print(f"[radar_ia] {p['nome']}: {total} avaliados (modelo {GMODEL})", flush=True)
+            time.sleep(PAUSA_IA)
+    return total
+
+
+ETAPAS = {"editais": editais, "pca": pca, "radar": radar, "ia": ia, "radar_ia": radar_ia}
+EXTRAS = {"catalogo": catalogo}
 
 if __name__ == "__main__":
     modo = sys.argv[1] if len(sys.argv) > 1 else "tudo"
