@@ -64,6 +64,9 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .stit i{width:9px;height:9px;border-radius:50%;flex:none;margin-top:5px}
 .stit b{display:block;font-size:12.5px;font-weight:600;color:#1e293b}.stit span{display:block;font-size:11px;color:var(--mut);margin-top:1px;line-height:1.35}
 .stit.on b::after{content:' ✓';color:var(--pri3)}
+.leg{margin:-6px 0 14px}.leg summary{cursor:pointer;font-size:12.5px;font-weight:600;color:var(--pri3);list-style:none;display:inline-block}.leg summary::-webkit-details-marker{display:none}.leg summary::before{content:'▸ '}.leg[open] summary::before{content:'▾ '}
+.legc{background:#fff;border:1px solid var(--bd);border-radius:var(--r);padding:12px 14px;margin-top:8px;box-shadow:var(--sh)}
+.legf{margin-top:8px;font-size:12.5px;color:var(--mut);line-height:1.6}.legf .tag{margin:0 2px}
 .brk{display:flex;gap:2px;align-items:flex-end;justify-content:center;height:24px;margin-top:4px}
 .brk i{width:5px;height:var(--h);background:linear-gradient(180deg,#60a5fa,#2f5a94);border-radius:2px;opacity:.75;cursor:help}
 .brk i:hover{opacity:1}
@@ -339,7 +342,7 @@ async processos(){
 async radar(){
  const A0=window.ARG||{};window.ARG=null;
  const perfis=(await q(sb.from('perfis_busca').select('id,nome').order('nome'))).data;
- main.innerHTML=`<div class="top"><div><h2>Radar de oportunidades</h2><p class="sub">Ordenado pela nota de interesse: aderência ao perfil, tamanho do negócio, folga de preço, prazo e risco do edital. Passe o mouse na nota para ver a composição.</p></div></div><div class="bar"><select id="fp"><option value="">Todos os perfis</option>${perfis.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select>
+ main.innerHTML=`<div class="top"><div><h2>Radar de oportunidades</h2><p class="sub">Ordenado pela nota de interesse. Passe o mouse na nota para ver a composição.</p></div><details class="leg"><summary>Como a nota é calculada</summary><div class="legc"><table class="tb"><tr><th>Fator</th><th>Peso</th><th>O que mede</th></tr><tr><td>Aderência ao perfil</td><td>35%</td><td>o quanto o objeto é do seu setor (IA quando já avaliou, senão palavras-chave)</td></tr><tr><td>Tamanho do negócio</td><td>25%</td><td>comissão potencial, em escala log: R$ 30 mil = 0, R$ 1 mi = 60, R$ 10 mi = 100</td></tr><tr><td>Folga de preço</td><td>15%</td><td>desconto típico da disputa nesse objeto (30% ou mais = folga grande)</td></tr><tr><td>Prazo</td><td>15%</td><td>dá para mobilizar uma empresa a tempo (5 a 20 dias é o ideal)</td></tr><tr><td>Risco do edital</td><td>10%</td><td>o quanto é restritivo, invertido (edital analisado pela IA)</td></tr></table><div class="legf"><b>Faixas:</b> <span class="tag ok">65+</span> olhar hoje · <span class="tag w">50 a 64</span> vale conferir · <span class="tag">35 a 49</span> só se sobrar tempo · <span class="tag b">abaixo de 35</span> provavelmente não compensa. O que ainda não se sabe entra como neutro (50), então a nota tende a subir conforme a IA analisa o edital e a base de preços cresce.</div></div></details></div><div class="bar"><select id="fp"><option value="">Todos os perfis</option>${perfis.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select>
  <select id="fs"><option value="">Status (todos)</option>${opts(STATUS)}</select><select id="ff"><option value="">Edital + PCA</option><option value="e">Só editais</option><option value="p">Só PCA</option></select>
  <select id="fu"><option value="">UF (todas)</option>${opts(UFS)}</select><input id="fq" type="search" placeholder="Buscar no objeto…"></div><div id="lista"></div>`;
  const carregar=async()=>{
