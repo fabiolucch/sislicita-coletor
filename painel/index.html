@@ -92,10 +92,17 @@ async oportunidades(){
  $('#fq').onkeydown=e=>{if(e.key==='Enter'){pg=0;go();}};await go();},
 
 async pca(){
- main.innerHTML=`<h2>PCA — previsão de contratações</h2><p class="m">Itens dos Planos de Contratações Anuais que casam com seus perfis. É a chance de chegar antes do edital.</p><div class="bar"><input id="fq" type="search" placeholder="Buscar item…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select><button onclick="go()">Buscar</button></div><div id="lista"></div>`;
- window.go=async()=>{let r=sb.from('pca_itens').select('descricao,valor_total,quantidade,unidade_medida,data_desejada,nome_unidade,pca_planos!inner(orgao_nome,uf,ano)').order('data_desejada').limit(100);
-  const t=$('#fq').value.trim();if(t)r=r.textSearch('descricao_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)r=r.eq('pca_planos.uf',$('#fu').value);
-  const {data}=await q(r);$('#lista').innerHTML=data.length?data.map(i=>`<div class="card"><div class="t">${esc((i.descricao||'').slice(0,200))}</div><div class="m">${esc(i.pca_planos.orgao_nome)} · ${esc(i.pca_planos.uf)} · PCA ${i.pca_planos.ano}</div><span class="tag">${brl(i.valor_total)}</span><span class="tag">${esc(i.quantidade??'')} ${esc(i.unidade_medida||'')}</span><span class="tag w">desejada ${dt(i.data_desejada)}</span></div>`).join(''):'<div class="vazio">Nenhum item ainda. Rode a coleta PCA.</div>';};
+ main.innerHTML=`<h2>PCA — previsão de contratações</h2><p class="m">Demanda planejada pelos órgãos, em todas as áreas. O resumo agrupa por categoria e mês; os itens de valor alto aparecem em detalhe. É a chance de chegar antes do edital.</p><div class="bar"><input id="fq" type="search" placeholder="Filtrar categoria ou grupo (ex.: alimentos, informática)…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select><select id="ft"><option value="r">Resumo por categoria</option><option value="i">Itens de valor alto</option></select><button onclick="go()">Buscar</button></div><div id="lista"></div>`;
+ window.go=async()=>{const t=$('#fq').value.trim().replace(/[,()%]/g,' ');
+  if($('#ft').value==='i'){
+   let r=sb.from('pca_itens').select('descricao,valor_total,quantidade,unidade_medida,data_desejada,nome_unidade,pca_planos!inner(orgao_nome,uf,ano)').order('valor_total',{ascending:false}).limit(100);
+   if(t)r=r.textSearch('descricao_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)r=r.eq('pca_planos.uf',$('#fu').value);
+   const {data}=await q(r);$('#lista').innerHTML=data.length?data.map(i=>`<div class="card"><div class="t">${esc((i.descricao||'').slice(0,200))}</div><div class="m">${esc(i.pca_planos.orgao_nome)} · ${esc(i.pca_planos.uf)} · PCA ${i.pca_planos.ano}</div><span class="tag">${brl(i.valor_total)}</span><span class="tag">${esc(i.quantidade??'')} ${esc(i.unidade_medida||'')}</span><span class="tag w">desejada ${dt(i.data_desejada)}</span></div>`).join(''):'<div class="vazio">Nenhum item ainda. A coleta de PCA está em andamento.</div>';
+  }else{
+   let r=sb.from('pca_demanda').select('classificacao_nome,grupo_contratacao,categoria,mes,n_itens,valor_total,pca_planos!inner(orgao_nome,uf,ano)').order('valor_total',{ascending:false,nullsFirst:false}).limit(100);
+   if(t)r=r.or(`classificacao_nome.ilike.%${t}%,grupo_contratacao.ilike.%${t}%`);if($('#fu').value)r=r.eq('pca_planos.uf',$('#fu').value);
+   const {data}=await q(r);$('#lista').innerHTML=data.length?`<div class="card"><table><tr><th>Categoria</th><th>Órgão</th><th>UF</th><th>Mês</th><th>Itens</th><th>Valor</th></tr>${data.map(d=>`<tr><td>${esc(d.classificacao_nome||d.grupo_contratacao||'—')}<div class="m">${esc(d.categoria)}</div></td><td>${esc(d.pca_planos.orgao_nome)}</td><td>${esc(d.pca_planos.uf)}</td><td>${d.mes&&d.mes>'1901'?esc(d.mes.slice(0,7)):'—'}</td><td>${d.n_itens}</td><td>${brl(d.valor_total)}</td></tr>`).join('')}</table></div>`:'<div class="vazio">Nenhum dado ainda. A coleta de PCA está em andamento.</div>';
+  }};
  $('#fq').onkeydown=e=>{if(e.key==='Enter')go();};await go();},
 
 async funil(){
