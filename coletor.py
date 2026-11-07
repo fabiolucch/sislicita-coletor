@@ -191,10 +191,18 @@ def historico():
             print(f"[historico] orcamento de {orcamento} min atingido; retoma em {d:%Y-%m-%d}", flush=True)
             break
         s = d.strftime("%Y%m%d")
-        try:
-            rows = coletar_dia(s)
-        except RuntimeError as e:
-            print(f"[historico] AVISO {s}: {e}; paro aqui e retomo nesta data na proxima execucao", file=sys.stderr, flush=True)
+        rows, erro = None, None
+        for tent in range(3):            # o PNCP limita (429) e oscila (503): espera e tenta o mesmo dia de novo
+            try:
+                rows = coletar_dia(s)
+                break
+            except RuntimeError as e:
+                erro = e
+                if tent < 2 and (time.monotonic() - inicio) / 60 < orcamento + 15:
+                    print(f"[historico] {s}: PNCP recusou ({str(e)[-90:]}); aguardo 5 min e tento o dia de novo", flush=True)
+                    time.sleep(300)
+        if rows is None:
+            print(f"[historico] AVISO {s}: {erro}; paro aqui e retomo nesta data na proxima execucao", file=sys.stderr, flush=True)
             break
         if rows:
             total += upsert("oportunidades", rows, "numero_controle_pncp")
