@@ -26,6 +26,56 @@ async function gemini(env, prompt, json) {
   throw new Error("limite de uso da IA atingido; tente em alguns minutos");
 }
 
+async function geminiPartes(env, partes) {        // mesma escolha de modelo, mas aceita PDF junto do texto
+  for (const m of MODELOS) {
+    for (const espera of [0, 4000]) {
+      if (espera) await new Promise(r => setTimeout(r, espera));
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent`, {
+        method: "POST",
+        headers: { "x-goog-api-key": env.GEMINI_API_KEY, "content-type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: partes }], generationConfig: { temperature: 0.3, responseMimeType: "application/json" } }),
+      });
+      if (r.status === 404) break;
+      if (r.status === 429 || r.status >= 500) continue;
+      if (!r.ok) throw new Error(`Gemini ${r.status}`);
+      const j = await r.json();
+      const t = j.candidates?.[0]?.content?.parts?.map(p => p.text).join("") || "";
+      try { return JSON.parse(t); } catch { throw new Error("resposta da IA inválida"); }
+    }
+  }
+  throw new Error("limite de uso da IA atingido; tente em alguns minutos");
+}
+
+const b64 = buf => {                               // base64 em blocos, para nao estourar a pilha
+  const u = new Uint8Array(buf); let s = "";
+  for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+  return btoa(s);
+};
+
+const PNCP_MAX = 8 * 1024 * 1024;                  // teto do que mandamos ao Gemini de uma vez
+
+async function pdfsDoEdital(numero) {
+  const m = /^(\d{14})-\d+-(\d+)\/(\d{4})$/.exec(numero || "");
+  if (!m) return [];
+  const r = await fetch(`https://pncp.gov.br/pncp-api/v1/orgaos/${m[1]}/compras/${m[3]}/${parseInt(m[2], 10)}/arquivos`, { headers: { accept: "application/json" } });
+  if (!r.ok) return [];
+  const tipo = a => (a.tipoDocumentoNome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const arqs = (await r.json() || []).filter(a => a.statusAtivo !== false && ["edital", "termo de referencia", "projeto basico"].includes(tipo(a)))
+    .sort((a, b) => (tipo(a) === "edital" ? 0 : 1) - (tipo(b) === "edital" ? 0 : 1));
+  const partes = []; let total = 0;
+  for (const a of arqs.slice(0, 2)) {
+    const url = a.url || a.uri; if (!url) continue;
+    const d = await fetch(url); if (!d.ok) continue;
+    const buf = await d.arrayBuffer();
+    if (!buf.byteLength || total + buf.byteLength > PNCP_MAX) continue;
+    const bytes = new Uint8Array(buf.slice(0, 5));
+    if (String.fromCharCode(...bytes).slice(0, 4) !== "%PDF") continue;   // so PDF: o Gemini nao le .docx/.zip aqui
+    total += buf.byteLength;
+    partes.push({ inlineData: { mimeType: "application/pdf", data: b64(buf) } });
+  }
+  return partes;
+}
+
 // Recorte inteligente: manda ao Gemini só os trechos do edital que decidem a participação.
 const TERMOS_RECORTE = [
   [6, ["habilitacao", "qualificacao tecnica", "qualificacao economico", "atestado de capacidade", "documentos de habilitacao", "regularidade fiscal", "certidao negativa", "balanco patrimonial", "indice de liquidez", "capital social minimo", "registro no conselho", "cnae"]],
@@ -105,7 +155,7 @@ export async function onRequestPost({ request, env }) {
   let b; try { b = await request.json(); } catch { return J({ erro: "JSON inválido" }, 400); }
   const id = parseInt(b.oportunidade_id, 10);
   if (!id) return J({ erro: "informe oportunidade_id" }, 400);
-  const [op] = await get(`oportunidades?id=eq.${id}&select=id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,ia_resumo,ia_termo,link_pncp`);
+  const [op] = await get(`oportunidades?id=eq.${id}&select=id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,ia_resumo,ia_termo,link_pncp,numero_controle_pncp`);
   if (!op) return J({ erro: "oportunidade não encontrada" }, 404);
   const [an] = await get(`edital_analise?oportunidade_id=eq.${id}&select=dados,resumo,risco,fonte`);
   const resumoEdital = JSON.stringify(an?.dados || {}).slice(0, 6000);
@@ -115,8 +165,12 @@ export async function onRequestPost({ request, env }) {
     if (b.acao === "analisar") {
       // Análise completa do edital sob demanda (a coleta também faz isso, mas só para editais do radar).
       const [tx] = await get(`edital_textos?oportunidade_id=eq.${id}&select=texto,arquivo`);
-      const fonte = tx?.texto ? "edital" : "objeto";
-      const corpo = tx?.texto
+      // sem texto salvo: baixa o PDF no PNCP e manda ao Gemini, que le PDF direto
+      const pdfs = tx?.texto ? [] : await pdfsDoEdital(op.numero_controle_pncp).catch(() => []);
+      const fonte = tx?.texto || pdfs.length ? "edital" : "objeto";
+      const corpo = pdfs.length
+        ? `O EDITAL COMPLETO VAI ANEXADO EM PDF. OBJETO: ${(op.objeto || "").slice(0, 1200)}`
+        : tx?.texto
         ? `TEXTO DO EDITAL (${tx.arquivo || ""}):\n${recortar(tx.texto)}`
         : `SÓ O OBJETO (o edital ainda não foi baixado):\n${(op.objeto || "").slice(0, 4000)}\nÓRGÃO: ${op.orgao_nome} (${op.municipio || ""}/${op.uf})\nMODALIDADE: ${op.modalidade || ""}\nVALOR ESTIMADO: ${op.valor_sigiloso ? "sigiloso" : op.valor_estimado}\nPRAZO PARA PROPOSTAS: ${op.data_fim_proposta || ""}`;
       const prompt = `Você analisa editais de licitação pública brasileira para uma consultoria que ajuda empresas fornecedoras a participar.
@@ -136,7 +190,7 @@ Em riscos considere prazo curto, exigência desproporcional, amostra, garantia a
 ${fonte === "objeto" ? 'Você recebeu apenas o objeto resumido: analise só o que ele permite, deixe o resto vazio e inclua em riscos um item {"nivel":"medio","tema":"Edital não lido","descricao":"Confirme exigências e prazos no edital completo no PNCP."}.' : ""}
 
 ${corpo}`;
-      const res = await gemini(env, prompt, true);
+      const res = pdfs.length ? await geminiPartes(env, [{ text: prompt }, ...pdfs]) : await gemini(env, prompt, true);
       const d = Array.isArray(res) ? (res[0] || {}) : (res || {});
       let risco = parseInt(d.risco_geral, 10);
       risco = isNaN(risco) ? null : Math.max(0, Math.min(100, risco));
