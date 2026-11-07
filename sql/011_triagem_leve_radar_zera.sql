@@ -1,0 +1,8 @@
+-- SISLICITA 011 - aplicado em 07/11/2026 pelo SQL editor (ver conteudo real no banco)
+-- 1) triar_perfil: calcula numa tabela temporaria e grava em `triagem` so o que a tela mostra
+--    (alta, revisao, "quase entraram", cortados por regra com nota >= revisao e os exemplos).
+--    Os totais do funil continuam contando todos os editais abertos. Trava por perfil com
+--    pg_try_advisory_xact_lock para duas triagens do mesmo perfil nao se bloquearem (lock timeout).
+-- 2) radar_v2: a cada triagem o radar do perfil recomeca - apaga o que ainda esta 'novo'
+--    (e sem match) antes de inserir os 'alta' da triagem nova. O que voce ja marcou permanece.
+-- O texto completo das duas funcoes esta no banco; ver sql/009_filtro_v2.sql para a versao anterior.
