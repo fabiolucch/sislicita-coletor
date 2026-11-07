@@ -7,11 +7,15 @@ on:
   workflow_dispatch:
     inputs:
       modo:
-        description: "editais, pca, radar, catalogo, ia, radar_ia, itens, vigia, docs, radar_pca_ia, interesse, briefing, aprender, alertas, contratos, resultados, fornecedores ou tudo (aceita varios separados por virgula)"
+        description: "editais, pca, radar, catalogo, ia, radar_ia, itens, vigia, docs, radar_pca_ia, interesse, briefing, aprender, alertas, contratos, resultados, fornecedores, historico ou tudo (aceita varios separados por virgula)"
         default: "tudo"
       max_ia:
         description: "maximo de editais para a IA classificar"
         default: "300"
+
+permissions:
+  contents: read
+  actions: write      # o historico se redispara sozinho enquanto faltar dia
 
 concurrency:
   group: coleta-pncp
@@ -20,20 +24,28 @@ concurrency:
 jobs:
   coletar:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 210   # coleta completa (~100 min) + ate 40 min de historico; repositorio publico: sem custo
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install requests pypdf
-      - run: python coletor.py "$MODO"
+      - name: Coletar
+        id: coleta
+        run: python coletor.py "$MODO"
         env:
           # a rodada da tarde so atualiza o que muda rapido; a completa roda de manha
-          MODO: ${{ github.event.inputs.modo || (github.event.schedule == '17 21 * * *' && 'editais,radar,ia,interesse,alertas' || 'tudo') }}
+          MODO: ${{ github.event.inputs.modo || (github.event.schedule == '17 21 * * *' && 'editais,radar,ia,interesse,alertas,historico' || 'tudo') }}
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           MAX_IA: ${{ github.event.inputs.max_ia || '300' }}
+      # enquanto o historico nao estiver completo e a rodada tiver avancado, agenda a proxima (entra na fila do concurrency)
+      - name: Continuar o historico
+        if: always() && steps.coleta.outputs.hist_pendente == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X POST "repos/${{ github.repository }}/actions/workflows/coleta.yml/dispatches" -f ref=main -f 'inputs[modo]=historico'

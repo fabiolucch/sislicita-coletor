@@ -157,7 +157,9 @@ def editais():
 
 # ---------------------------------------------------------------- historico de editais (ja encerrados)
 HIST_DIAS = int(os.getenv("HIST_DIAS", "180"))               # ate onde voltar (dias)
-HIST_ORCAMENTO_MIN = int(os.getenv("HIST_ORCAMENTO_MIN", "110"))  # para de abrir dias novos depois disso
+HIST_ORCAMENTO_MIN = os.getenv("HIST_ORCAMENTO_MIN", "")      # minutos; vazio = 110 se for so o historico, 40 dentro de outra coleta
+MODO_SOLO = False                                             # True quando a execucao e so "historico" (definido no main)
+HIST_RESULT = {"dias": 0, "completo": False}                  # lido no fim da execucao para encadear/avisar
 HIST_PAR = int(os.getenv("HIST_PAR", "3"))                   # paginas em paralelo (acima disso o PNCP devolve 429)
 
 
@@ -168,14 +170,15 @@ def historico():
     coleta existe no banco. Esta etapa anda de tras para a frente, dia a dia, por data de publicacao,
     guarda onde parou em coleta_estado e retoma na proxima execucao."""
     inicio = time.monotonic()
+    orcamento = int(HIST_ORCAMENTO_MIN) if HIST_ORCAMENTO_MIN != "" else (110 if MODO_SOLO else 40)
     hoje = datetime.now(timezone.utc).date()
     limite = hoje - timedelta(days=HIST_DIAS)
     mn = estado("historico_min")
     d = (datetime.strptime(mn, "%Y%m%d").date() - timedelta(days=1)) if mn else hoje
     total, dias_feitos = 0, 0
     while d >= limite:
-        if (time.monotonic() - inicio) / 60 > HIST_ORCAMENTO_MIN:
-            print(f"[historico] orcamento de {HIST_ORCAMENTO_MIN} min atingido; retoma em {d:%Y-%m-%d}", flush=True)
+        if dias_feitos and (time.monotonic() - inicio) / 60 > orcamento:   # sempre grava ao menos 1 dia por rodada
+            print(f"[historico] orcamento de {orcamento} min atingido; retoma em {d:%Y-%m-%d}", flush=True)
             break
         s = d.strftime("%Y%m%d")
         rows = []
@@ -194,7 +197,9 @@ def historico():
         print(f"[historico] {s}: {len(rows)} editais", flush=True)
         d -= timedelta(days=1)
     else:
+        HIST_RESULT["completo"] = True
         print(f"[historico] concluido ate {limite:%Y-%m-%d}", flush=True)
+    HIST_RESULT["dias"] = dias_feitos
     print(f"[historico] {dias_feitos} dia(s), {total} editais nesta execucao", flush=True)
     return total
 
@@ -1550,16 +1555,53 @@ def notificar_fim(modo, resumo, segundos):
     tg(chat, texto)
 
 
+def notificar_historico(completo, limite_txt=""):
+    """Avisos do historico: so quando termina ou quando para sem avancar (rodadas intermediarias ficam quietas)."""
+    if not TG:
+        return
+    chat = tg_chat()
+    if not chat:
+        return
+    if completo:
+        tg(chat, f"📚 <b>Histórico de editais completo</b>\nOs últimos {HIST_DIAS} dias estão no banco{limite_txt}. "
+                 "A coleta diária continua de onde parou, sem trabalho extra.")
+    else:
+        tg(chat, "⚠️ <b>Histórico de editais parou sem avançar</b>\nO PNCP não respondeu. Retomo sozinho na próxima coleta agendada.")
+
+
+def fechar_execucao(modo, resumo, falhou, segundos):
+    """Fim da execucao: sinaliza ao workflow se o historico deve continuar e decide quais avisos mandar."""
+    hist_rodou = any(n == "historico" and e is None for n, _, e in resumo)
+    pendente = hist_rodou and not HIST_RESULT["completo"] and HIST_RESULT["dias"] > 0
+    saida = os.getenv("GITHUB_OUTPUT")
+    if saida:
+        with open(saida, "a") as f:
+            f.write(f"hist_pendente={'true' if pendente else 'false'}\n")
+    if HIST_RESULT["completo"] and HIST_RESULT["dias"] > 0:      # terminou nesta execucao
+        notificar_historico(True, f" (desde {(datetime.now(timezone.utc).date() - timedelta(days=HIST_DIAS)):%d/%m/%Y})")
+    if modo == "historico":
+        if pendente and not falhou:
+            return                                              # rodada intermediaria: sem aviso
+        if not HIST_RESULT["completo"] and HIST_RESULT["dias"] == 0 and not falhou:
+            notificar_historico(False)
+            return
+        if HIST_RESULT["completo"] and not falhou:
+            return                                              # ja avisou a conclusao acima
+    notificar_fim(modo, resumo, segundos)
+
+
 # a ordem importa no modo "tudo": o interesse so e calculado depois que a IA e a analise
 # do edital ja rodaram, e antes do briefing/alertas, que usam a nota para escolher o que mostrar
 ETAPAS = {"editais": editais, "pca": pca, "radar": radar, "ia": ia, "radar_ia": radar_ia, "itens": itens,
           "vigia": vigia, "docs": docs, "radar_pca_ia": radar_pca_ia, "interesse": interesse,
           "briefing": briefing, "aprender": aprender, "alertas": alertas,
-          "contratos": contratos, "resultados": resultados, "fornecedores": fornecedores}
-EXTRAS = {"catalogo": catalogo, "historico": historico}
+          "contratos": contratos, "resultados": resultados, "fornecedores": fornecedores,
+          "historico": historico}
+EXTRAS = {"catalogo": catalogo}
 
 if __name__ == "__main__":
     modo = sys.argv[1] if len(sys.argv) > 1 else "tudo"
+    MODO_SOLO = (modo.strip() == "historico")
     etapas = list(ETAPAS) if modo == "tudo" else [m.strip() for m in modo.split(",") if m.strip()]  # aceita varias: "contratos,resultados"
     ETAPAS = {**ETAPAS, **EXTRAS}
     falhou = False
@@ -1578,7 +1620,7 @@ if __name__ == "__main__":
             print(f"[{nome}] ERRO: {e}", file=sys.stderr)
             resumo.append((nome, 0, str(e)[:200]))
     try:
-        notificar_fim(modo, resumo, time.time() - inicio)
+        fechar_execucao(modo, resumo, falhou, time.time() - inicio)
     except Exception as e:
-        print(f"[fim] aviso no Telegram falhou: {e}", file=sys.stderr)
+        print(f"[fim] fechamento falhou: {e}", file=sys.stderr)
     sys.exit(1 if falhou else 0)
