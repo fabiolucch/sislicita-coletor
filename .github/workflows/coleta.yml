@@ -48,4 +48,13 @@ jobs:
         if: always() && steps.coleta.outputs.hist_pendente == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh api -X POST "repos/${{ github.repository }}/actions/workflows/coleta.yml/dispatches" -f ref=main -f 'inputs[modo]=historico'
+        run: |
+          # se ha uma execucao manual esperando na fila, nao a substitui: ela retoma o historico quando terminar
+          r="repos/${{ github.repository }}/actions/workflows/coleta.yml/runs"
+          n=0
+          for st in queued pending waiting requested; do
+            k=$(gh api "$r?status=$st&per_page=10" --jq '[.workflow_runs[] | select(.id != ${{ github.run_id }})] | length')
+            n=$((n + k))
+          done
+          if [ "$n" -gt 0 ]; then echo "ha $n execucao(oes) na fila; o historico continua depois dela"; exit 0; fi
+          gh api -X POST "repos/${{ github.repository }}/actions/workflows/coleta.yml/dispatches" -f ref=main -f 'inputs[modo]=historico'

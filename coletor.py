@@ -1745,6 +1745,14 @@ def fechar_execucao(modo, resumo, falhou, segundos):
     """Fim da execucao: sinaliza ao workflow se o historico deve continuar e decide quais avisos mandar."""
     hist_rodou = any(n == "historico" and e is None for n, _, e in resumo)
     pendente = hist_rodou and not HIST_RESULT["completo"] and HIST_RESULT["dias"] > 0
+    if not any(n == "historico" for n, _, _ in resumo):
+        # uma coleta manual pode ter ocupado o lugar da corrente do historico na fila: retoma se ainda falta
+        try:
+            mn = estado("historico_min")
+            limite = datetime.now(timezone.utc).date() - timedelta(days=HIST_DIAS)
+            pendente = bool(mn) and datetime.strptime(mn, "%Y%m%d").date() - timedelta(days=1) >= limite
+        except Exception:
+            pendente = False
     saida = os.getenv("GITHUB_OUTPUT")
     if saida:
         with open(saida, "a") as f:
