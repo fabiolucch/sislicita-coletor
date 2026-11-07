@@ -139,6 +139,52 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .tv aside{display:none}.tv main{margin:0;max-width:none;padding:22px 28px}.tv .hero .clk{font-size:78px}
 @media(max-width:860px){.hero{grid-template-columns:1fr;text-align:center}.hero .hr{justify-content:center}.hero .hr div{text-align:center}.hero .clk{font-size:44px}.dg{grid-template-columns:1fr}}
 .aib{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;color:#8b7cf6;vertical-align:-2px;margin-right:5px;flex:none;opacity:.9}.aib svg{width:14px;height:14px;fill:currentColor}.tag .aib{width:11px;height:11px;margin:0 4px 0 -2px;vertical-align:-1px}.tag .aib svg{width:11px;height:11px}.hero .aib,.tv-root .aib{color:#c4b5fd}
+/* ===== Responsivo: celular e tablet (o desktop acima nao muda) ===== */
+@media(max-width:1100px) and (min-width:861px){main{padding:22px 20px 36px;min-width:0}.hero .hr{flex-wrap:wrap;justify-content:flex-end}.dg{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}.dg>*{min-width:0}.cols14{gap:3px}.cols14 .c{min-width:0}.cols14 .c b{font-size:9px}}
+@media(max-width:860px){
+ /* o main ainda herdava width:calc(100% - 236px) do desktop e ficava com ~150px no celular */
+ main{width:100%;max-width:100%;margin:0;min-width:0;padding:14px 14px calc(28px + env(safe-area-inset-bottom));overflow-x:clip}
+ aside{position:sticky;top:0;z-index:60;width:100%;max-width:100%;padding:6px 10px;gap:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch;box-shadow:0 2px 14px #02061766}
+ aside::-webkit-scrollbar{display:none}
+ aside a{padding:10px 12px;font-size:13.5px;flex:none}
+ aside a svg{width:17px;height:17px}
+ aside .sair{padding:9px 14px;flex:none}
+ h2{font-size:19px;line-height:1.25}.sub{font-size:13px}
+ .top{margin-bottom:12px;gap:8px}
+ /* tamanho 16px evita o zoom automatico do iOS ao tocar num campo */
+ input,select,textarea{font-size:16px;padding:10px 11px}
+ button{min-height:40px}button.sm{min-height:34px;padding:6px 12px}
+ .bar{padding:10px;gap:8px;margin-bottom:12px}
+ .bar>*{flex:1 1 calc(50% - 8px);min-width:0;width:auto}
+ .bar input[type=search],.bar input.grow{flex:1 1 100%;min-width:0}
+ .bar button{flex:1 1 100%}
+ .card{padding:13px 14px}
+ .row{flex-wrap:wrap}
+ .oc{padding:14px 14px 0;gap:4px 12px}
+ .oc .acts{margin:12px -14px 0;padding:9px 12px}
+ .oc .h{font-size:14px}
+ .scr{width:46px;height:46px}.scr b{width:37px;height:37px;font-size:14px}
+ .grid{grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:10px}
+ .kps{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.kp{padding:11px 12px}.kp .n{font-size:23px}
+ .pbox{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .dg,.dex{grid-template-columns:minmax(0,1fr)}.dg>*{min-width:0}
+ .cols14{gap:3px}.cols14 .c{min-width:0}.cols14 .c b{font-size:9px;letter-spacing:-.2px}
+ .dkv,.pzg{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .dsum{flex-wrap:wrap}
+ .br.wide{grid-template-columns:minmax(90px,36%) 1fr 44px}
+ .hero{padding:16px;gap:12px}.hero .hk{font-size:21px}.hero .hr{flex-wrap:wrap;gap:12px 18px}.hero .hr div{white-space:normal}
+ .hero .clk{font-size:40px}
+ .funil div{flex:1 1 calc(33% - 8px)}
+ .cols{grid-auto-columns:minmax(80vw,1fr);scroll-snap-type:x mandatory;padding-bottom:6px}.cols>*{scroll-snap-align:start}
+ table{font-size:13px}td,th{padding:8px 6px}
+ /* menu de status vira uma folha na parte de baixo, em vez de um popover de 250px que estoura a tela */
+ .stmenu{position:fixed;left:10px;right:10px;top:auto;bottom:10px;width:auto;max-height:65vh;z-index:80;box-shadow:0 -6px 30px #0f172a40}
+ .stit{padding:10px 10px}
+ .toastw{left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom))}.toast{width:100%}
+ .pg{flex-wrap:wrap}
+ #login .box{padding:26px 20px}
+}
+@media(max-width:380px){.kps,.pbox,.dkv,.pzg{grid-template-columns:1fr}.bar>*{flex-basis:100%}}
 </style>
 </head>
 <body>
@@ -342,7 +388,7 @@ async processos(){
 async radar(){
  const A0=window.ARG||{};window.ARG=null;
  const perfis=(await q(sb.from('perfis_busca').select('id,nome').order('nome'))).data;
- main.innerHTML=`<div class="top"><div><h2>Radar de oportunidades</h2><p class="sub">Ordenado pela nota de interesse. Passe o mouse na nota para ver a composição.</p></div><details class="leg"><summary>Como a nota é calculada</summary><div class="legc"><table class="tb"><tr><th>Fator</th><th>Peso</th><th>O que mede</th></tr><tr><td>Aderência ao perfil</td><td>35%</td><td>o quanto o objeto é do seu setor (IA quando já avaliou, senão palavras-chave)</td></tr><tr><td>Tamanho do negócio</td><td>25%</td><td>comissão potencial, em escala log: R$ 30 mil = 0, R$ 1 mi = 60, R$ 10 mi = 100</td></tr><tr><td>Folga de preço</td><td>15%</td><td>desconto típico da disputa nesse objeto (30% ou mais = folga grande)</td></tr><tr><td>Prazo</td><td>15%</td><td>dá para mobilizar uma empresa a tempo (5 a 20 dias é o ideal)</td></tr><tr><td>Risco do edital</td><td>10%</td><td>o quanto é restritivo, invertido (edital analisado pela IA)</td></tr></table><div class="legf"><b>Faixas:</b> <span class="tag ok">65+</span> olhar hoje · <span class="tag w">50 a 64</span> vale conferir · <span class="tag">35 a 49</span> só se sobrar tempo · <span class="tag b">abaixo de 35</span> provavelmente não compensa. O que ainda não se sabe entra como neutro (50), então a nota tende a subir conforme a IA analisa o edital e a base de preços cresce.</div></div></details></div><div class="bar"><select id="fp"><option value="">Todos os perfis</option>${perfis.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select>
+ main.innerHTML=`<div class="top"><div><h2>Radar de oportunidades</h2><p class="sub">Ordenado pela nota de interesse. No computador, passe o mouse na nota para ver a composição; no celular, abra Detalhes.</p></div><details class="leg"><summary>Como a nota é calculada</summary><div class="legc"><table class="tb"><tr><th>Fator</th><th>Peso</th><th>O que mede</th></tr><tr><td>Aderência ao perfil</td><td>35%</td><td>o quanto o objeto é do seu setor (IA quando já avaliou, senão palavras-chave)</td></tr><tr><td>Tamanho do negócio</td><td>25%</td><td>comissão potencial, em escala log: R$ 30 mil = 0, R$ 1 mi = 60, R$ 10 mi = 100</td></tr><tr><td>Folga de preço</td><td>15%</td><td>desconto típico da disputa nesse objeto (30% ou mais = folga grande)</td></tr><tr><td>Prazo</td><td>15%</td><td>dá para mobilizar uma empresa a tempo (5 a 20 dias é o ideal)</td></tr><tr><td>Risco do edital</td><td>10%</td><td>o quanto é restritivo, invertido (edital analisado pela IA)</td></tr></table><div class="legf"><b>Faixas:</b> <span class="tag ok">65+</span> olhar hoje · <span class="tag w">50 a 64</span> vale conferir · <span class="tag">35 a 49</span> só se sobrar tempo · <span class="tag b">abaixo de 35</span> provavelmente não compensa. O que ainda não se sabe entra como neutro (50), então a nota tende a subir conforme a IA analisa o edital e a base de preços cresce.</div></div></details></div><div class="bar"><select id="fp"><option value="">Todos os perfis</option>${perfis.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select>
  <select id="fs"><option value="">Status (todos)</option>${opts(STATUS)}</select><select id="ff"><option value="">Edital + PCA</option><option value="e">Só editais</option><option value="p">Só PCA</option></select>
  <select id="fu"><option value="">UF (todas)</option>${opts(UFS)}</select><input id="fq" type="search" placeholder="Buscar no objeto…"></div><div id="lista"></div>`;
  const carregar=async()=>{
