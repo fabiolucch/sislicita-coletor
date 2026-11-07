@@ -495,7 +495,7 @@ async perfis(){
  main.innerHTML=`<div class="top"><div><h2>Perfis de busca</h2><p class="sub">Cada perfil descreve, com suas palavras, o que você procura. O sistema compara o <b>significado</b> de cada edital aberto com essa descrição e dá uma nota de 0 a 100: <b>Alta</b> vai para o Radar e alertas, <b>Revisão</b> fica para você conferir, o resto fica guardado com o motivo. Você pode ter quantos perfis quiser e escolher quais estão <b>valendo agora</b>.</p></div></div>
  ${(data||[]).map(p=>`<div class="card pf" id="p${p.id}">
  <div class="row"><input class="pf-n" data-k="nome" value="${esc(p.nome)}"><label class="pf-on"><input type="checkbox" style="width:auto" data-k="ativo" ${p.ativo?'checked':''}> Valendo agora</label></div>
- <div class="m" id="fr${p.id}">${p.funil&&!p.funil.erro?funilTxtPf(p):'Ainda não testado: escreva a descrição e toque em <b>Salvar e testar</b>.'}</div>
+ <div class="m" id="fr${p.id}">${p.funil&&!p.funil.erro?funilTxtPf(p):'Este perfil ainda não buscou nada: escreva a descrição e toque em <b>Salvar e buscar editais</b>.'}</div>
  <h4>1. O que você procura</h4><div class="m sv-ex">Escreva livremente: o que a empresa vende ou presta, outros nomes que aparecem nos editais e o que <b>não</b> interessa (coisas parecidas que devem ficar de fora).</div>
  <textarea rows="6" data-k="prompt" placeholder="Ex.: Fornecimento de carne bovina, suína e de frango congelada ou resfriada, cortes para churrasco, picanha, fraldinha, linguiça. Também gêneros alimentícios perecíveis quando a carne for parte relevante. Não interessa: merenda preparada, refeições prontas, ração animal.">${esc(p.prompt||'')}</textarea>
  <div class="sv-bt"><button class="sec sm" onclick="sugerirPf('${p.id}')">${AI('Usa o Gemini')} Melhorar o texto com IA</button></div><div id="sg${p.id}"></div>
@@ -509,7 +509,8 @@ async perfis(){
  <div><label>Nota mínima para Alta (vai ao Radar)</label><input type="number" data-k="nota_alta" value="${p.nota_alta??70}"></div><div><label>Nota mínima para Revisão</label><input type="number" data-k="nota_revisao" value="${p.nota_revisao??45}"></div></div>
  <h4>4. Sua comissão</h4><div class="f2"><div><label>Percentual sobre o contrato (%)</label><input type="number" step="0.1" data-k="comissao_pct" value="${p.comissao_pct??1}"></div><div class="m" style="align-self:end">Usado para estimar quanto você recebe em cada oportunidade.</div></div>
  <h4>5. Exemplos</h4><div class="m">${(p.exemplos_pos||[]).length} bons · ${(p.exemplos_neg||[]).length} ruins. Na tela <a class="l" onclick="window.__TG.perfil='${p.id}';ir('triagem')">Triagem</a>, toque em 👍 ou 👎 nos editais: o perfil aprende na hora.</div>
- <div class="sv-bt" style="margin-top:14px"><button onclick="salvarPerfil('${p.id}')">Salvar e testar</button><button class="sec" onclick="window.__TG.perfil='${p.id}';ir('triagem')">Ver triagem</button><button class="sec" onclick="duplicarPerfil('${p.id}')">Duplicar</button><button class="sec" onclick="excluirPerfil('${p.id}')">Excluir</button></div></div>`).join('')}
+ <div class="m" style="margin-top:14px"><b>Salvar e buscar editais:</b> grava o perfil e procura agora, entre todos os editais abertos, os que combinam com ele. O resultado aparece no topo deste card e em <b>Triagem</b>. Use sempre que mudar o texto, as regras ou os exemplos.</div>
+ <div class="sv-bt" style="margin-top:8px"><button onclick="salvarPerfil('${p.id}')">Salvar e buscar editais</button><button class="sec" onclick="window.__TG.perfil='${p.id}';ir('triagem')">Ver triagem</button><button class="sec" onclick="duplicarPerfil('${p.id}')">Duplicar</button><button class="sec" onclick="excluirPerfil('${p.id}')">Excluir</button></div></div>`).join('')}
  <button class="sec" onclick="novoPerfil()">+ Novo perfil</button>`;},
 
 async triagem(){return renderTriagem();},
@@ -565,7 +566,7 @@ async function salvarPerfil(id){const c=$('#p'+id);const arr=v=>v.split(',').map
  if(v.nota_revisao>v.nota_alta)return alert('A nota de Revisão não pode ser maior que a de Alta.');
  const fr=$('#fr'+id);fr.innerHTML='Salvando…';
  const {error}=await sb.from('perfis_busca').update(v).eq('id',id);if(error){fr.textContent='Erro: '+error.message;return;}
- if(!v.prompt){fr.innerHTML='Salvo. Escreva a descrição (item 1) para o perfil poder ser testado.';return;}
+ if(!v.prompt){fr.innerHTML='Salvo. Escreva a descrição (item 1) para o perfil poder buscar editais.';return;}
  fr.innerHTML='Salvo. Lendo a descrição com IA e avaliando todos os editais abertos… (até 1 minuto)';
  const j=await apiPerfil({acao:'salvar',perfil:id});
  if(j.erro||j.funil?.erro){fr.textContent='Não consegui testar: '+(j.erro||j.funil.erro);return;}
@@ -587,7 +588,7 @@ async function renderTriagem(){
  let h=`<div class="top"><div><h2>Triagem</h2><p class="sub">Todos os editais abertos recebem uma nota de 0 a 100 de semelhança com o perfil. Nada some sem motivo: aqui você vê o que entrou, o que está na dúvida e o que ficou de fora. Toque em 👍 (é isso) ou 👎 (não é) para o perfil aprender.</p></div></div>
  <div class="card"><div class="row" style="gap:10px;flex-wrap:wrap"><select onchange="window.__TG.perfil=this.value;window.__TG.pag=0;renderTriagem()" style="max-width:340px">${perfis.map(x=>`<option value="${x.id}" ${x.id===p.id?'selected':''}>${esc(x.nome)}${x.ativo?' · valendo':''}</option>`).join('')}</select>
  <span class="tag ${p.ativo?'ok':''}">${p.ativo?'Valendo agora':'Desativado (só teste)'}</span><button class="sec sm" onclick="refazerTriagem()">Refazer triagem</button><button class="sec sm" onclick="ir('perfis')">Editar perfil</button></div>`;
- if(!p.funil||f.erro){h+=`<div class="m" style="margin-top:10px">${f.erro?esc(f.erro):'Este perfil ainda não foi testado.'} Escreva a descrição em <a class="l" onclick="ir('perfis')">Perfis de busca</a> e toque em <b>Salvar e testar</b>.</div></div>`;main.innerHTML=h;return;}
+ if(!p.funil||f.erro){h+=`<div class="m" style="margin-top:10px">${f.erro?esc(f.erro):'Este perfil ainda não buscou editais.'} Escreva a descrição em <a class="l" onclick="ir('perfis')">Perfis de busca</a> e toque em <b>Salvar e buscar editais</b>.</div></div>`;main.innerHTML=h;return;}
  const sem=Math.max(0,(f.abertos||0)-(f.com_vetor||0)),aval=(f.com_vetor||0)-(f.regra||0),w=v=>Math.max(.5,100*(v||0)/Math.max(1,f.com_vetor));
  h+=`<div class="m" style="margin-top:8px">Triagem feita ${p.triado_em?'há '+agoSB(p.triado_em):'—'} · comissão ${String(p.comissao_pct??1).replace('.',',')}% · Alta ≥ ${p.nota_alta}, Revisão ≥ ${p.nota_revisao}</div>
  <div class="tg-f"><div><b>${nBR(f.abertos)}</b><span>editais abertos</span></div><div><b>${nBR(f.regra)}</b><span>cortados por regra fixa</span></div><div><b>${nBR(aval)}</b><span>avaliados pela IA</span></div><div class="ok"><b>${nBR(f.alta)}</b><span>Alta</span></div><div class="w"><b>${nBR(f.revisao)}</b><span>Revisão</span></div></div>
