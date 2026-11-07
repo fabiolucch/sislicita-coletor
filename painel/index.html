@@ -564,7 +564,7 @@ async function conferirCobertura(){
 async function testarGeminiSv(){window.__SVX.gem='…';renderServicos(true,true);window.__SVX.gem=await apiSv('POST','',{acao:'testar_gemini'});if(tela==='servicos')renderServicos(true,true);}
 
 async function renderServicos(sil,cache){
- clearInterval(window.__sv);window.__sv=setInterval(()=>{if(tela!=='servicos')clearInterval(window.__sv);else if(!document.hidden&&!window.__SVX.cobBusy)renderServicos(true);},30000);
+ clearInterval(window.__sv);window.__sv=setInterval(()=>{if(tela!=='servicos')clearInterval(window.__sv);else if(!document.hidden&&!window.__SVX.cobBusy)renderServicos(true);},60000);
  const X=window.__SVX;
  if(!cache||!window.__SVD){
   if(!sil)main.innerHTML='<div class="vazio">Carregando…</div>';
@@ -572,7 +572,7 @@ async function renderServicos(sil,cache){
   window.__SV=rs.data||null;window.__SVD={L:lg.data||[],R:rs.data,rpcErro:rs.error,ex,hm:(es.data||[])[0]?.valor};
  }
  const {L,R,rpcErro,ex,hm}=window.__SVD,agora=Date.now(),H=36e5;
- const runs=ex.runs||[],rodando=runs.filter(r=>r.status!=='completed'),emFila=rodando.length>0;
+ const runs=ex.runs||[],rodGH=runs.filter(r=>r.status!=='completed'),rodLog=L.filter(c=>!c.finalizado_em&&Date.now()-new Date(c.iniciado_em)<3*36e5),rodando=rodGH.length?rodGH:rodLog,emFila=rodando.length>0;
  const okUlt=L.find(c=>c.finalizado_em&&c.status==='ok'),idadeH=okUlt?(agora-new Date(okUlt.finalizado_em))/H:null;
  const err24=L.filter(c=>c.status==='erro'&&agora-new Date(c.iniciado_em)<24*H);
  const fontes=[...new Set(L.map(c=>c.fonte))];
@@ -594,7 +594,7 @@ async function renderServicos(sil,cache){
  const ia=R?R.ia_por_dia:[],hoje=new Date().toLocaleDateString('sv-SE'),iaHoje=ia.filter(x=>x.dia===hoje).reduce((a,x)=>({c:a.c+x.chamadas,l:a.l+x.limite,f:a.f+x.falhas,ti:a.ti+x.tin,to:a.to+x.tout}),{c:0,l:0,f:0,ti:0,to:0});
  const iaCol=iaHoje.c?(iaHoje.l+iaHoje.f>iaHoje.c*.3?'b':iaHoje.l+iaHoje.f>0?'w':'ok'):'';
  const cobOk=X.cob.filter(c=>c.pncp>0);const cobMin=cobOk.length?Math.min(...cobOk.map(c=>c.banco/c.pncp)):null;
- let h=`<div class="top"><div><h2>Serviços</h2><p class="sub">Coleta do PNCP, banco de dados e Gemini: situação, evolução e disparo manual. Atualiza sozinha a cada 30 s.</p></div><button class="sec sm" onclick="window.__SVD=null;renderServicos()">Atualizar agora</button></div>`;
+ let h=`<div class="top"><div><h2>Serviços</h2><p class="sub">Coleta do PNCP, banco de dados e Gemini: situação, evolução e disparo manual. Atualiza sozinha a cada minuto.</p></div><button class="sec sm" onclick="window.__SVD=null;renderServicos()">Atualizar agora</button></div>`;
  if(rpcErro)h+=`<div class="card" style="border-color:#d97706"><b>Faltam as métricas do banco.</b> <span class="m">Rode o arquivo <code>sql/008_servicos.sql</code> no SQL editor do Supabase (uma vez) e atualize. Enquanto isso, só as seções de coleta e GitHub funcionam. (${esc(rpcErro.message||'')})</span></div>`;
  h+=`<div class="sv-g">${chipSv(sCol,'Coleta',emFila?'Rodando':sCol==='ok'?'Em dia':sCol==='w'?'Com erros':'Atrasada',emFila?`${rodando.length} execução(ões) no GitHub`:okUlt?`última ok há ${agoSB(okUlt.finalizado_em)} · ${err24.length} erro(s) em 24 h`:'sem coletas')}${chipSv(hp?(hp.completo?'ok':emFila?'':'w'):'','Histórico',hp?hp.pct+'%':'—',hp?(hp.completo?'completo (180 dias)':'até '+hp.dia.toLocaleDateString('pt-BR')):'não iniciado')}${R?chipSv(dPct>.8?'b':dPct>.6?'w':'ok','Banco',fmtB(R.banco_bytes),`${(dPct*100).toFixed(1)}% de ${fmtB(SV_DISCO)}`):''}${R?chipSv(iaCol,'Gemini hoje',nBR(iaHoje.c)+' chamadas',iaHoje.c?`${nBR(iaHoje.l)} limite (429) · ${nBR(iaHoje.f)} falhas`:'sem uso registrado hoje'):''}${chipSv(cobMin==null?'':cobMin>=.98?'ok':cobMin>=.9?'w':'b','Cobertura',cobMin==null?'—':(cobMin*100).toFixed(1)+'%',cobMin==null?'rode a conferência abaixo':'pior dia dos últimos 7')}</div>`;
 
