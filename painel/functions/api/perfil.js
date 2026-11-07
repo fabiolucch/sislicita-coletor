@@ -55,11 +55,16 @@ async function sugerir(env, texto) {
 Reescreva a descrição abaixo em 4 a 8 linhas, em português, deixando claro: o que a empresa vende ou presta; variações e sinônimos que aparecem em editais (inclua termos técnicos e populares); o que NÃO interessa (coisas parecidas que devem ficar de fora). Não invente limites de valor, UF ou prazo. Responda só com o texto.
 
 Descrição: ${texto}`;
-  const r = await fetch(`${GEM}/models/gemini-2.5-flash:generateContent`, {
-    method: "POST", headers: { "x-goog-api-key": env.GEMINI_API_KEY, "content-type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3 } }),
-  });
-  if (!r.ok) throw new Error(`Gemini ${r.status}`);
+  let r, ultimo = 0;
+  for (const m of ["gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-2.5-flash"]) {  // mesma lista do ia.js: segue se um modelo nao existir (404)
+    r = await fetch(`${GEM}/models/${m}:generateContent`, {
+      method: "POST", headers: { "x-goog-api-key": env.GEMINI_API_KEY, "content-type": "application/json" },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3 } }),
+    });
+    if (r.ok) break;
+    ultimo = r.status;
+  }
+  if (!r.ok) throw new Error(`Gemini ${ultimo}`);
   return ((await r.json()).candidates?.[0]?.content?.parts?.[0]?.text || "").trim();
 }
 
