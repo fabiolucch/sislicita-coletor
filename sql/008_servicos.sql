@@ -21,7 +21,7 @@ create policy ia_uso_ler on public.ia_uso for select to authenticated using (tru
 create index if not exists oportunidades_pub_idx on public.oportunidades (data_publicacao);
 
 create or replace function public.servico_resumo() returns jsonb
-language plpgsql security definer set search_path = public
+language plpgsql security definer set search_path = public set statement_timeout = '30s'
 as $$
 declare r jsonb;
 begin
