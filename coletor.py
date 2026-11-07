@@ -260,25 +260,32 @@ def vetorizar(textos, tarefa="RETRIEVAL_DOCUMENT"):
     raise RuntimeError("embedding: limite do Gemini esgotado (429) - continua na proxima execucao")
 
 
-def vetores():
-    """Gera o vetor de significado dos editais abertos que ainda nao tem (prioriza os que fecham antes)."""
-    inicio, total = time.monotonic(), 0
+def _vetorizar_fonte(rpc, tabela, coluna, rotulo, inicio, total):
+    """Vetoriza o que a RPC listar como pendente, respeitando o orcamento de tempo/quantidade."""
     while total < VET_MAX and (time.monotonic() - inicio) / 60 < VET_MIN:
-        r = requests.post(f"{SB}/rpc/pendentes_vetor", headers=HDR, data=json.dumps({"p_limite": 1000}), timeout=120)
+        r = requests.post(f"{SB}/rpc/{rpc}", headers=HDR, data=json.dumps({"p_limite": 1000}), timeout=120)
         if r.status_code >= 300:
-            raise RuntimeError(f"pendentes_vetor: {r.status_code} {r.text[:200]}")
+            raise RuntimeError(f"{rpc}: {r.status_code} {r.text[:200]}")
         pend = r.json()
         if not pend:
             break
         for i in range(0, len(pend), VET_LOTE):
             lote = pend[i:i + VET_LOTE]
             vs = vetorizar([x["texto"] for x in lote])
-            rows = [{"oportunidade_id": x["id"], "emb": "[" + ",".join(f"{v:.5f}" for v in vec) + "]"} for x, vec in zip(lote, vs)]
-            upsert("edital_emb", rows, "oportunidade_id")
+            rows = [{coluna: x["id"], "emb": "[" + ",".join(f"{v:.5f}" for v in vec) + "]"} for x, vec in zip(lote, vs)]
+            upsert(tabela, rows, coluna)
             total += len(rows)
             if total >= VET_MAX or (time.monotonic() - inicio) / 60 >= VET_MIN:
                 break
-        print(f"[vetores] {total} editais vetorizados ate agora", flush=True)
+        print(f"[vetores] {total} vetorizados ate agora (ultima fonte: {rotulo})", flush=True)
+    return total
+
+
+def vetores():
+    """Vetor de significado dos editais abertos e, com o tempo que sobrar, dos itens futuros do PCA."""
+    inicio = time.monotonic()
+    total = _vetorizar_fonte("pendentes_vetor", "edital_emb", "oportunidade_id", "editais", inicio, 0)
+    total = _vetorizar_fonte("pendentes_vetor_pca", "pca_emb", "pca_item_id", "PCA", inicio, total)
     return total
 
 

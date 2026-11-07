@@ -588,7 +588,7 @@ async function excluirPerfil(id){if(!confirm('Excluir este perfil? A triagem e o
 
 async function renderTriagem(){
  const T=window.__TG;
- const perfis=(await q(sb.from('perfis_busca').select('id,nome,ativo,funil,triado_em,comissao_pct,nota_alta,nota_revisao,exemplos_pos,exemplos_neg').order('nome'))).data||[];
+ const perfis=(await q(sb.from('perfis_busca').select('id,nome,ativo,funil,funil_pca,triado_em,comissao_pct,nota_alta,nota_revisao,exemplos_pos,exemplos_neg').order('nome'))).data||[];
  if(!perfis.length){main.innerHTML='<div class="vazio">Crie um perfil em <a class="l" onclick="ir(\'perfis\')">Perfis de busca</a>.</div>';return;}
  if(!T.perfil||!perfis.find(p=>p.id===T.perfil))T.perfil=(perfis.find(p=>p.ativo&&p.funil)||perfis.find(p=>p.funil)||perfis[0]).id;
  const p=perfis.find(x=>x.id===T.perfil),f=p.funil||{},pos=new Set(p.exemplos_pos||[]),neg=new Set(p.exemplos_neg||[]);
@@ -603,6 +603,7 @@ async function renderTriagem(){
  <div class="tg-bar" title="Distribuição dos editais avaliados"><i style="width:${w(f.alta)}%;background:#16a34a"></i><i style="width:${w(f.revisao)}%;background:#d97706"></i><i style="width:${w(f.baixa)}%;background:#cbd5e1"></i><i style="width:${w(f.regra)}%;background:#94a3b8"></i></div>
  <div class="m">Cortes por regra: ${Object.entries(f.cortes||{}).map(([k,v])=>`${esc(k)} <b>${nBR(v)}</b>`).join(' · ')||'nenhum'}</div>
  ${sem>0?`<div class="m">⏳ ${nBR(sem)} editais abertos ainda não foram lidos pela IA; entram nas próximas coletas.</div>`:''}
+ ${p.funil_pca&&!p.funil_pca.erro?`<div class="m">📅 PCA (previsão de compras): <b>${nBR(p.funil_pca.alta)}</b> em Alta e <b>${nBR(p.funil_pca.revisao)}</b> em Revisão, de ${nBR(p.funil_pca.itens)} itens futuros. Os de Alta vão para o <a class="l" onclick="ir('radar',{perfil:'${p.id}'})">Radar</a>.</div>`:''}
  ${f.regra_bons>0?`<div class="sv-d"><span>⚠ ${nBR(f.regra_bons)} editais com nota de Alta foram cortados por regra fixa. Confira na aba "Cortados por regra" se a regra não está apertada demais.</span></div>`:''}</div>
  <div class="tg-tabs">${abas.map(a=>`<button class="${T.aba===a[0]?'':'sec'} sm" onclick="window.__TG.aba='${a[0]}';window.__TG.pag=0;renderTriagem()">${a[1]} <span class="m">${nBR(a[2])}</span></button>`).join('')}</div>
  <div class="m sv-ex">${{alta:'Muito parecidos com o perfil: já estão no Radar (se o perfil estiver valendo).',revisao:'Zona de dúvida: confira e marque 👍 ou 👎. Cada marcação ajusta o perfil.',quase:'Ficaram pouco abaixo da Revisão. Se algum interessar, marque 👍: o perfil passa a buscar coisas assim.',regra:'Parecidos, mas cortados por UF, valor, modalidade ou prazo. Ordenados pela nota.',exemplos:'Editais que você marcou. 👍 puxa o perfil para coisas assim; 👎 afasta.'}[T.aba]}</div>

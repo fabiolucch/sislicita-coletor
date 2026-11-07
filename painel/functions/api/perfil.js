@@ -99,7 +99,9 @@ export async function onRequestPost({ request, env }) {
     } else if (b.acao !== "triar") return J({ erro: "ação inválida" }, 400);
 
     const funil = await rpc(auth, "triar_perfil", { p_id: id });
+    let funil_pca = null;
+    if (!funil?.erro) funil_pca = await rpc(auth, "triar_pca", { p_id: id }).catch(() => null);  // PCA e opcional: so tem nota se ja houver vetores
     if (p.ativo && !funil?.erro) await rpc(auth, "radar_v2", { p_id: id });
-    return J({ ok: true, funil });
+    return J({ ok: true, funil, funil_pca });
   } catch (e) { return J({ erro: String(e.message || e).slice(0, 240) }, 500); }
 }
