@@ -163,6 +163,16 @@ HIST_RESULT = {"dias": 0, "completo": False}                  # lido no fim da e
 HIST_PAR = int(os.getenv("HIST_PAR", "3"))                   # paginas em paralelo (acima disso o PNCP devolve 429)
 
 
+def coletar_dia(s):
+    """Todos os editais (das modalidades configuradas) publicados no dia s (AAAAMMDD)."""
+    rows = []
+    for m in MODALIDADES:
+        lista = paginas(f"{PNCP}/consulta/v1/contratacoes/publicacao",
+                        {"dataInicial": s, "dataFinal": s, "codigoModalidadeContratacao": m}, 50, HIST_PAR)
+        rows += [parse_edital(c) for c in lista if c.get("numeroControlePNCP")]
+    return rows
+
+
 def historico():
     """Preenche o banco com editais publicados no passado, ja encerrados ou nao.
 
@@ -181,12 +191,8 @@ def historico():
             print(f"[historico] orcamento de {orcamento} min atingido; retoma em {d:%Y-%m-%d}", flush=True)
             break
         s = d.strftime("%Y%m%d")
-        rows = []
         try:
-            for m in MODALIDADES:
-                lista = paginas(f"{PNCP}/consulta/v1/contratacoes/publicacao",
-                                {"dataInicial": s, "dataFinal": s, "codigoModalidadeContratacao": m}, 50, HIST_PAR)
-                rows += [parse_edital(c) for c in lista if c.get("numeroControlePNCP")]
+            rows = coletar_dia(s)
         except RuntimeError as e:
             print(f"[historico] AVISO {s}: {e}; paro aqui e retomo nesta data na proxima execucao", file=sys.stderr, flush=True)
             break
@@ -202,6 +208,55 @@ def historico():
     HIST_RESULT["dias"] = dias_feitos
     print(f"[historico] {dias_feitos} dia(s), {total} editais nesta execucao", flush=True)
     return total
+
+
+# ------------------------------------------------------------------ cobertura
+COB_DIAS = int(os.getenv("COB_DIAS", "14"))
+COB_MINIMO = float(os.getenv("COB_MINIMO", "0.98"))
+
+
+def contar_banco(iso):
+    r = requests.get(f"{SB}/oportunidades", timeout=120, params={"data_publicacao": "eq." + iso, "select": "id"},
+                     headers={**HDR, "Prefer": "count=exact", "Range-Unit": "items", "Range": "0-0"})
+    r.raise_for_status()
+    return int(r.headers.get("content-range", "0-0/0").split("/")[-1] or 0)
+
+
+def total_pncp(s):
+    """Quantos editais o PNCP diz ter publicado no dia (soma das modalidades coletadas)."""
+    t = 0
+    for m in MODALIDADES:
+        j = get(f"{PNCP}/consulta/v1/contratacoes/publicacao",
+                {"dataInicial": s, "dataFinal": s, "codigoModalidadeContratacao": m, "pagina": 1, "tamanhoPagina": 50})
+        t += int((j or {}).get("totalRegistros") or 0)
+    return t
+
+
+def cobertura():
+    """Compara, dia a dia, o que o PNCP publicou com o que esta no banco; refaz o dia que estiver abaixo do minimo."""
+    hoje = datetime.now(timezone.utc).date()
+    dias, refeitos = [], 0
+    for k in range(1, COB_DIAS + 1):
+        d = hoje - timedelta(days=k)
+        s, iso = d.strftime("%Y%m%d"), d.isoformat()
+        item = {"dia": iso}
+        try:
+            pncp, banco = total_pncp(s), contar_banco(iso)
+            item.update(pncp=pncp, banco=banco)
+            if pncp and banco < pncp * COB_MINIMO:
+                print(f"[cobertura] {iso}: banco {banco} de {pncp} no PNCP; refazendo o dia", flush=True)
+                rows = coletar_dia(s)
+                if rows:
+                    upsert("oportunidades", rows, "numero_controle_pncp")
+                item.update(banco=contar_banco(iso), refeito=True, antes=banco)
+                refeitos += 1
+        except RuntimeError as e:
+            item["erro"] = str(e)[:160]
+            print(f"[cobertura] AVISO {iso}: {e}", file=sys.stderr, flush=True)
+        dias.append(item)
+        print(f"[cobertura] {iso}: {item.get('banco')} de {item.get('pncp')}", flush=True)
+    estado("cobertura", json.dumps({"em": datetime.now(timezone.utc).isoformat(), "dias": dias}))
+    return refeitos
 
 
 # -------------------------------------------------------------------- PCA
@@ -1632,7 +1687,7 @@ ETAPAS = {"editais": editais, "pca": pca, "radar": radar, "ia": ia, "radar_ia": 
           "vigia": vigia, "docs": docs, "radar_pca_ia": radar_pca_ia, "interesse": interesse,
           "briefing": briefing, "aprender": aprender, "alertas": alertas,
           "contratos": contratos, "resultados": resultados, "fornecedores": fornecedores,
-          "historico": historico}
+          "historico": historico, "cobertura": cobertura}
 EXTRAS = {"catalogo": catalogo}
 
 if __name__ == "__main__":

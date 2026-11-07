@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       modo:
-        description: "editais, pca, radar, catalogo, ia, radar_ia, itens, vigia, docs, radar_pca_ia, interesse, briefing, aprender, alertas, contratos, resultados, fornecedores, historico ou tudo (aceita varios separados por virgula)"
+        description: "editais, pca, radar, catalogo, ia, radar_ia, itens, vigia, docs, radar_pca_ia, interesse, briefing, aprender, alertas, contratos, resultados, fornecedores, historico, cobertura ou tudo (aceita varios separados por virgula)"
         default: "tudo"
       max_ia:
         description: "maximo de editais para a IA classificar"

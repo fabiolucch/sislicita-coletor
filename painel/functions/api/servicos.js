@@ -1,12 +1,11 @@
-// Aba Serviços: execuções do GitHub Actions, disparo manual, teste do Gemini e conferência de cobertura no PNCP.
+// Aba Serviços: execuções do GitHub Actions, disparo manual e teste do Gemini (a cobertura roda no coletor: o PNCP bloqueia o Cloudflare com 429).
 // Exige login (JWT do Supabase). Segredos no Cloudflare Pages:
 //   GH_DISPARO  = token do GitHub (fine-grained, só neste repositório, permissão "Actions: Read and write") - necessário só para os botões de disparo
 //   GEMINI_API_KEY = já existente (usada no teste do Gemini)
 const SB = "https://tkbkkqebsxvmxnqiwjfl.supabase.co";
 const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrYmtrcWVic3h2bXhucWl3amZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5MDk1MjIsImV4cCI6MjEwOTQ4NTUyMn0.v--eJcYHEanBh9WG1xgOP-jPGwbR_fikk65AkvMPEaI";
 const REPO = "fabiolucch/sislicita-coletor", WORKFLOW = "coleta.yml", REF = "main";
-const ETAPAS = ["editais", "pca", "radar", "catalogo", "ia", "radar_ia", "itens", "vigia", "docs", "radar_pca_ia", "interesse", "briefing", "aprender", "alertas", "contratos", "resultados", "fornecedores", "historico", "tudo"];
-const MODALIDADES = { 4: "Concorrência Eletrônica", 5: "Concorrência Presencial", 6: "Pregão Eletrônico", 7: "Pregão Presencial", 8: "Dispensa", 12: "Credenciamento" };
+const ETAPAS = ["editais", "pca", "radar", "catalogo", "ia", "radar_ia", "itens", "vigia", "docs", "radar_pca_ia", "interesse", "briefing", "aprender", "alertas", "contratos", "resultados", "fornecedores", "historico", "cobertura", "tudo"];
 const MODELOS = ["gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-2.5-flash"];
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 
@@ -61,28 +60,6 @@ async function testarGemini(env) {
   return { modelos: out };
 }
 
-// Total de editais que o PNCP tem publicados no dia, por modalidade (para comparar com o que está no banco).
-async function cobertura(dia) {
-  if (!/^\d{8}$/.test(dia)) return { erro: "dia inválido" };
-  const por = {};
-  for (const [cod, nome] of Object.entries(MODALIDADES)) {
-    let n = null, http = 0;
-    for (const espera of [0, 1500, 4000]) {
-      if (espera) await new Promise(r => setTimeout(r, espera));
-      try {
-        const r = await fetch(`https://pncp.gov.br/api/consulta/v1/contratacoes/publicacao?dataInicial=${dia}&dataFinal=${dia}&codigoModalidadeContratacao=${cod}&pagina=1&tamanhoPagina=10`, { headers: { accept: "application/json", "user-agent": "sislicita-painel" } });
-        http = r.status;
-        if (r.status === 204) { n = 0; break; }
-        if (r.ok) { n = (await r.json()).totalRegistros ?? 0; break; }
-        if (r.status !== 429 && r.status < 500) break;
-      } catch { http = 0; }
-    }
-    por[nome] = { n, http };
-  }
-  const falhou = Object.values(por).some(v => v.n == null);
-  return { dia, por, total: falhou ? null : Object.values(por).reduce((a, v) => a + v.n, 0), pncp_ok: !falhou };
-}
-
 export async function onRequest({ request, env }) {
   if (!(await autenticar(request))) return J({ erro: "não autenticado" }, 401);
   const url = new URL(request.url);
@@ -90,7 +67,6 @@ export async function onRequest({ request, env }) {
     if (request.method === "GET") {
       const a = url.searchParams.get("acao");
       if (a === "execucoes") return J(await execucoes(env));
-      if (a === "cobertura") return J(await cobertura(url.searchParams.get("dia") || ""));
       return J({ erro: "ação inválida" }, 400);
     }
     const b = await request.json().catch(() => ({}));
