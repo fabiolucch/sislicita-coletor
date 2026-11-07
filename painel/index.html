@@ -518,7 +518,7 @@ async perfis(){
  <h4>4. Sua comissão</h4><div class="f2"><div><label>Percentual sobre o contrato (%)</label><input type="number" step="0.1" data-k="comissao_pct" value="${p.comissao_pct??1}"></div><div class="m" style="align-self:end">Usado para estimar quanto você recebe em cada oportunidade.</div></div>
  <h4>5. Exemplos</h4><div class="m">${(p.exemplos_pos||[]).length} bons · ${(p.exemplos_neg||[]).length} ruins. Na tela <a class="l" onclick="window.__TG.perfil='${p.id}';ir('triagem')">Triagem</a>, toque em 👍 ou 👎 nos editais: o perfil aprende na hora.</div>
  <div class="m" style="margin-top:14px"><b>Salvar e buscar editais:</b> grava o perfil e procura agora, entre todos os editais abertos, os que combinam com ele. O resultado aparece no topo deste card e em <b>Triagem</b>. Use sempre que mudar o texto, as regras ou os exemplos.</div>
- <div class="sv-bt" style="margin-top:8px"><button onclick="salvarPerfil('${p.id}')">Salvar e buscar editais</button><button class="sec" onclick="window.__TG.perfil='${p.id}';ir('triagem')">Ver triagem</button><button class="sec" onclick="duplicarPerfil('${p.id}')">Duplicar</button><button class="sec" onclick="excluirPerfil('${p.id}')">Excluir</button></div></div>`).join('')}
+ <div class="sv-bt" style="margin-top:8px"><button onclick="salvarPerfil('${p.id}')">Salvar e buscar editais</button><button class="sec" onclick="window.__TG.perfil='${p.id}';ir('triagem')">Ver triagem</button><button class="sec" onclick="duplicarPerfil('${p.id}')">Duplicar</button><button class="sec" onclick="excluirPerfil('${p.id}')">Excluir</button></div><div class="m" id="fb${p.id}" style="margin-top:10px"></div></div>`).join('')}
  <button class="sec" onclick="novoPerfil()">+ Novo perfil</button>`;},
 
 async triagem(){return renderTriagem();},
@@ -569,10 +569,10 @@ const MODS_PF=['Pregão - Eletrônico','Concorrência - Eletrônica','Dispensa',
 window.__TG=window.__TG||{perfil:null,aba:'alta',busca:'',pag:0};
 async function apiPerfil(body){const {data:{session}}=await sb.auth.getSession();const r=await fetch('/api/perfil',{method:'POST',headers:{authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:JSON.stringify(body)});const j=await r.json().catch(()=>({erro:'HTTP '+r.status}));return j;}
 function funilTxtPf(p){const f=p.funil||{};return `Última triagem ${p.triado_em?'há '+agoSB(p.triado_em):''}: <b>${nBR(f.alta)}</b> em Alta · <b>${nBR(f.revisao)}</b> em Revisão · ${nBR(f.regra)} cortados por regra · ${nBR(f.baixa)} pouco parecidos (de ${nBR(f.com_vetor)} editais abertos avaliados).`;}
-async function salvarPerfil(id){const c=$('#p'+id);const arr=v=>v.split(',').map(s=>s.trim()).filter(Boolean),num=v=>v===''?null:Number(v);const g=k=>c.querySelector(`[data-k=${k}]`);
+async function salvarPerfil(id){const c=$('#p'+id);const fb=$('#fb'+id);const arr=v=>v.split(',').map(s=>s.trim()).filter(Boolean),num=v=>v===''?null:Number(v);const g=k=>c.querySelector(`[data-k=${k}]`);
  const v={nome:g('nome').value.trim()||'Perfil',ativo:g('ativo').checked,prompt:g('prompt').value.trim()||null,palavras_incluir:arr(g('palavras_incluir').value),palavras_excluir:arr(g('palavras_excluir').value),ufs:arr(g('ufs').value.toUpperCase()),modalidades:[...c.querySelectorAll('[data-mod]')].filter(x=>x.checked).map(x=>x.dataset.mod),valor_min:num(g('valor_min').value),valor_max:num(g('valor_max').value),dias_min_abertura:Number(g('dias_min_abertura').value||0),nota_alta:Number(g('nota_alta').value||70),nota_revisao:Number(g('nota_revisao').value||45),comissao_pct:Number(g('comissao_pct').value||1)};
  if(v.nota_revisao>v.nota_alta)return alert('A nota de Revisão não pode ser maior que a de Alta.');
- const fr=$('#fr'+id);fr.innerHTML='Salvando…';
+ const fr={set innerHTML(v){$('#fr'+id).innerHTML=v;if(fb)fb.innerHTML=v;},set textContent(v){this.innerHTML=esc(v);}};fr.innerHTML='Salvando…';if(fb)fb.scrollIntoView({block:'center',behavior:'smooth'});
  const {error}=await sb.from('perfis_busca').update(v).eq('id',id);if(error){fr.textContent='Erro: '+error.message;return;}
  if(!v.prompt){fr.innerHTML='Salvo. Escreva a descrição (item 1) para o perfil poder buscar editais.';return;}
  fr.innerHTML='Salvo. Lendo a descrição com IA e avaliando todos os editais abertos… (até 1 minuto)';
