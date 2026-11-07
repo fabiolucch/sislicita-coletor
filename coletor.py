@@ -225,6 +225,8 @@ EMB_DIM = 768
 VET_MAX = int(os.getenv("VET_MAX", "40000"))        # editais vetorizados por execucao
 VET_MIN = float(os.getenv("VET_MIN", "45"))          # minutos de orcamento por execucao
 VET_LOTE = 100
+VET_PCA_MAX = int(os.getenv("VET_PCA_MAX", "15000"))  # itens de PCA por execucao (carga inicial sao ~80 mil)
+VET_PAUSA = float(os.getenv("VET_PAUSA", "0.4"))        # pausa entre lotes do PCA, em segundos
 
 
 def _norm(v):
@@ -260,9 +262,10 @@ def vetorizar(textos, tarefa="RETRIEVAL_DOCUMENT"):
     raise RuntimeError("embedding: limite do Gemini esgotado (429) - continua na proxima execucao")
 
 
-def _vetorizar_fonte(rpc, tabela, coluna, rotulo, inicio, total):
+def _vetorizar_fonte(rpc, tabela, coluna, rotulo, inicio, total, teto=None, pausa=0.0):
     """Vetoriza o que a RPC listar como pendente, respeitando o orcamento de tempo/quantidade."""
-    while total < VET_MAX and (time.monotonic() - inicio) / 60 < VET_MIN:
+    teto = min(VET_MAX, teto) if teto else VET_MAX
+    while total < teto and (time.monotonic() - inicio) / 60 < VET_MIN:
         r = requests.post(f"{SB}/rpc/{rpc}", headers=HDR, data=json.dumps({"p_limite": 1000}), timeout=120)
         if r.status_code >= 300:
             raise RuntimeError(f"{rpc}: {r.status_code} {r.text[:200]}")
@@ -275,17 +278,25 @@ def _vetorizar_fonte(rpc, tabela, coluna, rotulo, inicio, total):
             rows = [{coluna: x["id"], "emb": "[" + ",".join(f"{v:.5f}" for v in vec) + "]"} for x, vec in zip(lote, vs)]
             upsert(tabela, rows, coluna)
             total += len(rows)
-            if total >= VET_MAX or (time.monotonic() - inicio) / 60 >= VET_MIN:
+            if pausa:
+                time.sleep(pausa)      # deixa o disco do banco respirar entre os lotes
+            if total >= teto or (time.monotonic() - inicio) / 60 >= VET_MIN:
                 break
         print(f"[vetores] {total} vetorizados ate agora (ultima fonte: {rotulo})", flush=True)
     return total
 
 
 def vetores():
-    """Vetor de significado dos editais abertos e, com o tempo que sobrar, dos itens futuros do PCA."""
+    """Vetor de significado dos editais abertos e, com o tempo que sobrar, dos itens futuros do PCA.
+
+    O PCA tem um teto menor por execucao (VET_PCA_MAX): sao 80 mil itens de uma vez so na primeira
+    carga, e gravar tudo de uma vez esgota o orcamento de disco do Supabase. Depois da carga inicial
+    sobram poucos itens novos por dia, bem abaixo do teto, entao nao ha nada para desfazer.
+    """
     inicio = time.monotonic()
     total = _vetorizar_fonte("pendentes_vetor", "edital_emb", "oportunidade_id", "editais", inicio, 0)
-    total = _vetorizar_fonte("pendentes_vetor_pca", "pca_emb", "pca_item_id", "PCA", inicio, total)
+    total = _vetorizar_fonte("pendentes_vetor_pca", "pca_emb", "pca_item_id", "PCA", inicio, total,
+                             teto=total + VET_PCA_MAX, pausa=VET_PAUSA)
     return total
 
 
