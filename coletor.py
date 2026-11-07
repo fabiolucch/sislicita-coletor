@@ -863,7 +863,7 @@ def radar_ia():
 
 # ------------------------------------------------------------------ itens e documentos dos editais (PNCP)
 MAX_ITENS = int(os.getenv("MAX_ITENS", "400"))
-MAX_DOCS = int(os.getenv("MAX_DOCS", "40"))
+MAX_DOCS = int(os.getenv("MAX_DOCS", "150"))
 PNCP_ARQ = "https://pncp.gov.br/pncp-api/v1"
 MAX_TEXTO = 150000          # caracteres guardados por edital
 MAX_PROMPT_TEXTO = int(os.getenv("MAX_PROMPT_TEXTO", "22000"))  # caracteres enviados ao Gemini (apos o recorte)
