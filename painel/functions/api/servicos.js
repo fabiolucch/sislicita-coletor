@@ -5,7 +5,7 @@
 const SB = "https://tkbkkqebsxvmxnqiwjfl.supabase.co";
 const ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrYmtrcWVic3h2bXhucWl3amZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5MDk1MjIsImV4cCI6MjEwOTQ4NTUyMn0.v--eJcYHEanBh9WG1xgOP-jPGwbR_fikk65AkvMPEaI";
 const REPO = "fabiolucch/sislicita-coletor", WORKFLOW = "coleta.yml", REF = "main";
-const ETAPAS = ["editais", "pca", "radar", "catalogo", "ia", "radar_ia", "itens", "vigia", "docs", "radar_pca_ia", "interesse", "briefing", "aprender", "alertas", "contratos", "resultados", "fornecedores", "historico", "cobertura", "tudo"];
+const ETAPAS = ["editais", "vetores", "triagem", "pca", "radar", "catalogo", "ia", "radar_ia", "itens", "vigia", "docs", "radar_pca_ia", "interesse", "briefing", "aprender", "alertas", "contratos", "resultados", "fornecedores", "historico", "cobertura", "tudo"];
 const MODELOS = ["gemini-3.1-flash-lite", "gemini-2.5-flash-lite", "gemini-2.5-flash"];
 const J = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" } });
 

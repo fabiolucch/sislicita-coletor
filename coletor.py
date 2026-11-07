@@ -218,6 +218,79 @@ def historico():
     return total
 
 
+
+# ------------------------------------------------------------------ filtro v2: vetores e triagem
+EMB_MODELO = os.getenv("EMB_MODELO", "gemini-embedding-001")
+EMB_DIM = 768
+VET_MAX = int(os.getenv("VET_MAX", "40000"))        # editais vetorizados por execucao
+VET_MIN = float(os.getenv("VET_MIN", "45"))          # minutos de orcamento por execucao
+VET_LOTE = 100
+
+
+def _norm(v):
+    m = sum(x * x for x in v) ** 0.5 or 1.0
+    return [x / m for x in v]
+
+
+def vetorizar(textos, tarefa="RETRIEVAL_DOCUMENT"):
+    """Vetores normalizados (768) para uma lista de textos, em um lote."""
+    url = f"{GEM}/models/{EMB_MODELO}:batchEmbedContents"
+    corpo = {"requests": [{"model": f"models/{EMB_MODELO}", "content": {"parts": [{"text": t[:6000]}]},
+                           "taskType": tarefa, "outputDimensionality": EMB_DIM} for t in textos]}
+    for espera in (0, 20, 60, 120, 240):
+        time.sleep(espera)
+        _uso(EMB_MODELO, "chamadas")
+        try:
+            r = requests.post(url, headers={"x-goog-api-key": GKEY, "Content-Type": "application/json"},
+                              data=json.dumps(corpo), timeout=120)
+        except requests.RequestException as e:
+            _uso(EMB_MODELO, "falhas")
+            print(f"[vetores] {type(e).__name__}, aguardando...", flush=True)
+            continue
+        if r.status_code == 429 or r.status_code >= 500:
+            _uso(EMB_MODELO, "limite" if r.status_code == 429 else "falhas")
+            print(f"[vetores] HTTP {r.status_code}: {r.text[:160]}", flush=True)
+            continue
+        if r.status_code >= 300:
+            _uso(EMB_MODELO, "falhas")
+            raise RuntimeError(f"embedding {r.status_code}: {r.text[:300]}")
+        _uso(EMB_MODELO, "ok")
+        _uso(EMB_MODELO, "tokens_in", sum(len(t) for t in textos) // 4)
+        return [_norm(e["values"]) for e in r.json()["embeddings"]]
+    raise RuntimeError("embedding: limite do Gemini esgotado (429) - continua na proxima execucao")
+
+
+def vetores():
+    """Gera o vetor de significado dos editais abertos que ainda nao tem (prioriza os que fecham antes)."""
+    inicio, total = time.monotonic(), 0
+    while total < VET_MAX and (time.monotonic() - inicio) / 60 < VET_MIN:
+        r = requests.post(f"{SB}/rpc/pendentes_vetor", headers=HDR, data=json.dumps({"p_limite": 1000}), timeout=120)
+        if r.status_code >= 300:
+            raise RuntimeError(f"pendentes_vetor: {r.status_code} {r.text[:200]}")
+        pend = r.json()
+        if not pend:
+            break
+        for i in range(0, len(pend), VET_LOTE):
+            lote = pend[i:i + VET_LOTE]
+            vs = vetorizar([x["texto"] for x in lote])
+            rows = [{"oportunidade_id": x["id"], "emb": "[" + ",".join(f"{v:.5f}" for v in vec) + "]"} for x, vec in zip(lote, vs)]
+            upsert("edital_emb", rows, "oportunidade_id")
+            total += len(rows)
+            if total >= VET_MAX or (time.monotonic() - inicio) / 60 >= VET_MIN:
+                break
+        print(f"[vetores] {total} editais vetorizados ate agora", flush=True)
+    return total
+
+
+def triagem():
+    """Da nota a todos os editais abertos para cada perfil ativo (filtro v2) e atualiza o radar."""
+    r = requests.post(f"{SB}/rpc/triar_todos", headers=HDR, data="{}", timeout=900)
+    if r.status_code >= 300:
+        raise RuntimeError(f"triar_todos: {r.status_code} {r.text[:300]}")
+    res = r.json() or {}
+    print(f"[triagem] alta por perfil: {res}", flush=True)
+    return sum(int(v or 0) for v in res.values())
+
 # ------------------------------------------------------------------ cobertura
 COB_DIAS = int(os.getenv("COB_DIAS", "14"))
 COB_MINIMO = float(os.getenv("COB_MINIMO", "0.98"))
@@ -1691,7 +1764,7 @@ def fechar_execucao(modo, resumo, falhou, segundos):
 
 # a ordem importa no modo "tudo": o interesse so e calculado depois que a IA e a analise
 # do edital ja rodaram, e antes do briefing/alertas, que usam a nota para escolher o que mostrar
-ETAPAS = {"editais": editais, "pca": pca, "radar": radar, "ia": ia, "radar_ia": radar_ia, "itens": itens,
+ETAPAS = {"editais": editais, "vetores": vetores, "triagem": triagem, "pca": pca, "radar": radar, "ia": ia, "radar_ia": radar_ia, "itens": itens,
           "vigia": vigia, "docs": docs, "radar_pca_ia": radar_pca_ia, "interesse": interesse,
           "briefing": briefing, "aprender": aprender, "alertas": alertas,
           "contratos": contratos, "resultados": resultados, "fornecedores": fornecedores,
