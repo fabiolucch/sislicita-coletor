@@ -426,24 +426,60 @@ ITENS:
 """
 
 
+USO_IA = {}          # (fase, modelo) -> contadores; gravado em ia_uso ao fim de cada etapa
+FASE_ATUAL = ""
+
+
+def _uso(modelo, campo, n=1):
+    d = USO_IA.setdefault((FASE_ATUAL, modelo), {"chamadas": 0, "ok": 0, "limite": 0, "falhas": 0, "tokens_in": 0, "tokens_out": 0})
+    d[campo] += n
+
+
+def gravar_uso():
+    """Grava o consumo de Gemini da etapa que acabou (melhor esforco: nunca derruba a coleta)."""
+    global USO_IA
+    linhas = [{"fase": f, "modelo": m, **d} for (f, m), d in USO_IA.items() if d["chamadas"]]
+    USO_IA = {}
+    if not linhas:
+        return
+    try:
+        requests.post(f"{SB}/ia_uso", headers={**HDR, "Prefer": "return=minimal"}, data=json.dumps(linhas), timeout=60)
+    except Exception as e:
+        print(f"[ia] aviso: nao gravei o uso do Gemini: {e}", flush=True)
+
+
 def gemini(prompt, modelo):
     url = f"{GEM}/models/{modelo}:generateContent"
     corpo = {"contents": [{"parts": [{"text": prompt}]}],
              "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json"}}
     for espera in (0, 30, 60, 120):
         time.sleep(espera)
-        r = requests.post(url, headers={"x-goog-api-key": GKEY, "Content-Type": "application/json"},
-                          data=json.dumps(corpo), timeout=120)
+        _uso(modelo, "chamadas")
+        try:
+            r = requests.post(url, headers={"x-goog-api-key": GKEY, "Content-Type": "application/json"},
+                              data=json.dumps(corpo), timeout=120)
+        except requests.RequestException as e:      # timeout/queda de conexao: tenta de novo, nao derruba a etapa
+            _uso(modelo, "falhas")
+            print(f"[ia] {type(e).__name__}, aguardando...", flush=True)
+            continue
         if r.status_code == 429 or r.status_code >= 500:
+            _uso(modelo, "limite" if r.status_code == 429 else "falhas")
             print(f"[ia] HTTP {r.status_code}, aguardando...", flush=True)
             continue
         if r.status_code >= 300:
+            _uso(modelo, "falhas")
             raise RuntimeError(f"gemini {r.status_code}: {r.text[:300]}")
         j = r.json()
+        um = j.get("usageMetadata") or {}
+        _uso(modelo, "tokens_in", int(um.get("promptTokenCount") or 0))
+        _uso(modelo, "tokens_out", int(um.get("candidatesTokenCount") or 0))
         try:
-            return json.loads(j["candidates"][0]["content"]["parts"][0]["text"])
+            res = json.loads(j["candidates"][0]["content"]["parts"][0]["text"])
         except Exception:
+            _uso(modelo, "falhas")
             raise RuntimeError("gemini: resposta fora do formato: " + json.dumps(j)[:300])
+        _uso(modelo, "ok")
+        return res
     return None  # limite esgotado
 
 
@@ -1609,6 +1645,7 @@ if __name__ == "__main__":
     inicio = time.time()
     for nome in etapas:
         id_ = log_inicio(nome)
+        FASE_ATUAL = nome
         try:
             n = ETAPAS[nome]()
             log_fim(id_, n, "ok")
@@ -1619,6 +1656,7 @@ if __name__ == "__main__":
             log_fim(id_, 0, "erro", str(e)[:500])
             print(f"[{nome}] ERRO: {e}", file=sys.stderr)
             resumo.append((nome, 0, str(e)[:200]))
+        gravar_uso()
     try:
         fechar_execucao(modo, resumo, falhou, time.time() - inicio)
     except Exception as e:

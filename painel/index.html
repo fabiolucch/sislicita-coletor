@@ -199,6 +199,14 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
  #login .box{padding:26px 20px}
 }
 @media(max-width:380px){.kps,.pbox,.dkv,.pzg{grid-template-columns:1fr}.bar>*{flex-basis:100%}}
+
+.sv-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:14px}.sv-k{background:var(--card);border:1px solid var(--bd);border-radius:var(--r);padding:12px 14px;box-shadow:var(--sh);border-left:4px solid var(--bd);min-width:0}.sv-k.ok{border-left-color:#16a34a}.sv-k.w{border-left-color:#d97706}.sv-k.b{border-left-color:#dc2626}.sv-v{font-size:21px;font-weight:700;letter-spacing:-.3px;margin:2px 0}
+.sv-d{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:9px 12px;margin:8px 0;border-radius:10px;background:#fef3c7;font-size:13.5px}.sv-d.b{background:#fee2e2}.sv-d span{min-width:0}
+.sv-bt{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:12px 0 4px}.sv-bt select{max-width:100%}
+.sv-pb{height:10px;border-radius:99px;background:var(--pri2);overflow:hidden;margin-bottom:8px}.sv-pb i{display:block;height:100%;background:var(--pri);border-radius:99px}
+.sv-ch{display:flex;align-items:flex-end;gap:2px;height:120px}.sv-b{flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}.sv-s{width:100%;height:calc(100% - 14px);display:flex;flex-direction:column;justify-content:flex-end}.sv-s i{display:block;width:100%;min-height:2px}.sv-b small{font-size:9px;color:var(--mut);height:14px;line-height:14px}
+.tw{overflow-x:auto}.tw table{min-width:380px}
+@media(max-width:700px){.sv-d{flex-direction:column;align-items:flex-start}}
 </style>
 </head>
 <body>
@@ -206,7 +214,7 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 <label>E-mail</label><input id="em" type="email" autocomplete="username">
 <label>Senha</label><input id="pw" type="password" autocomplete="current-password">
 <p id="err" style="color:var(--bad);margin:10px 0 0"></p><button style="width:100%;margin-top:14px" onclick="entrar()">Entrar</button></div></div>
-<div id="app"><aside><div class="logo"><i id="lg2"></i><b>SISLICITA</b></div><div id="nav"></div><div class="user" id="usr"></div><button class="sair" onclick="sair()">Sair</button></aside><div id="sbar" onclick="ir('coletas')" title="Ver detalhes das coletas" hidden></div><main id="main"></main></div>
+<div id="app"><aside><div class="logo"><i id="lg2"></i><b>SISLICITA</b></div><div id="nav"></div><div class="user" id="usr"></div><button class="sair" onclick="sair()">Sair</button></aside><div id="sbar" onclick="ir('servicos')" title="Ver serviços e métricas" hidden></div><main id="main"></main></div>
 <script>
 // Chave "anon" é pública por desenho; o acesso real é protegido pelo RLS + login.
 const SUPABASE_URL="https://tkbkkqebsxvmxnqiwjfl.supabase.co";
@@ -273,7 +281,7 @@ async function escolherSel(el,val){
 }
 const P={market:'<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',building:'<path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/>',brief:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M3 13h18"/>',home:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',radar:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12l6-6"/>',list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',cal:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',tag:'<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1"/>',funnel:'<path d="M3 4h18l-7 8v7l-4 2v-9z"/>',coin:'<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.2 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2m0 8v2"/>',sliders:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',db:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/>'};
 const svg=k=>`<svg viewBox="0 0 24 24">${P[k]}</svg>`;
-const GRUPOS=[['Visão geral',[['home','Início','home'],['radar','Radar','radar']]],['Oportunidades',[['oportunidades','Editais abertos','list'],['pca','PCA (previsão)','cal'],['precos','Preços','tag'],['mercado','Mercado e fornecedores','market']]],['Negócios',[['processos','Meus processos','brief'],['empresas','Empresas','building'],['funil','Funil','funnel'],['comissoes','Comissões','coin']]],['Sistema',[['perfis','Perfis de busca','sliders'],['coletas','Coletas','db'],['usuarios','Usuários e alertas','users']]]];
+const GRUPOS=[['Visão geral',[['home','Início','home'],['radar','Radar','radar']]],['Oportunidades',[['oportunidades','Editais abertos','list'],['pca','PCA (previsão)','cal'],['precos','Preços','tag'],['mercado','Mercado e fornecedores','market']]],['Negócios',[['processos','Meus processos','brief'],['empresas','Empresas','building'],['funil','Funil','funnel'],['comissoes','Comissões','coin']]],['Sistema',[['perfis','Perfis de busca','sliders'],['servicos','Serviços','sliders'],['coletas','Coletas','db'],['usuarios','Usuários e alertas','users']]]];
 const TELAS=Object.fromEntries(GRUPOS.flatMap(g=>g[1]).map(x=>[x[0],x[1]]));
 let tela='home';
 
@@ -512,6 +520,7 @@ async usuarios(){
  ${adm?`<table class="tb"><tr><th>E-mail</th><th>Papel</th><th>Último acesso</th></tr>${(ust.data||[]).map(u=>`<tr><td>${esc(u.email)}</td><td><select style="width:130px" onchange="papel(this.dataset.e,this.value)" data-e="${esc(u.email)}">${opts(['admin','editor','leitor'],u.papel)}</select></td><td class="m">${u.ultimo_acesso?new Date(u.ultimo_acesso).toLocaleString('pt-BR'):'nunca'}</td></tr>`).join('')}</table>`:'<div class="m">Somente administradores veem a lista.</div>'}</div>
  <div class="card"><h3>Base de mercado</h3><p class="m">Contratos carregados desde ${E.contratos_min?E.contratos_min.valor.replace(/(\d{4})(\d\d)(\d\d)/,'$3/$2/$1'):'—'} · compras homologadas desde ${E.resultados_min?E.resultados_min.valor.replace(/(\d{4})(\d\d)(\d\d)/,'$3/$2/$1'):'—'}. A cada coleta o histórico recua mais 10 dias (até 180 dias de contratos e 365 de resultados).</p></div>`;},
 
+async servicos(){return renderServicos();},
 async coletas(){
  const {data}=await q(sb.from('coletas_log').select('*').order('id',{ascending:false}).limit(30));
  const [o,p,r]=await Promise.all(['oportunidades','pca_itens','radar'].map(t=>q(sb.from(t).select('id',{count:'exact',head:true}))));
@@ -519,6 +528,106 @@ async coletas(){
  <div class="card"><table><tr><th>Etapa</th><th>Início</th><th>Registros</th><th>Status</th><th>Erro</th></tr>${data.map(c=>`<tr><td>${esc(c.fonte)}</td><td>${new Date(c.iniciado_em).toLocaleString('pt-BR')}</td><td>${c.registros}</td><td><span class="tag ${c.status==='ok'?'ok':c.status==='erro'?'b':'w'}">${esc(c.status)}</span></td><td class="m">${esc((c.erro||'').slice(0,120))}</td></tr>`).join('')}</table></div>
  <p class="m">A coleta roda automaticamente no GitHub Actions às 06:17 e 18:17 (Brasília).</p>`;}
 };
+
+// ---------------------------------------------------------------- aba Serviços
+window.__SVX=window.__SVX||{cob:[],gem:null,cobBusy:false};
+const SV_ENXUTA='editais,radar,ia,interesse,alertas,historico',SV_DISCO=8*1024**3;
+const fmtB=b=>b>=1024**3?(b/1024**3).toFixed(2)+' GB':b>=1024**2?(b/1024**2).toFixed(0)+' MB':(b/1024).toFixed(0)+' KB';
+const nBR=v=>Number(v||0).toLocaleString('pt-BR');
+const minSV=(a,b)=>Math.max(0,Math.round((new Date(b)-new Date(a))/6e4));
+async function apiSv(metodo,qs,body){const {data:{session}}=await sb.auth.getSession();const r=await fetch('/api/servicos'+(qs?'?'+qs:''),{method:metodo,headers:{authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});const j=await r.json().catch(()=>({erro:'resposta inválida (HTTP '+r.status+')'}));if(!r.ok&&!j.erro)j.erro='HTTP '+r.status;return j;}
+async function dispararSv(modo,rot){
+ if(!confirm(`Disparar "${rot}" agora?\nA execução entra na fila do GitHub e pode levar de 2 a 130 minutos.`))return;
+ const j=await apiSv('POST','',{acao:'disparar',modo});
+ if(j.erro)return alert(j.erro);
+ toast('Disparado: '+rot);setTimeout(()=>{if(tela==='servicos')renderServicos(true);},5000);
+}
+function dispararEtapaSv(){const m=document.getElementById('sv-et').value;dispararSv(m,FASES[m]||(m==='tudo'?'Coleta completa':m));}
+function barrasSv(itens,cores,fmt){
+ const max=Math.max(1,...itens.map(i=>i.v.reduce((a,b)=>a+b,0)));
+ return `<div class="sv-ch">${itens.map(i=>{const t=i.v.reduce((a,b)=>a+b,0);return `<div class="sv-b" title="${esc(i.rot+' · '+(fmt?fmt(i):nBR(t)))}"><div class="sv-s">${i.v.map((x,k)=>x?`<i style="height:${x/max*100}%;background:${cores[k]}"></i>`:'').join('')}</div><small>${esc(i.eixo||'')}</small></div>`;}).join('')}</div>`;
+}
+const corSv=c=>({ok:'#16a34a',w:'#d97706',b:'#dc2626'}[c]);
+function chipSv(c,t,v,s,go){return `<div class="sv-k ${c}" ${go?`onclick="${go}"`:''}><div class="m">${t}</div><div class="sv-v">${v}</div><div class="m">${s||''}</div></div>`;}
+
+async function conferirCobertura(){
+ const X=window.__SVX;if(X.cobBusy)return;X.cobBusy=true;X.cob=[];
+ const por=Object.fromEntries(((window.__SV||{}).por_dia||[]).map(d=>[d.dia,d.n]));
+ for(let k=1;k<=7;k++){
+  const d=new Date();d.setDate(d.getDate()-k);const iso=d.toLocaleDateString('sv-SE'),dia=iso.replace(/-/g,'');
+  X.cob.push({iso,pncp:'…',banco:por[iso]||0});if(tela==='servicos')renderServicos(true,true);
+  const j=await apiSv('GET','acao=cobertura&dia='+dia);
+  const it=X.cob[X.cob.length-1];it.pncp=j.erro?null:j.total;it.erro=j.erro||(j.pncp_ok===false?'PNCP não respondeu em alguma modalidade':'');it.por=j.por;
+ }
+ X.cobBusy=false;if(tela==='servicos')renderServicos(true,true);
+}
+async function testarGeminiSv(){window.__SVX.gem='…';renderServicos(true,true);window.__SVX.gem=await apiSv('POST','',{acao:'testar_gemini'});if(tela==='servicos')renderServicos(true,true);}
+
+async function renderServicos(sil,cache){
+ clearInterval(window.__sv);window.__sv=setInterval(()=>{if(tela!=='servicos')clearInterval(window.__sv);else if(!document.hidden&&!window.__SVX.cobBusy)renderServicos(true);},30000);
+ const X=window.__SVX;
+ if(!cache||!window.__SVD){
+  if(!sil)main.innerHTML='<div class="vazio">Carregando…</div>';
+  const [lg,rs,ex,es]=await Promise.all([q(sb.from('coletas_log').select('fonte,iniciado_em,finalizado_em,registros,status,erro').order('id',{ascending:false}).limit(400)),sb.rpc('servico_resumo'),apiSv('GET','acao=execucoes').catch(e=>({erro:e.message})),q(sb.from('coleta_estado').select('chave,valor').eq('chave','historico_min'))]);
+  window.__SV=rs.data||null;window.__SVD={L:lg.data||[],R:rs.data,rpcErro:rs.error,ex,hm:(es.data||[])[0]?.valor};
+ }
+ const {L,R,rpcErro,ex,hm}=window.__SVD,agora=Date.now(),H=36e5;
+ const runs=ex.runs||[],rodando=runs.filter(r=>r.status!=='completed'),emFila=rodando.length>0;
+ const okUlt=L.find(c=>c.finalizado_em&&c.status==='ok'),idadeH=okUlt?(agora-new Date(okUlt.finalizado_em))/H:null;
+ const err24=L.filter(c=>c.status==='erro'&&agora-new Date(c.iniciado_em)<24*H);
+ const fontes=[...new Set(L.map(c=>c.fonte))];
+ const ult=Object.fromEntries(fontes.map(f=>[f,L.find(c=>c.fonte===f&&c.finalizado_em)||L.find(c=>c.fonte===f)]));
+ const fonteErro=fontes.filter(f=>ult[f]&&ult[f].status==='erro');
+ // histórico
+ let hp=null;if(hm&&/^\d{8}$/.test(hm)){const d=new Date(+hm.slice(0,4),+hm.slice(4,6)-1,+hm.slice(6,8)),h0=new Date();h0.setHours(0,0,0,0);const f=Math.min(HIST_DIAS,Math.round((h0-d)/864e5)+1);hp={pct:Math.round(f/HIST_DIAS*100),dia:d,completo:f>=HIST_DIAS};}
+ const histUlt=L.find(c=>c.fonte==='historico'&&c.finalizado_em);
+ // o que precisa de disparo manual
+ const dicas=[];
+ if(!emFila&&(idadeH==null||idadeH>14))dicas.push(['b',`Nenhuma coleta concluída ${idadeH==null?'registrada':'há '+Math.round(idadeH)+' h'}. As coletas automáticas rodam às 06:17 e 18:17.`,'tudo','Coleta completa']);
+ if(hp&&!hp.completo&&!emFila&&histUlt&&(agora-new Date(histUlt.finalizado_em))>2*H)dicas.push(['w',`O histórico está em ${hp.pct}% e parou (última rodada há ${Math.round((agora-new Date(histUlt.finalizado_em))/H)} h). A corrente automática foi interrompida.`,'historico','Retomar histórico']);
+ if(R&&R.editais_sem_ia>200&&!emFila)dicas.push(['w',`${nBR(R.editais_sem_ia)} editais abertos ainda sem classificação por IA.`,'ia','Classificar por IA']);
+ if(R&&R.radar_sem_edital>0&&!emFila)dicas.push(['w',`${nBR(R.radar_sem_edital)} editais do radar sem o texto do edital lido.`,'docs','Ler editais']);
+ fonteErro.filter(f=>f!=='historico'&&!emFila).slice(0,4).forEach(f=>dicas.push(['b',`Etapa "${esc(FASES[f]||f)}" terminou com erro na última execução: ${esc((ult[f].erro||'').slice(0,110))}`,f,'Repetir '+(FASES[f]||f)]));
+ // saúde
+ const sCol=emFila?'ok':idadeH==null||idadeH>26?'b':err24.length?'w':'ok';
+ const dPct=R?R.banco_bytes/SV_DISCO:0;
+ const ia=R?R.ia_por_dia:[],hoje=new Date().toLocaleDateString('sv-SE'),iaHoje=ia.filter(x=>x.dia===hoje).reduce((a,x)=>({c:a.c+x.chamadas,l:a.l+x.limite,f:a.f+x.falhas,ti:a.ti+x.tin,to:a.to+x.tout}),{c:0,l:0,f:0,ti:0,to:0});
+ const iaCol=iaHoje.c?(iaHoje.l+iaHoje.f>iaHoje.c*.3?'b':iaHoje.l+iaHoje.f>0?'w':'ok'):'';
+ const cobOk=X.cob.filter(c=>c.pncp>0);const cobMin=cobOk.length?Math.min(...cobOk.map(c=>c.banco/c.pncp)):null;
+ let h=`<div class="top"><div><h2>Serviços</h2><p class="sub">Coleta do PNCP, banco de dados e Gemini: situação, evolução e disparo manual. Atualiza sozinha a cada 30 s.</p></div><button class="sec sm" onclick="window.__SVD=null;renderServicos()">Atualizar agora</button></div>`;
+ if(rpcErro)h+=`<div class="card" style="border-color:#d97706"><b>Faltam as métricas do banco.</b> <span class="m">Rode o arquivo <code>sql/008_servicos.sql</code> no SQL editor do Supabase (uma vez) e atualize. Enquanto isso, só as seções de coleta e GitHub funcionam. (${esc(rpcErro.message||'')})</span></div>`;
+ h+=`<div class="sv-g">${chipSv(sCol,'Coleta',emFila?'Rodando':sCol==='ok'?'Em dia':sCol==='w'?'Com erros':'Atrasada',emFila?`${rodando.length} execução(ões) no GitHub`:okUlt?`última ok há ${agoSB(okUlt.finalizado_em)} · ${err24.length} erro(s) em 24 h`:'sem coletas')}${chipSv(hp?(hp.completo?'ok':emFila?'':'w'):'','Histórico',hp?hp.pct+'%':'—',hp?(hp.completo?'completo (180 dias)':'até '+hp.dia.toLocaleDateString('pt-BR')):'não iniciado')}${R?chipSv(dPct>.8?'b':dPct>.6?'w':'ok','Banco',fmtB(R.banco_bytes),`${(dPct*100).toFixed(1)}% de ${fmtB(SV_DISCO)}`):''}${R?chipSv(iaCol,'Gemini hoje',nBR(iaHoje.c)+' chamadas',iaHoje.c?`${nBR(iaHoje.l)} limite (429) · ${nBR(iaHoje.f)} falhas`:'sem uso registrado hoje'):''}${chipSv(cobMin==null?'':cobMin>=.98?'ok':cobMin>=.9?'w':'b','Cobertura',cobMin==null?'—':(cobMin*100).toFixed(1)+'%',cobMin==null?'rode a conferência abaixo':'pior dia dos últimos 7')}</div>`;
+
+ h+=`<div class="card"><h3>Precisa disparar algo?</h3>${dicas.length?dicas.map(d=>`<div class="sv-d ${d[0]}"><span>${d[1]}</span><button class="sec sm" onclick="dispararSv('${d[2]}','${esc(d[3])}')">${esc(d[3])}</button></div>`).join(''):`<div class="m">${emFila?'Há uma coleta em andamento; aguarde terminar.':'Nada pendente: o sistema está em dia.'}</div>`}
+  <div class="sv-bt"><button onclick="dispararSv('tudo','Coleta completa')">Coleta completa</button><button class="sec" onclick="dispararSv('${SV_ENXUTA}','Coleta enxuta')">Coleta enxuta</button><button class="sec" onclick="dispararSv('historico','Histórico de editais')">Histórico</button><select id="sv-et">${['editais','pca','radar','ia','radar_ia','itens','vigia','docs','radar_pca_ia','interesse','briefing','aprender','alertas','contratos','resultados','fornecedores','catalogo'].map(k=>`<option value="${k}">${esc(FASES[k]||k)}</option>`).join('')}</select><button class="sec" onclick="dispararEtapaSv()">Disparar etapa</button></div>
+  ${ex.token===false?`<div class="m" style="margin-top:10px">⚠ Os botões ainda não funcionam: falta o segredo <b>GH_DISPARO</b> no Cloudflare Pages (token do GitHub com permissão "Actions: Read and write" só neste repositório).</div>`:''}${ex.erro?`<div class="m" style="margin-top:10px">⚠ GitHub: ${esc(ex.erro)}</div>`:''}</div>`;
+
+ h+=`<div class="card"><h3>Execuções no GitHub Actions</h3><div class="tw"><table><tr><th>Início</th><th>Origem</th><th>Duração</th><th>Resultado</th><th></th></tr>${runs.map(r=>{const run=r.status!=='completed',d=minSV(r.inicio,run?new Date():r.fim);return `<tr><td>${new Date(r.inicio).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}</td><td>${r.evento==='schedule'?'agendada':'manual/automática'}</td><td>${d} min</td><td><span class="tag ${run?'w':r.conclusao==='success'?'ok':'b'}">${run?(r.status==='queued'?'na fila':'rodando'):r.conclusao==='success'?'concluída':esc(r.conclusao||'?')}</span></td><td><a class="l" href="${esc(r.url)}" target="_blank" rel="noopener">abrir ↗</a></td></tr>`;}).join('')||'<tr><td colspan="5" class="m">Sem dados do GitHub.</td></tr>'}</table></div></div>`;
+
+ h+=`<div class="card"><h3>Etapas da coleta</h3><div class="tw"><table><tr><th>Etapa</th><th>Última execução</th><th>Registros</th><th>Status</th><th>Observação</th></tr>${fontes.map(f=>{const c=ult[f],run=!c.finalizado_em;return `<tr><td>${esc(FASES[f]||f)}</td><td>há ${agoSB(c.finalizado_em||c.iniciado_em)}</td><td>${nBR(c.registros)}</td><td><span class="tag ${run?'w':c.status==='ok'?'ok':'b'}">${run?'rodando':esc(c.status)}</span></td><td class="m">${esc((c.erro||'').slice(0,140))}</td></tr>`;}).join('')}</table></div></div>`;
+
+ if(R){
+  const por=R.por_dia||[],mapa=Object.fromEntries(por.map(d=>[d.dia,d.n])),dias=[];
+  for(let k=44;k>=0;k--){const d=new Date();d.setDate(d.getDate()-k);const iso=d.toLocaleDateString('sv-SE');dias.push({rot:d.toLocaleDateString('pt-BR')+' ('+d.toLocaleDateString('pt-BR',{weekday:'short'})+')',v:[mapa[iso]||0],eixo:k%7===0?String(d.getDate()):''});}
+  h+=`<div class="card"><h3>Banco de dados</h3><div class="sv-pb"><i style="width:${Math.min(100,dPct*100)}%;background:${corSv(dPct>.8?'b':dPct>.6?'w':'ok')}"></i></div><div class="m">${fmtB(R.banco_bytes)} usados de ${fmtB(SV_DISCO)} (disco incluído no plano Pro) · ${nBR(R.editais_total)} editais · ${nBR(R.editais_abertos)} abertos · publicados de ${dt(R.pub_min)} a ${dt(R.pub_max)}</div>
+  <div class="dg" style="margin-top:12px"><div><div class="m" style="margin-bottom:6px"><b>Editais coletados por dia de publicação</b> (45 dias; fins de semana são baixos)</div>${barrasSv(dias,['var(--pri)'])}</div><div class="tw"><table><tr><th>Tabela</th><th>Tamanho</th><th>Linhas (aprox.)</th></tr>${R.tabelas.map(t=>`<tr><td>${esc(t.nome)}</td><td>${fmtB(t.bytes)}</td><td>${nBR(t.linhas)}</td></tr>`).join('')}</table></div></div>${hp?`<div class="m" style="margin-top:8px">Histórico: <span class="sv-pb" style="display:inline-block;width:140px;height:7px;vertical-align:middle"><i style="width:${Math.max(2,hp.pct)}%"></i></span> <b>${hp.pct}%</b> · ${hp.completo?'completo':'coletado até '+hp.dia.toLocaleDateString('pt-BR')} (meta: ${HIST_DIAS} dias)</div>`:''}</div>`;
+
+  const cb=X.cob;
+  h+=`<div class="card"><h3>Cobertura: o banco tem tudo o que o PNCP publicou?</h3><div class="m">Compara, dia a dia, o total de editais que o PNCP informa (Pregão, Concorrência, Dispensa e Credenciamento) com o que está no seu banco. Abaixo de 98% indica coleta incompleta no dia.</div>
+  <div class="sv-bt"><button class="sec" onclick="conferirCobertura()" ${X.cobBusy?'disabled':''}>${X.cobBusy?'Conferindo…':'Conferir últimos 7 dias'}</button></div>
+  ${cb.length?`<div class="tw"><table><tr><th>Dia</th><th>No PNCP</th><th>No banco</th><th>Cobertura</th></tr>${cb.map(c=>{const p=c.pncp==='…'?null:c.pncp,pc=p>0?c.banco/p:(p===0?1:null);return `<tr><td>${new Date(c.iso+'T12:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit'})}</td><td>${c.pncp==='…'?'…':p==null?'—':nBR(p)}</td><td>${nBR(c.banco)}</td><td>${c.pncp==='…'?'':pc==null?`<span class="tag b">${esc(c.erro||'sem resposta')}</span>`:`<span class="tag ${pc>=.98?'ok':pc>=.9?'w':'b'}">${(pc*100).toFixed(1)}%</span>`}</td></tr>`;}).join('')}</table></div>`:''}</div>`;
+
+  const dg=[];for(let k=13;k>=0;k--){const d=new Date();d.setDate(d.getDate()-k);const iso=d.toLocaleDateString('sv-SE'),xs=ia.filter(x=>x.dia===iso),s=f=>xs.reduce((a,x)=>a+x[f],0);dg.push({rot:d.toLocaleDateString('pt-BR'),v:[s('ok'),s('limite'),s('falhas')],eixo:String(d.getDate())});}
+  const g=X.gem;
+  h+=`<div class="card"><h3>Gemini (IA)</h3><div class="m">Consumo da coleta automática (registrado desde a instalação desta aba). Verde = respostas boas · amarelo = limite de uso (429) · vermelho = falhas/timeouts.</div>
+  <div class="dg" style="margin-top:10px"><div>${barrasSv(dg,['#16a34a','#d97706','#dc2626'],i=>`${i.v[0]} ok · ${i.v[1]} limite · ${i.v[2]} falhas`)}<div class="m" style="margin-top:6px">Hoje: ${nBR(iaHoje.c)} chamadas · ${nBR(iaHoje.ti)} tokens enviados · ${nBR(iaHoje.to)} recebidos</div></div>
+  <div class="tw"><table><tr><th>Etapa (24 h)</th><th>Chamadas</th><th>429</th><th>Falhas</th></tr>${R.ia_por_fase.map(f=>`<tr><td>${esc(FASES[f.fase]||f.fase||'—')}</td><td>${nBR(f.chamadas)}</td><td>${nBR(f.limite)}</td><td>${nBR(f.falhas)}</td></tr>`).join('')||'<tr><td colspan="4" class="m">Sem uso nas últimas 24 h.</td></tr>'}</table></div></div>
+  <div class="sv-bt"><button class="sec" onclick="testarGeminiSv()" ${g==='…'?'disabled':''}>${g==='…'?'Testando…':'Testar Gemini agora'}</button></div>
+  ${g&&g!=='…'?(g.erro?`<div class="m">⚠ ${esc(g.erro)}</div>`:`<div class="tw"><table><tr><th>Modelo</th><th>Resposta</th><th>Tempo</th></tr>${g.modelos.map(m=>`<tr><td>${esc(m.modelo)}</td><td><span class="tag ${m.ok?'ok':m.http===429?'w':'b'}">${m.ok?'funcionando':m.http===429?'limite (429)':m.http===404?'modelo inexistente':'erro '+(m.http||esc(m.erro||''))}</span></td><td>${m.ms} ms</td></tr>`).join('')}</table></div>`):''}
+  <div class="m" style="margin-top:8px">Pendências para a IA: ${nBR(R.editais_sem_ia)} editais abertos sem classificação · ${nBR(R.radar_sem_edital)} editais do radar sem o edital lido (${nBR(R.radar_total)} no radar).</div></div>`;
+ }
+ main.innerHTML=h;
+}
 
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
 const irPreco=t=>ir('precos',t);
