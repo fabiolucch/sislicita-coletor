@@ -126,8 +126,13 @@ def parse_edital(c):
     }
 
 
-def coletar_edital(modalidade, uf):
-    rows, pagina = [], 1
+AVISOS = []                    # (etapa, texto) de problemas parciais: aparecem no Telegram sem derrubar a coleta
+FALHAS_EDITAIS = []            # (modalidade, uf, pagina) que o PNCP nao devolveu; repetidas no fim da etapa
+
+
+def coletar_edital(modalidade, uf, pagina=1, anotar=True):
+    """Pagina os editais abertos de uma modalidade/UF. Se o PNCP falhar, anota de onde retomar."""
+    rows = []
     while True:
         try:
             j = get(f"{PNCP}/consulta/v1/contratacoes/proposta",
@@ -135,6 +140,8 @@ def coletar_edital(modalidade, uf):
                      "pagina": pagina, "tamanhoPagina": 50})
         except RuntimeError as e:
             print(f"[editais] AVISO modalidade={modalidade} uf={uf} pag={pagina}: {e}", file=sys.stderr)
+            if anotar:
+                FALHAS_EDITAIS.append((modalidade, uf, pagina))
             break
         if not j or not j.get("data"):
             break
@@ -146,12 +153,32 @@ def coletar_edital(modalidade, uf):
 
 
 def editais():
+    FALHAS_EDITAIS.clear()
     tarefas = [(m, u) for m in MODALIDADES for u in UFS]
     total = 0
     with cf.ThreadPoolExecutor(WORKERS) as ex:
         for rows in ex.map(lambda t: coletar_edital(*t), tarefas):
             if rows:
                 total += upsert("oportunidades", rows, "numero_controle_pncp")
+    # O PNCP recusa consultas de vez em quando (429/5xx). Retoma as que falharam, devagar e em serie.
+    pendentes = list(FALHAS_EDITAIS)
+    FALHAS_EDITAIS.clear()
+    if pendentes:
+        print(f"[editais] repetindo {len(pendentes)} consulta(s) que o PNCP recusou", flush=True)
+        time.sleep(60)
+        for m, uf, pag in pendentes:
+            rows = coletar_edital(m, uf, pag)
+            if rows:
+                total += upsert("oportunidades", rows, "numero_controle_pncp")
+            time.sleep(3)
+    if FALHAS_EDITAIS:
+        faltou = ", ".join(f"{u}/mod {m}" for m, u, _ in FALHAS_EDITAIS[:6])
+        aviso = (f"{len(FALHAS_EDITAIS)} consulta(s) o PNCP nao devolveu nem na 2a tentativa "
+                 f"({faltou}{'...' if len(FALHAS_EDITAIS) > 6 else ''}) - entram na proxima coleta")
+        print(f"[editais] AVISO {aviso}", file=sys.stderr)
+        AVISOS.append(("editais", aviso))
+        if not total:            # nada coletado: ai sim a etapa falhou de verdade
+            raise RuntimeError(aviso)
     return total
 
 
@@ -1765,6 +1792,8 @@ def notificar_fim(modo, resumo, segundos):
     texto = f"🏁 <b>Coleta concluída</b> · {rotulo} · {mins} min\n" + ("\n".join(ok) if ok else "(nenhuma etapa concluida)")
     if ko:
         texto += "\n\n<b>Com erro:</b>\n" + "\n".join(ko)
+    if AVISOS:
+        texto += "\n\n<b>Avisos:</b>\n" + "\n".join(f"⚠️ {h(n)}: {h(t)}" for n, t in AVISOS)
     tg(chat, texto)
 
 
@@ -1820,6 +1849,11 @@ ETAPAS = {"editais": editais, "vetores": vetores, "triagem": triagem, "pca": pca
           "historico": historico, "cobertura": cobertura}
 EXTRAS = {"catalogo": catalogo}
 
+# Etapas sem as quais a coleta nao cumpriu seu papel: so elas marcam a execucao como falha.
+ESSENCIAIS = {"editais", "vetores", "triagem", "radar"}
+# Etapas longas ou que ja fazem a propria repeticao: repetir na hora so gastaria tempo.
+SEM_REPETIR = {"historico", "ia", "radar_ia", "radar_pca_ia", "docs", "pca", "contratos", "resultados"}
+
 if __name__ == "__main__":
     modo = sys.argv[1] if len(sys.argv) > 1 else "tudo"
     MODO_SOLO = (modo.strip() == "historico")
@@ -1831,16 +1865,28 @@ if __name__ == "__main__":
     for nome in etapas:
         id_ = log_inicio(nome)
         FASE_ATUAL = nome
-        try:
-            n = ETAPAS[nome]()
-            log_fim(id_, n, "ok")
-            print(f"[{nome}] ok: {n} registros")
-            resumo.append((nome, n, None))
-        except Exception as e:  # registra e segue para a proxima etapa
-            falhou = True
-            log_fim(id_, 0, "erro", str(e)[:500])
-            print(f"[{nome}] ERRO: {e}", file=sys.stderr)
-            resumo.append((nome, 0, str(e)[:200]))
+        erro = None
+        for tentativa in (1, 2):   # instabilidade do PNCP/Gemini costuma passar em poucos minutos
+            try:
+                n = ETAPAS[nome]()
+                log_fim(id_, n, "ok")
+                print(f"[{nome}] ok: {n} registros")
+                resumo.append((nome, n, None))
+                erro = None
+                break
+            except Exception as e:
+                erro = e
+                if tentativa == 1 and nome not in SEM_REPETIR:
+                    print(f"[{nome}] falhou ({str(e)[:120]}); repetindo em 2 min", file=sys.stderr)
+                    time.sleep(120)
+                else:
+                    break
+        if erro is not None:
+            if nome in ESSENCIAIS:
+                falhou = True
+            log_fim(id_, 0, "erro", str(erro)[:500])
+            print(f"[{nome}] ERRO: {erro}", file=sys.stderr)
+            resumo.append((nome, 0, str(erro)[:200]))
         gravar_uso()
     for rpc in ("atualizar_dashboard", "atualizar_servico"):  # resumos do Inicio e da aba Servicos ficam em cache
         try:
