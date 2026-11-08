@@ -896,8 +896,15 @@ function blocosMercado(d){const c=d.__ctx,t=termoDe(c.op);
 const MES_PT=['','janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 async function blocoOrgao(t,op,el){if(!el)return;if(!t||!op?.orgao_nome){el.innerHTML='<div class="m">Sem termo de busca para consultar o histórico.</div>';return;}
  el.innerHTML='<span class="m">Consultando o histórico deste órgão no PNCP…</span>';
- const {data,error}=await sb.rpc('historico_orgao',{q:t,p_orgao:op.orgao_nome,p_uf:op.uf||null});
+ let {data,error}=await sb.rpc('historico_orgao',{q:t,p_orgao:op.orgao_nome,p_uf:op.uf||null});
  if(error){el.innerHTML=`<div class="m">Não consegui consultar agora (${esc(error.message)}).</div>`;return;}
+ // a busca exige todas as palavras: sem resultado, tenta de novo so com a palavra mais especifica
+ let usado=t;
+ if(!(data?.setor?.contratos)&&t.includes(' ')){
+  const p1=t.split(' ').sort((a,b)=>b.length-a.length)[0];
+  const r2=await sb.rpc('historico_orgao',{q:p1,p_orgao:op.orgao_nome,p_uf:op.uf||null});
+  if(!r2.error&&r2.data?.setor?.contratos){data=r2.data;usado=p1;}
+ }
  const o=data?.orgao||{},s=data?.setor||{};
  const meses=(o.meses||[]).filter(m=>m.n>1).map(m=>MES_PT[+m.mes]).slice(0,2);
  const lider=(s.top||[])[0],share=s.share_lider!=null?Math.round(s.share_lider*100):null;
@@ -911,7 +918,7 @@ async function blocoOrgao(t,op,el){if(!el)return;if(!t||!op?.orgao_nome){el.inne
   ${concent?`<div><span>Concorrência</span><b class="${concent[0]==='b'?'bw':''}">${concent[1]}${lider?` · líder ${share}%`:''}</b></div>`:''}</div>
  ${(o.fornecedores||[]).length?`<div class="m" style="margin-top:6px">Quem já venceu neste órgão: ${o.fornecedores.map(f=>`<b>${esc(f.nome)}</b> (${f.n}×)`).join(' · ')}.</div>`:''}
  ${lider&&share>=40?`<div class="m">⚠ <b>${esc(lider.nome)}</b> ganhou ${share}% dos contratos parecidos${op.uf?' em '+esc(op.uf):''}: provável fornecedor habitual, espere disputa de preço.</div>`:''}
- <div class="m" style="margin-top:6px">Base: contratos e compras homologadas do PNCP dos últimos meses, buscados pelo termo “${esc(t)}”. Não mostra quantas empresas disputaram, e sim quantas venceram.</div>`;}
+ <div class="m" style="margin-top:6px">Base: contratos e compras homologadas do PNCP dos últimos meses, buscados pelo termo “${esc(usado)}”. Não mostra quantas empresas disputaram, e sim quantas venceram.</div>`;}
 
 // Clausulas restritivas + impugnacao
 async function verDirecionamento(bt){const d=bt.closest('.det'),box=bt.closest('.dirc');
