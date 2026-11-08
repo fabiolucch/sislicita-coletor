@@ -47,3 +47,17 @@ language sql stable set statement_timeout = '25s' as $$
 $$;
 grant execute on function public.pca_itens_buscar(text,text,date,date,int), public.pca_orgaos(text,text,date,date,int), public.pca_meses(text,text) to authenticated;
 select 'ok16';
+
+-- PCA virou edital? Para cada {c: cnpj, t: termo}, quantos editais abertos do mesmo órgão batem com o termo.
+create or replace function public.pca_virou_edital(p jsonb)
+returns table(i int, n bigint, proximo date, primeiro_id bigint)
+language sql stable set statement_timeout = '20s' as $$
+  select (x.ord - 1)::int, count(o.id), min(o.data_fim_proposta)::date, (array_agg(o.id order by o.data_fim_proposta))[1]
+  from jsonb_array_elements(p) with ordinality x(e, ord)
+  join lateral (select id, data_fim_proposta from public.oportunidades o
+                where o.orgao_cnpj = x.e->>'c' and o.data_fim_proposta >= now() and nullif(trim(x.e->>'t'), '') is not null
+                  and o.objeto_tsv @@ websearch_to_tsquery('portuguese', x.e->>'t')) o on true
+  group by x.ord;
+$$;
+grant execute on function public.pca_virou_edital(jsonb) to authenticated;
+select 'ok16c';

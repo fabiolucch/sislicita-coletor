@@ -491,14 +491,17 @@ async radar(){
  await carregar();},
 
 async oportunidades(){
- main.innerHTML=`<div class="top"><div><h2>Editais abertos</h2><p class="sub">Contratações do PNCP. Com “só abertos” marcado, aparecem as que ainda recebem proposta; desmarcado, inclui o histórico já encerrado (mais recentes primeiro).</p></div></div><div class="bar"><input id="fq" type="search" placeholder="Buscar no objeto (ex.: carne bovina)…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select>
+ main.innerHTML=`<div class="top"><div><h2>Editais abertos</h2><p class="sub">Contratações do PNCP. Com “só abertos” marcado, aparecem as que ainda recebem proposta; desmarcado, inclui o histórico já encerrado (mais recentes primeiro).</p></div></div><div id="orgchip"></div><div class="bar"><input id="fq" type="search" placeholder="Buscar no objeto (ex.: carne bovina)…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select>
  <input id="vmin" type="number" placeholder="Valor mín."><input id="vmax" type="number" placeholder="Valor máx."><label style="margin:0;align-self:center"><input id="ab" type="checkbox" checked style="width:auto"> só abertos</label><button onclick="pg=0;go()">Buscar</button></div><div id="lista"></div><div class="pg" id="pg"></div>`;
  window.pg=0;window.go=async()=>{const N=30;let r=sb.from('oportunidades').select('id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,situacao,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome',{count:'exact'}).order('data_fim_proposta',{ascending:$('#ab').checked}).range(pg*N,pg*N+N-1);
-  const t=$('#fq').value.trim();if(t)r=r.textSearch('objeto_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)r=r.eq('uf',$('#fu').value);
+  const t=$('#fq').value.trim();if(t)r=r.textSearch('objeto_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)r=r.eq('uf',$('#fu').value);if(window.__ORG)r=r.eq('orgao_cnpj',window.__ORG);
   if($('#vmin').value)r=r.gte('valor_estimado',$('#vmin').value);if($('#vmax').value)r=r.lte('valor_estimado',$('#vmax').value);if($('#ab').checked)r=r.gte('data_fim_proposta',new Date().toISOString());
   const {data,count}=await q(r);$('#lista').innerHTML=data.length?data.map(o=>cardOp(o)).join(''):'<div class="vazio">Sem resultados.</div>';
   $('#pg').innerHTML=`<button class="sec" ${pg?'':'disabled'} onclick="pg--;go()">‹</button><span class="m">${count??0} resultados · pág. ${pg+1}</span><button class="sec" ${(pg+1)*N>=(count||0)?'disabled':''} onclick="pg++;go()">›</button>`;};
- $('#fq').onkeydown=e=>{if(e.key==='Enter'){pg=0;go();}};if(window.ARG&&window.ARG.uf){$('#fu').value=window.ARG.uf;window.ARG=null;}await go();},
+ $('#fq').onkeydown=e=>{if(e.key==='Enter'){pg=0;go();}};
+ window.__ORG=null;const chip=nome=>{$('#orgchip').innerHTML=window.__ORG?`<div class="m" style="margin:0 0 10px">Mostrando só o órgão <b>${esc(nome)}</b>, com o histórico de editais já encerrados. <a class="l" onclick="window.__ORG=null;$('#orgchip').innerHTML='';pg=0;go()">ver todos os órgãos</a></div>`:'';};
+ if(window.ARG&&window.ARG.cnpj){window.__ORG=window.ARG.cnpj;$('#ab').checked=false;chip(window.ARG.nome||window.ARG.cnpj);}
+ if(window.ARG&&window.ARG.uf){$('#fu').value=window.ARG.uf;}window.ARG=null;await go();},
 
 async pca(){
  const A0=window.ARG||{};window.ARG=null;
@@ -517,6 +520,11 @@ async pca(){
   const a=data||[];if(!a.length){$('#pmes').innerHTML='';return;}
   const mx=Math.max(...a.map(x=>+x.valor||0),1);
   $('#pmes').innerHTML=`<div class="card"><div class="m" style="margin-bottom:8px">Quando os órgãos pretendem comprar${t?` “${esc(t)}”`:''}${uf?` em ${esc(uf)}`:''} · próximos 12 meses (valor planejado)</div><div style="display:flex;gap:6px;align-items:flex-end;height:90px;overflow-x:auto">${a.map(x=>`<div style="flex:1;min-width:46px;text-align:center" title="${nBR(x.n_itens)} itens · ${brl(x.valor)}"><div style="background:var(--ac,#2563eb);opacity:.85;border-radius:4px 4px 0 0;height:${Math.max(4,Math.round((+x.valor||0)/mx*64))}px"></div><div class="m" style="font-size:11px">${ymd(x.mes)}</div></div>`).join('')}</div></div>`;};
+ const enr=async()=>{
+  const els=[...document.querySelectorAll('#lista .ve')];if(!els.length)return;
+  const {data}=await sb.rpc('pca_virou_edital',{p:els.map(e=>({c:e.dataset.c,t:e.dataset.t}))});
+  (data||[]).forEach(r=>{const e=els[r.i];if(!e)return;
+   e.innerHTML=`<div class="just" style="margin-top:8px"><b>Já virou edital:</b> ${r.n} edital(is) aberto(s) deste órgão sobre isso, o mais próximo encerra em ${dt(r.proximo)}. <a class="l" onclick="ir('oportunidades',{cnpj:'${esc(e.dataset.c)}',nome:this.dataset.n,uf:''})" data-n="${esc(e.dataset.n||'')}">Ver editais</a></div>`;});};
  let seq=0;window.go=async()=>{
   const eu=++seq,t=$('#fq').value.trim().replace(/[,()%]/g,' '),uf=$('#fu').value,v=$('#ft').value,P=per();
   const L=h=>{if(eu===seq)$('#lista').innerHTML=h;};
@@ -527,14 +535,16 @@ async pca(){
    if(error)return L(erro(error));
    L(data.length?`<div class="m" style="margin:0 0 8px">${data.length} itens de maior valor planejado${uf?` em ${esc(uf)}`:''}.</div>`+data.map(i=>`<div class="card"><div class="t">${esc((i.descricao||'').slice(0,220))}</div><div class="m">${esc(i.orgao_nome)} · ${esc(i.uf)} · PCA ${i.ano}${i.nome_unidade?' · '+esc(i.nome_unidade):''}</div><span class="tag">${brl(i.valor_total)}</span>${i.quantidade!=null?`<span class="tag">${nBR(i.quantidade)} ${esc(i.unidade_medida||'')}</span>`:''}<span class="tag w">desejada ${dt(i.data_desejada)}</span><button class="gh" onclick="irPreco(this.dataset.t)" data-t="${esc((i.descricao||'').slice(0,80))}">${ic('preco')}Preço</button></div>`).join(''):'<div class="vazio">Nenhum item encontrado nesse período. Amplie o período ou mude o termo.</div>');
   }else if(v==='m'){
-   const SELM='id,interesse,interesse_detalhe,score,status,justificativa,perfil_id,perfis_busca(nome),pca_itens!inner(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))';
+   const SELM='id,interesse,interesse_detalhe,score,status,justificativa,perfil_id,perfis_busca(nome),pca_itens!inner(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf,orgao_cnpj))';
    let rows=(await q(sb.from('radar').select(SELM).not('pca_item_id','is',null).neq('status','descartado').order('interesse',{ascending:false,nullsFirst:false}).limit(400))).data||[];
    rows=rows.filter(x=>{const p=x.pca_itens;if(uf&&p?.pca_planos?.uf!==uf)return false;if(t&&!(p?.descricao||'').toLowerCase().includes(t.toLowerCase()))return false;if(P.p_de&&p?.data_desejada&&(p.data_desejada<P.p_de||p.data_desejada>P.p_ate))return false;return true;});
    L(rows.length?`<div class="m" style="margin:0 0 8px">${rows.length} previsões que o filtro de IA considerou aderentes aos seus perfis, da maior nota para a menor.</div>`+rows.map(x=>cardPca(x.pca_itens,x)).join(''):'<div class="vazio">Nenhuma previsão aderente aos perfis nesse filtro. Rode a triagem do PCA (Serviços) ou amplie o período.</div>');
+   if(eu===seq&&rows.length){[...document.querySelectorAll('#lista .card.oc')].forEach((el,k)=>{const x=rows[k],pl=x?.pca_itens?.pca_planos;if(pl?.orgao_cnpj&&el.firstElementChild)el.firstElementChild.insertAdjacentHTML('beforeend',`<div class="ve" data-c="${esc(pl.orgao_cnpj)}" data-t="${esc(termoDe({objeto:x.pca_itens.descricao}))}" data-n="${esc(pl.orgao_nome||'')}"></div>`);});enr();}
   }else{
    const {data,error}=await sb.rpc('pca_orgaos',{p_uf:uf||null,p_termo:t||null,...P,p_limite:60});
    if(error)return L(erro(error));
-   L(data.length?`<div class="m" style="margin:0 0 8px">Órgãos com maior valor planejado${t?` para “${esc(t)}”`:''}${uf?` em ${esc(uf)}`:''}. Quanto antes você chegar ao órgão, maior a chance de entrar na especificação.</div>`+data.map(o=>`<div class="card"><div class="t">${esc(o.orgao_nome)}</div><div class="m">${esc(o.uf)} · ${nBR(o.n_itens)} ${o.n_itens==1?'item':'itens'} planejados${o.proxima?` · primeira compra prevista ${ymd(o.proxima)}`:''}</div><span class="tag">${brl(o.valor)}</span><div class="m" style="margin-top:6px">Maior item: ${esc((o.exemplo||'').slice(0,160))}</div></div>`).join(''):'<div class="vazio">Nenhum órgão encontrado nesse período. Amplie o período ou mude o termo.</div>');
+   L(data.length?`<div class="m" style="margin:0 0 8px">Órgãos com maior valor planejado${t?` para “${esc(t)}”`:''}${uf?` em ${esc(uf)}`:''}. Quanto antes você chegar ao órgão, maior a chance de entrar na especificação.</div>`+data.map(o=>`<div class="card"><div class="t">${esc(o.orgao_nome)}</div><div class="m">${esc(o.uf)} · ${nBR(o.n_itens)} ${o.n_itens==1?'item':'itens'} planejados${o.proxima?` · primeira compra prevista ${ymd(o.proxima)}`:''}</div><span class="tag">${brl(o.valor)}</span><div class="m" style="margin-top:6px">Maior item: ${esc((o.exemplo||'').slice(0,160))}</div><div class="acts" style="margin-top:8px"><button class="gh" onclick="ir('oportunidades',{cnpj:'${esc(o.orgao_cnpj)}',nome:this.dataset.n,uf:'${esc(o.uf||'')}'})" data-n="${esc(o.orgao_nome)}">Editais e histórico do órgão</button></div>${t?`<div class="ve" data-c="${esc(o.orgao_cnpj)}" data-t="${esc(t)}" data-n="${esc(o.orgao_nome)}"></div>`:''}</div>`).join(''):'<div class="vazio">Nenhum órgão encontrado nesse período. Amplie o período ou mude o termo.</div>');
+   if(eu===seq)enr();
   }};
  $('#fq').onkeydown=e=>{if(e.key==='Enter')go();};['fu','fd','ft'].forEach(i=>$('#'+i).onchange=go);
  if(A0.uf)$('#fu').value=A0.uf;await go();},

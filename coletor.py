@@ -1784,24 +1784,45 @@ def alertas():
         tg(chat, t)
         requests.patch(f"{SB}/briefings", params={"id": f"eq.{b['id']}"}, headers=HDR, timeout=60, data=json.dumps({"enviado_em": agora.isoformat()}))
         enviados += 1
-    # 2) oportunidades novas com score alto
+    # 2) oportunidades novas com score alto (editais e previsoes do PCA, em mensagens separadas)
     rr = requests.get(f"{SB}/radar", headers=HDR, timeout=120, params={
-        "select": "id,score,interesse,justificativa,perfis_busca(nome),oportunidades(objeto,orgao_nome,uf,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp),pca_itens(descricao,valor_total,pca_planos(orgao_nome,uf))",
-        "notificado_em": "is.null", "interesse": f"gte.{ALERTA_SCORE}", "status": "neq.descartado", "order": "interesse.desc", "limit": "40"}).json()
-    if rr:
-        partes = []
-        for x in rr[:15]:
-            o, p = x.get("oportunidades"), x.get("pca_itens")
-            if o:
+        "select": "id,score,interesse,justificativa,perfis_busca(nome),oportunidades(objeto,orgao_nome,uf,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))",
+        "notificado_em": "is.null", "interesse": f"gte.{ALERTA_SCORE}", "status": "neq.descartado", "order": "interesse.desc", "limit": "80"}).json()
+    if isinstance(rr, list) and rr:
+        eds = [x for x in rr if x.get("oportunidades")]
+        pcas = [x for x in rr if not x.get("oportunidades") and x.get("pca_itens")]
+        if eds:
+            partes = []
+            for x in eds[:15]:
+                o = x["oportunidades"]
                 val = "sigiloso" if o.get("valor_sigiloso") else f"R$ {o.get('valor_estimado') or 0:,.0f}".replace(",", ".")
                 fim = (o.get("data_fim_proposta") or "")[:10]
                 partes.append(f"• <b>{x['interesse']}</b> · {h((o.get('objeto') or '')[:160])}\n  {h(o.get('orgao_nome'))}/{h(o.get('uf'))} · {val} · até {fim[8:10]}/{fim[5:7]}" + (f" · <a href=\"{h(o.get('link_pncp'))}\">PNCP</a>" if o.get("link_pncp") else ""))
-            elif p:
-                partes.append(f"• <b>{x['interesse']}</b> · [PCA] {h((p.get('descricao') or '')[:160])}\n  {h((p.get('pca_planos') or {}).get('orgao_nome'))}/{h((p.get('pca_planos') or {}).get('uf'))} · R$ {p.get('valor_total') or 0:,.0f}".replace(",", "."))
-        tg(chat, f"🎯 <b>{len(rr)} oportunidade(s) nova(s) com interesse ≥ {ALERTA_SCORE}</b>\n\n" + "\n\n".join(partes) + (f"\n\n…e mais {len(rr) - 15} no painel." if len(rr) > 15 else "") + f"\n{PAINEL}/#radar")
+            tg(chat, f"🎯 <b>{len(eds)} oportunidade(s) nova(s) com interesse ≥ {ALERTA_SCORE}</b>\n\n" + "\n\n".join(partes) + (f"\n\n…e mais {len(eds) - 15} no painel." if len(eds) > 15 else "") + f"\n{PAINEL}/#radar")
+            enviados += 1
+        # PCA: agrupado por orgao; ignora compras previstas para antes de 30 dias atras
+        corte = (agora - timedelta(days=30)).date().isoformat()
+        grupos = {}
+        for x in pcas:
+            p = x["pca_itens"]
+            if p.get("data_desejada") and p["data_desejada"][:10] < corte:
+                continue
+            pl = p.get("pca_planos") or {}
+            grupos.setdefault((pl.get("orgao_nome") or "?", pl.get("uf") or ""), []).append((x, p))
+        if grupos:
+            blocos = []
+            for (org, uf), itens in sorted(grupos.items(), key=lambda kv: -max(i[0]["interesse"] or 0 for i in kv[1]))[:8]:
+                linhas_i = []
+                for x, p in itens[:3]:
+                    d = (p.get("data_desejada") or "")[:10]
+                    linhas_i.append(f"  • <b>{x['interesse']}</b> · {h((p.get('descricao') or '')[:110])} · R$ {p.get('valor_total') or 0:,.0f}".replace(",", ".") + (f" · prevista {d[5:7]}/{d[:4]}" if d else ""))
+                mais = f"\n  …e mais {len(itens) - 3} deste órgão" if len(itens) > 3 else ""
+                blocos.append(f"🏛️ <b>{h(org)}</b>{('/' + h(uf)) if uf else ''}\n" + "\n".join(linhas_i) + mais)
+            total = sum(len(v) for v in grupos.values())
+            tg(chat, f"📅 <b>Previsão (PCA): {total} compra(s) planejada(s) aderente(s) aos seus perfis</b>\nÓrgãos que ainda vão licitar: é a hora de abordar antes do edital.\n\n" + "\n\n".join(blocos) + (f"\n\n…e mais {len(grupos) - 8} órgão(s) no painel." if len(grupos) > 8 else "") + f"\n{PAINEL}/#pca")
+            enviados += 1
         ids = ",".join(str(x["id"]) for x in rr)
         requests.patch(f"{SB}/radar", params={"id": f"in.({ids})"}, headers=HDR, timeout=60, data=json.dumps({"notificado_em": agora.isoformat()}))
-        enviados += 1
     # 3) demais alertas (documentos novos, sessoes, documentos vencendo)
     ic = {"retificacao": "📄", "sessao": "⏰", "doc_vencendo": "🗂️"}
     for a in requests.get(f"{SB}/alertas", headers=HDR, timeout=60, params={"select": "*", "enviado_em": "is.null", "order": "id", "limit": "30"}).json():
