@@ -102,7 +102,7 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .toast{background:#1e293b;color:#f1f5f9;border-radius:10px;padding:10px 14px;font-size:13px;box-shadow:0 10px 30px #0008;display:flex;align-items:center;gap:12px;animation:tsin .18s ease-out}
 .toast button{background:#ffffff1f;padding:5px 10px;font-size:12px;white-space:nowrap}.toast button:hover{background:#ffffff38}
 @keyframes tsin{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
-.gh{display:inline-flex;align-items:center;gap:6px;background:transparent;color:#475569;border:1px solid transparent;border-radius:8px;padding:5px 10px;font-size:12.5px;font-weight:500;text-decoration:none;cursor:pointer}.gh:hover{background:#eef3fa;color:var(--pri)}.gh svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.oc .acts button.sm{border-radius:8px}.oc .acts .pri{display:inline-flex;align-items:center;gap:6px}.oc .acts .pri svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}.tg-a .pri{display:inline-flex;align-items:center;gap:6px}.tg-a .pri svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;flex:0 0 auto}
+.gh{display:inline-flex;align-items:center;gap:6px;background:transparent;color:#475569;border:1px solid transparent;border-radius:8px;padding:5px 10px;font-size:12.5px;font-weight:500;text-decoration:none;cursor:pointer}.gh:hover{background:#eef3fa;color:var(--pri)}.gh.fav svg{fill:none;stroke:#94a3b8}.gh.fav.on svg{fill:#f59e0b;stroke:#f59e0b}.gh.fav:hover svg{stroke:#f59e0b}.gh svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.oc .acts button.sm{border-radius:8px}.oc .acts .pri{display:inline-flex;align-items:center;gap:6px}.oc .acts .pri svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2}.tg-a .pri{display:inline-flex;align-items:center;gap:6px}.tg-a .pri svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;flex:0 0 auto}
 .oc .det{margin:0 0 4px}
 @media(max-width:700px){.oc .acts .sp{display:none}}
 .hero{position:relative;background:linear-gradient(135deg,#0b1220,#14233f 60%,#1b3358);color:#e2e8f0;border-radius:16px;padding:22px 26px;margin-bottom:16px;display:grid;grid-template-columns:minmax(0,.75fr) auto minmax(0,1.25fr);gap:18px;align-items:center;box-shadow:0 8px 24px #0f172a22}
@@ -238,6 +238,7 @@ const UFS="AC AL AM AP BA CE DF ES GO MA MG MS MT PA PB PE PI PR RJ RN RO RR RS 
 const STATUS=['novo','analisando','em_abordagem','participando','ganho','perdido','descartado'];
 const ETAPAS=['listado','contatado','reuniao','contrato_assinado','habilitacao','proposta','resultado','descartado'];
 const opts=(a,sel)=>a.map(x=>`<option ${x===sel?'selected':''}>${esc(x)}</option>`).join('');
+const optsM=(a,meta,sel)=>a.map(x=>`<option value="${esc(x)}" ${x===sel?'selected':''}>${esc((meta[x]||{}).l||x)}</option>`).join('');
 const STATUS_META={
  novo:{l:'Novo',c:'#64748b',d:'Ainda não avaliado.'},
  analisando:{l:'Analisando',c:'#2563eb',d:'Você está avaliando se vale a pena participar.'},
@@ -448,27 +449,44 @@ async processos(){
  <label>Objeto / título</label><input id="pt" value="${esc((pre?.objeto||'').slice(0,200))}"><div class="f2"><div><label>Órgão</label><input id="po" value="${esc(pre?.orgao_nome||'')}"></div><div><label>UF</label><input id="pu" value="${esc(pre?.uf||'')}"></div></div><label>Link do PNCP</label><input id="pl" value="${esc(pre?.link_pncp||'')}">
  <div class="f2"><div><label>Valor da proposta (R$)</label><input id="pv" type="number" step="0.01"></div><div><label>Custo total da empresa (R$)</label><input id="pc" type="number" step="0.01"></div><div><label>Base da comissão</label><select id="pb"><option value="contrato">Valor do contrato</option><option value="margem">Margem da empresa</option></select></div><div><label>Percentual (%)</label><input id="pp" type="number" step="0.01" value="1"></div></div>
  <label>Observações</label><textarea id="pob" rows="2"></textarea><button style="margin-top:10px" onclick="novoProc()">Abrir processo</button></details>`:`<div class="card vazio">Cadastre primeiro uma empresa na tela <a class="l" onclick="ir('empresas')" style="cursor:pointer">Empresas</a>.</div>`}
- <div class="bar"><select id="fe"><option value="">Todas as empresas</option>${eo(arg.emp)}</select><select id="fs2"><option value="">Todos os status</option><option value="abertos">Só em andamento</option>${opts(PSTAT)}</select></div><div id="plist"></div>`;
+ <div class="bar"><select id="fe"><option value="">Todas as empresas</option>${eo(arg.emp)}</select><select id="fs2"><option value="">Todos os status</option><option value="abertos">Só em andamento</option>${optsM(PSTAT,PSTAT_META)}</select></div><div id="plist"></div>`;
  $('#fe').onchange=$('#fs2').onchange=listarProc;await listarProc();},
 
 async radar(){
  const A0=window.ARG||{};window.ARG=null;
  const perfis=(await q(sb.from('perfis_busca').select('id,nome,ativo').order('nome'))).data;
+ await carregarFav();
  const cnt={};((await q(sb.from('radar').select('perfil_id'))).data||[]).forEach(x=>{cnt[x.perfil_id]=(cnt[x.perfil_id]||0)+1;});
  const tot=Object.values(cnt).reduce((a,b)=>a+b,0);
- const abasPf=[['','Todos os perfis',tot],...perfis.filter(x=>cnt[x.id]||x.ativo).map(x=>[x.id,x.nome+(x.ativo?'':' (parado)'),cnt[x.id]||0])];
+ const abasPf=[['','Todos os perfis',tot],...perfis.filter(x=>cnt[x.id]||x.ativo).map(x=>[x.id,x.nome+(x.ativo?'':' (parado)'),cnt[x.id]||0]),['fav','★ Favoritos',window.__FAV.size]];
  main.innerHTML=`<div class="top"><div><h2>Radar de oportunidades</h2><p class="sub">Ordenado pela nota de interesse. No computador, passe o mouse na nota para ver a composição; no celular, abra Detalhes.</p></div><details class="leg"><summary>Como a nota é calculada</summary><div class="legc"><table class="tb"><tr><th>Fator</th><th>Peso</th><th>O que mede</th></tr><tr><td>Aderência ao perfil</td><td>35%</td><td>o quanto o objeto é do seu setor (IA quando já avaliou, senão palavras-chave)</td></tr><tr><td>Tamanho do negócio</td><td>25%</td><td>comissão potencial, em escala log: R$ 30 mil = 0, R$ 1 mi = 60, R$ 10 mi = 100</td></tr><tr><td>Folga de preço</td><td>15%</td><td>desconto típico da disputa nesse objeto (30% ou mais = folga grande)</td></tr><tr><td>Prazo</td><td>15%</td><td>dá para mobilizar uma empresa a tempo (5 a 20 dias é o ideal)</td></tr><tr><td>Risco do edital</td><td>10%</td><td>o quanto é restritivo, invertido (edital analisado pela IA)</td></tr></table><div class="legf"><b>Faixas:</b> <span class="tag ok">65+</span> olhar hoje · <span class="tag w">50 a 64</span> vale conferir · <span class="tag">35 a 49</span> só se sobrar tempo · <span class="tag b">abaixo de 35</span> provavelmente não compensa. O que ainda não se sabe entra como neutro (50), então a nota tende a subir conforme a IA analisa o edital e a base de preços cresce.</div></div></details></div>${abasPf.length>2?`<div class="tg-tabs" id="rtabs">${abasPf.map(a=>`<button data-pf="${a[0]}" class="${a[0]===(A0.perfil||'')?'':'sec'} sm" onclick="abaRadar('${a[0]}')">${esc(a[1])} <span class="m">${nBR(a[2])}</span></button>`).join('')}</div>`:''}<div class="bar"><select id="fp" ${abasPf.length>2?'style="display:none"':''}><option value="">Todos os perfis</option>${perfis.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select>
- <select id="fs"><option value="">Status (todos)</option>${opts(STATUS)}</select><select id="ff"><option value="">Edital + PCA</option><option value="e">Só editais</option><option value="p">Só PCA</option></select>
- <select id="fu"><option value="">UF (todas)</option>${opts(UFS)}</select><input id="fq" type="search" placeholder="Buscar no objeto…"></div><div id="lista"></div>`;
+ <select id="fs"><option value="">Status (todos)</option>${optsM(STATUS,STATUS_META)}</select><select id="ff"><option value="">Edital + PCA</option><option value="e">Só editais</option><option value="p">Só PCA</option></select>
+ <select id="fu"><option value="">UF (todas)</option>${opts(UFS)}</select>${selOrd('fo')}<input id="fq" type="search" placeholder="Buscar no objeto…"></div><div id="lista"></div>`;
  const carregar=async()=>{
-  let r=sb.from('radar').select('id,score,interesse,interesse_detalhe,status,justificativa,observacoes,perfil_id,perfis_busca(nome),oportunidades(id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))').order('interesse',{ascending:false,nullsFirst:false}).limit(120);
-  if($('#fp').value)r=r.eq('perfil_id',$('#fp').value);if($('#fs').value)r=r.eq('status',$('#fs').value);
-  if($('#ff').value==='e')r=r.not('oportunidade_id','is',null);if($('#ff').value==='p')r=r.not('pca_item_id','is',null);
-  let rows=(await q(r)).data;const uf=$('#fu').value,t=$('#fq').value.toLowerCase();
+  const favAba=$('#fp').value==='fav';
+  const SEL='id,score,interesse,interesse_detalhe,status,justificativa,observacoes,perfil_id,perfis_busca(nome),oportunidades(id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))';
+  const OPC='id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_categoria,ia_resumo,ia_atencao,ia_termo';
+  let rows=[];
+  if(favAba){
+   const ids=[...window.__FAV];
+   if(ids.length){
+    rows=(await q(sb.from('radar').select(SEL).in('oportunidade_id',ids).limit(500))).data||[];
+    const falta=ids.filter(i=>!rows.some(x=>x.oportunidades?.id===i));
+    if(falta.length){const ex=(await q(sb.from('oportunidades').select(OPC).in('id',falta))).data||[];
+     rows=rows.concat(ex.map(o=>({id:null,score:null,interesse:null,status:null,oportunidades:o})));}
+   }
+  }else{
+   let r=sb.from('radar').select(SEL).order('interesse',{ascending:false,nullsFirst:false}).limit(500);
+   if($('#fp').value)r=r.eq('perfil_id',$('#fp').value);if($('#fs').value)r=r.eq('status',$('#fs').value);
+   if($('#ff').value==='e')r=r.not('oportunidade_id','is',null);if($('#ff').value==='p')r=r.not('pca_item_id','is',null);
+   rows=(await q(r)).data||[];
+  }
+  const uf=$('#fu').value,t=$('#fq').value.toLowerCase();
   rows=rows.filter(x=>{const o=x.oportunidades,p=x.pca_itens;const u=o?o.uf:p?.pca_planos?.uf;const tx=(o?o.objeto:p?.descricao||'').toLowerCase();return(!uf||u===uf)&&(!t||tx.includes(t));});
+  rows=ordenar(rows,$('#fo').value,x=>x.oportunidades||{orgao_nome:x.pca_itens?.pca_planos?.orgao_nome,data_fim_proposta:x.pca_itens?.data_desejada,valor_estimado:x.pca_itens?.valor_total});
   $('#lista').innerHTML=rows.length?rows.map(x=>{const o=x.oportunidades,p=x.pca_itens;
-   return o?cardOp(o,{score:x.interesse??x.score,det:x.interesse_detalhe,perfil:x.perfis_busca?.nome,just:x.justificativa,status:selHTML('mudarStatus',x.id,STATUS,x.status,STATUS_META,o.id)}):cardPca(p,x);}).join(''):'<div class="vazio">Nada por aqui ainda. Rode a coleta e o radar, ou ajuste os filtros.</div>';};
- ['fp','fs','ff','fu'].forEach(i=>$('#'+i).onchange=carregar);let tm;$('#fq').oninput=()=>{clearTimeout(tm);tm=setTimeout(carregar,300);};if(A0.perfil)$('#fp').value=A0.perfil;
+   return o?cardOp(o,{score:x.interesse??x.score,det:x.interesse_detalhe,perfil:x.perfis_busca?.nome,just:x.justificativa,status:x.id?selHTML('mudarStatus',x.id,STATUS,x.status,STATUS_META,o.id):''}):cardPca(p,x);}).join(''):`<div class="vazio">${favAba?'Nenhum edital favoritado ainda. Clique na estrela de um card para guardá-lo aqui.':'Nada por aqui ainda. Rode a coleta e o radar, ou ajuste os filtros.'}</div>`;};
+ ['fp','fs','ff','fu','fo'].forEach(i=>$('#'+i).onchange=carregar);let tm;$('#fq').oninput=()=>{clearTimeout(tm);tm=setTimeout(carregar,300);};if(A0.perfil)$('#fp').value=A0.perfil;
  window.abaRadar=id=>{$('#fp').value=id;document.querySelectorAll('#rtabs button').forEach(b=>b.classList.toggle('sec',b.dataset.pf!==id));carregar();};
  await carregar();},
 
@@ -498,7 +516,7 @@ async pca(){
 
 async funil(){
  const {data}=await q(sb.from('matches').select('id,etapa,score,prospects(razao_social,uf),radar(oportunidades(objeto))').limit(500));
- main.innerHTML=`<div class="top"><div><h2>Funil de assessoria</h2><p class="sub">Cada card liga uma oportunidade a uma empresa-alvo.</p></div></div>`+(data.length?`<div class="cols">${ETAPAS.map(e=>`<div class="col"><h3>${e.replace('_',' ')} (${data.filter(m=>m.etapa===e).length})</h3>${data.filter(m=>m.etapa===e).map(m=>`<div class="card"><div class="t">${esc(m.prospects?.razao_social)}</div><div class="m">${esc((m.radar?.oportunidades?.objeto||'').slice(0,90))}</div><div style="margin-top:8px">${selHTML('mudarEtapa',m.id,ETAPAS,m.etapa,ETAPAS_META)}</div></div>`).join('')}</div>`).join('')}</div>`:'<div class="card vazio">Ainda não há empresas no funil.</div>');},
+ main.innerHTML=`<div class="top"><div><h2>Funil de assessoria</h2><p class="sub">Cada card liga uma oportunidade a uma empresa-alvo.</p></div></div>`+(data.length?`<div class="cols">${ETAPAS.map(e=>`<div class="col"><h3>${esc((ETAPAS_META[e]||{}).l||e)} (${data.filter(m=>m.etapa===e).length})</h3>${data.filter(m=>m.etapa===e).map(m=>`<div class="card"><div class="t">${esc(m.prospects?.razao_social)}</div><div class="m">${esc((m.radar?.oportunidades?.objeto||'').slice(0,90))}</div><div style="margin-top:8px">${selHTML('mudarEtapa',m.id,ETAPAS,m.etapa,ETAPAS_META)}</div></div>`).join('')}</div>`).join('')}</div>`:'<div class="card vazio">Ainda não há empresas no funil.</div>');},
 
 async comissoes(){
  const {data}=await q(sb.from('contratos_comissao').select('*').order('criado_em',{ascending:false}));
@@ -581,7 +599,7 @@ const SV_DESC={editais:'Busca no PNCP os editais com proposta aberta agora. ~10 
 function descEtapaSv(){const m=document.getElementById('sv-et');const d=document.getElementById('sv-edesc');if(m&&d)d.textContent=SV_DESC[m.value]||'';}
 // ---------------------------------------------------------------- filtro v2 (perfis e triagem)
 const MODS_PF=['Pregão - Eletrônico','Concorrência - Eletrônica','Dispensa','Credenciamento','Pregão - Presencial','Concorrência - Presencial'];
-window.__TG=window.__TG||{perfil:null,aba:'alta',busca:'',pag:0};
+window.__TG=window.__TG||{perfil:null,aba:'alta',busca:'',pag:0,ord:'nota'};
 async function apiPerfil(body){const {data:{session}}=await sb.auth.getSession();const r=await fetch('/api/perfil',{method:'POST',headers:{authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:JSON.stringify(body)});const j=await r.json().catch(()=>({erro:'HTTP '+r.status}));return j;}
 function funilTxtPf(p){const f=p.funil||{};return `Última triagem ${p.triado_em?'há '+agoSB(p.triado_em):''}: <b>${nBR(f.alta)}</b> em Alta · <b>${nBR(f.revisao)}</b> em Revisão · ${nBR(f.regra)} cortados por regra · ${nBR(f.baixa)} pouco parecidos (de ${nBR(f.com_vetor)} editais abertos avaliados).`;}
 async function salvarPerfil(id){const c=$('#p'+id);const fb=$('#fb'+id);const arr=v=>v.split(',').map(s=>s.trim()).filter(Boolean),num=v=>v===''?null:Number(v);const g=k=>c.querySelector(`[data-k=${k}]`);
@@ -622,19 +640,25 @@ async function renderTriagem(){
  ${f.regra_bons>0?`<div class="sv-d"><span>⚠ ${nBR(f.regra_bons)} editais com nota de Alta foram cortados por regra fixa. Confira na aba "Cortados por regra" se a regra não está apertada demais.</span></div>`:''}</div>
  <div class="tg-tabs">${abas.map(a=>`<button class="${T.aba===a[0]?'':'sec'} sm" onclick="window.__TG.aba='${a[0]}';window.__TG.pag=0;renderTriagem()">${a[1]} <span class="m">${nBR(a[2])}</span></button>`).join('')}</div>
  <div class="m sv-ex">${{alta:'Muito parecidos com o perfil: já estão no Radar (se o perfil estiver valendo).',revisao:'Zona de dúvida: confira e marque 👍 ou 👎. Cada marcação ajusta o perfil.',quase:'Ficaram pouco abaixo da Revisão. Se algum interessar, marque 👍: o perfil passa a buscar coisas assim.',regra:'Parecidos, mas cortados por UF, valor, modalidade ou prazo. Ordenados pela nota.',exemplos:'Editais que você marcou. 👍 puxa o perfil para coisas assim; 👎 afasta.'}[T.aba]}</div>
- <div class="sv-bt"><input id="tg-b" placeholder="Filtrar por palavra no objeto" value="${esc(T.busca)}" onkeydown="if(event.key==='Enter'){window.__TG.busca=this.value;window.__TG.pag=0;renderTriagem()}" style="max-width:340px"></div><div id="tg-l"><div class="vazio">Carregando…</div></div>`;
+ <div class="sv-bt"><input id="tg-b" placeholder="Filtrar por palavra no objeto" value="${esc(T.busca)}" onkeydown="if(event.key==='Enter'){window.__TG.busca=this.value;window.__TG.pag=0;renderTriagem()}" style="max-width:340px">${selOrd('tg-o',T.ord||'nota')}</div><div id="tg-l"><div class="vazio">Carregando…</div></div>`;
  main.innerHTML=h;
+ const selO=$('#tg-o');if(selO)selO.onchange=()=>{window.__TG.ord=selO.value;window.__TG.pag=0;renderTriagem();};
+ await carregarFav();
  const cols='id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp';
  let rows=[];
  if(T.aba==='exemplos'){const ids=[...pos,...neg];if(ids.length){let qy=sb.from('oportunidades').select(cols).in('id',ids);if(T.busca)qy=qy.ilike('objeto','%'+T.busca+'%');const r=(await q(qy)).data||[];const tr=(await q(sb.from('triagem').select('oportunidade_id,nota,motivo').eq('perfil_id',p.id).in('oportunidade_id',ids))).data||[];const tm=Object.fromEntries(tr.map(t=>[t.oportunidade_id,t]));rows=r.map(o=>({nota:tm[o.id]?.nota,motivo:tm[o.id]?.motivo||'Encerrado ou fora da triagem',o}));}}
- else{const fx={alta:'alta',revisao:'revisao',quase:'baixa',regra:'regra'}[T.aba];let qy=sb.from('triagem').select(`nota,motivo,oportunidades!inner(${cols})`).eq('perfil_id',p.id).eq('faixa',fx).order('nota',{ascending:false}).range(T.pag*50,T.pag*50+49);
-  if(T.aba==='quase')qy=qy.gte('nota',Math.max(0,p.nota_revisao-10));if(T.busca)qy=qy.ilike('oportunidades.objeto','%'+T.busca+'%');rows=((await q(qy)).data||[]).map(r=>({nota:r.nota,motivo:r.motivo,o:r.oportunidades}));}
+ else{const fx={alta:'alta',revisao:'revisao',quase:'baixa',regra:'regra'}[T.aba];const ord=T.ord||'nota';
+  // em qualquer ordem que nao seja a nota, o banco nao consegue ordenar pelo edital: trazemos uma janela maior e ordenamos aqui
+  let qy=sb.from('triagem').select(`nota,motivo,oportunidades!inner(${cols})`).eq('perfil_id',p.id).eq('faixa',fx).order('nota',{ascending:false}).range(0,ord==='nota'?T.pag*50+49:499);
+  if(T.aba==='quase')qy=qy.gte('nota',Math.max(0,p.nota_revisao-10));if(T.busca)qy=qy.ilike('oportunidades.objeto','%'+T.busca+'%');
+  rows=((await q(qy)).data||[]).map(r=>({nota:r.nota,motivo:r.motivo,o:r.oportunidades}));
+  rows=ordenar(rows,ord,r=>r.o).slice(T.pag*50,T.pag*50+50);}
  const pct=Number(p.comissao_pct??1);
  $('#tg-l').innerHTML=rows.length?rows.map(r=>{const o=r.o,ex=pos.has(o.id)?'pos':neg.has(o.id)?'neg':'',v=Number(o.valor_estimado||0);return `<div class="card tg-i"><div class="tg-n ${r.nota>=p.nota_alta?'ok':r.nota>=p.nota_revisao?'w':''}">${r.nota??'—'}</div><div class="tg-c"><div class="tg-o">${esc(o.objeto||'')}</div>
  <div class="m">${esc(o.orgao_nome||'')} · ${esc(o.municipio||'')}/${esc(o.uf||'')} · ${esc(o.modalidade||'')}</div>
  <div class="m">${o.valor_sigiloso?'Valor sigiloso':v?`<b>${brl(v)}</b> · sua comissão ≈ <b>${brl(v*pct/100)}</b>`:'Valor não informado'} · propostas até ${o.data_fim_proposta?new Date(o.data_fim_proposta).toLocaleDateString('pt-BR'):'—'}</div>
  <div class="m">${esc(r.motivo||'')}</div>
- <div class="tg-a"><button class="${ex==='pos'?'':'sec'} sm" onclick="marcarEx(${o.id},'${ex==='pos'?'remover':'pos'}')">👍 É isso</button><button class="${ex==='neg'?'':'sec'} sm" onclick="marcarEx(${o.id},'${ex==='neg'?'remover':'neg'}')">👎 Não é</button><button class="gh" onclick="detalhes(this,${o.id})">${ic('det')}Detalhes</button>${precoBtn(o,o.objeto)}${o.link_pncp?`<a class="gh" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">${ic('ext')}PNCP</a>`:''}<button class="sm pri" onclick="irProc(${o.id})">Iniciar processo${ic('play')}</button></div><div class="det" hidden></div></div></div>`;}).join('')+(rows.length===50&&T.aba!=='exemplos'?`<button class="sec" onclick="window.__TG.pag++;renderTriagem()">Próximos 50</button>`:'')+(T.pag>0?` <button class="sec" onclick="window.__TG.pag--;renderTriagem()">Anteriores</button>`:''):'<div class="vazio">Nada nesta aba.</div>';
+ <div class="tg-a">${favBtn(o.id)}<button class="${ex==='pos'?'':'sec'} sm" onclick="marcarEx(${o.id},'${ex==='pos'?'remover':'pos'}')">👍 É isso</button><button class="${ex==='neg'?'':'sec'} sm" onclick="marcarEx(${o.id},'${ex==='neg'?'remover':'neg'}')">👎 Não é</button><button class="gh" onclick="detalhes(this,${o.id})">${ic('det')}Detalhes</button>${precoBtn(o,o.objeto)}${o.link_pncp?`<a class="gh" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">${ic('ext')}PNCP</a>`:''}<button class="sm pri" onclick="irProc(${o.id})">Iniciar processo${ic('play')}</button></div><div class="det" hidden></div></div></div>`;}).join('')+(rows.length===50&&T.aba!=='exemplos'?`<button class="sec" onclick="window.__TG.pag++;renderTriagem()">Próximos 50</button>`:'')+(T.pag>0?` <button class="sec" onclick="window.__TG.pag--;renderTriagem()">Anteriores</button>`:''):'<div class="vazio">Nada nesta aba.</div>';
 }
 async function marcarEx(op,tipo){toast(tipo==='remover'?'Removendo o exemplo e recalculando…':'Ajustando o perfil e refazendo a triagem…');const j=await apiPerfil({acao:'exemplo',perfil:window.__TG.perfil,oportunidade:op,tipo});if(j.erro||j.funil?.erro)return alert(j.erro||j.funil.erro);toast(`Pronto: ${nBR(j.funil.alta)} em Alta, ${nBR(j.funil.revisao)} em Revisão`);renderTriagem();}
 async function refazerTriagem(){toast('Refazendo a triagem…');const j=await apiPerfil({acao:'triar',perfil:window.__TG.perfil});if(j.erro||j.funil?.erro)return alert(j.erro||j.funil.erro);renderTriagem();}
@@ -728,18 +752,38 @@ async function renderServicos(sil,cache){
 const norm=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
 const irPreco=t=>ir('precos',t);
 const AI=(t='Texto gerado por IA (Gemini)')=>`<span class="aib" title="${t}"><svg viewBox="0 0 24 24"><path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9zM19 14l.9 2.6 2.6.9-2.6.9L19 21l-.9-2.6-2.6-.9 2.6-.9zM5 15l.7 1.8 1.8.7-1.8.7L5 20l-.7-1.8L2.5 17.5l1.8-.7z"/></svg></span>`;
-const IC={preco:'<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1"/>',det:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',ext:'<path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/>',play:'<path d="M5 12h14M13 6l6 6-6 6"/>'},ic=k=>`<svg viewBox="0 0 24 24">${IC[k]}</svg>`;
+const IC={preco:'<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1"/>',det:'<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',ext:'<path d="M14 3h7v7M10 14L21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5"/>',play:'<path d="M5 12h14M13 6l6 6-6 6"/>',star:'<path d="M12 3.6l2.6 5.3 5.8.8-4.2 4.1 1 5.8-5.2-2.8-5.2 2.8 1-5.8L3.6 9.7l5.8-.8z"/>'},ic=k=>`<svg viewBox="0 0 24 24">${IC[k]}</svg>`;
 const PARTES=[['aderencia','Aderência ao seu perfil','35%'],['retorno','Tamanho do negócio','25%'],['margem','Folga de preço no setor','15%'],['prazo','Tempo para se organizar','15%'],['risco','Edital pouco restritivo','10%']];
 const scoreRing=(v,det)=>{if(v==null)return'';
  const dica=det?'Interesse '+v+'/100 = '+PARTES.map(([k,r,p])=>`${r} ${det[k]??'—'} (${p})`).join(' · '):'Nota de interesse (aderência, tamanho, margem, prazo e risco)';
  return `<div><div class="scr ${v>=65?'hi':v<45?'lo':''}" style="--p:${v}" title="${esc(dica)}"><b>${v}</b></div><small style="display:block;font-size:9px;color:var(--mut);text-align:center;margin-top:3px;letter-spacing:.4px;text-transform:uppercase">interesse</small>${det?`<div class="brk">${PARTES.map(([k])=>`<i style="--h:${Math.max(4,Math.round((det[k]??50)*.22))}px" title="${esc(PARTES.find(x=>x[0]===k)[1])}: ${det[k]??'—'}"></i>`).join('')}</div>`:''}</div>`;};
 const precoBtn=(o,t)=>{const ok=o&&o.ia_catalogo_codigo;const a=ok?`onclick="irPreco({tipo:'${o.ia_tipo}',codigo:'${o.ia_catalogo_codigo}',nome:this.dataset.n})" data-n="${esc(o.ia_catalogo_nome)}" title="Item sugerido pela IA: ${esc(o.ia_catalogo_nome)}"`:`onclick="irPreco(this.dataset.t)" data-t="${esc((o&&o.ia_termo?o.ia_termo:(t||'')).slice(0,80))}"`;return `<button class="gh" ${a}>${ic('preco')}Preço${ok?' ✦':''}</button>`;};
+window.__FAV=window.__FAV||new Set();
+async function carregarFav(){try{const {data}=await q(sb.from('favoritos').select('oportunidade_id'));window.__FAV=new Set((data||[]).map(x=>x.oportunidade_id));}catch(e){}return window.__FAV;}
+async function favoritar(bt,id){const on=window.__FAV.has(id);bt.disabled=true;
+ const {error}=on?await sb.from('favoritos').delete().eq('oportunidade_id',id):await sb.from('favoritos').upsert({oportunidade_id:id});
+ bt.disabled=false;if(error)return alert('Não consegui salvar o favorito: '+error.message);
+ on?window.__FAV.delete(id):window.__FAV.add(id);
+ document.querySelectorAll(`.gh.fav[onclick*="favoritar(this,${id})"]`).forEach(b=>b.classList.toggle('on',!on));
+ if(window.__TG&&window.__TG.perfil&&location.hash==='#radar'&&$('#fp')&&$('#fp').value==='fav')ir('radar');}
+// Ordenacoes disponiveis nas listas de oportunidades
+const ORD={nota:'Maior nota',prazo:'Encerra antes',prazo2:'Encerra depois',valor:'Maior valor',valor2:'Menor valor',novo:'Publicados há menos tempo',orgao:'Órgão (A→Z)'};
+const _dtv=o=>o&&o.data_fim_proposta?new Date(o.data_fim_proposta).getTime():Infinity;
+function ordenar(rows,modo,get){const o=get||(x=>x);
+ const f={prazo:(a,b)=>_dtv(o(a))-_dtv(o(b)),prazo2:(a,b)=>_dtv(o(b))-_dtv(o(a)),
+  valor:(a,b)=>Number(o(b)?.valor_estimado||0)-Number(o(a)?.valor_estimado||0),
+  valor2:(a,b)=>Number(o(a)?.valor_estimado||0)-Number(o(b)?.valor_estimado||0),
+  novo:(a,b)=>Number(o(b)?.id||0)-Number(o(a)?.id||0),
+  orgao:(a,b)=>String(o(a)?.orgao_nome||'').localeCompare(String(o(b)?.orgao_nome||''),'pt-BR')}[modo];
+ return f?[...rows].sort(f):rows;}
+const selOrd=(id,sel)=>`<select id="${id}">${Object.entries(ORD).map(([k,v])=>`<option value="${k}" ${k===sel?'selected':''}>Ordenar: ${esc(v)}</option>`).join('')}</select>`;
+const favBtn=id=>`<button class="gh fav${(window.__FAV||new Set()).has(id)?' on':''}" title="Favoritar" onclick="favoritar(this,${id})">${ic('star')}</button>`;
 const cardOp=(o,ex={})=>`<div class="card oc"><div><div class="h" title="${esc(o.objeto||'')}">${esc(o.objeto||'')}</div><div class="meta">${esc(o.orgao_nome||'')} · ${esc(o.municipio?o.municipio+'/':'')}${esc(o.uf||'')}${o.modalidade?' · '+esc(o.modalidade):''}</div>
  ${o.ia_resumo?`<div class="ia">${AI()}${esc(o.ia_resumo)}</div>`:''}
  <div class="tags">${ex.perfil?`<span class="tag">${esc(ex.perfil)}</span>`:''}${o.ia_categoria?`<span class="tag">${AI()}${esc(o.ia_categoria)}</span>`:''}<span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m">encerra ${dt(o.data_fim_proposta)}</span>${o.ia_atencao?`<span class="tag w">${AI()}${esc(o.ia_atencao)}</span>`:''}</div>
  ${ex.just?`<div class="just">${AI('Nota e justificativa geradas por IA (Gemini)')}${esc(ex.just)}</div>`:''}</div>${scoreRing(ex.score,ex.det)}
  <div class="det" hidden></div>
- <div class="acts">${ex.status||''}<span class="sp"></span>${precoBtn(o,o.objeto)}<button class="gh" onclick="detalhes(this,${o.id})">${ic('det')}Detalhes</button>${o.link_pncp?`<a class="gh" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">${ic('ext')}PNCP</a>`:''}<button class="sm pri" onclick="irProc(${o.id})">Iniciar processo${ic('play')}</button></div></div>`;
+ <div class="acts">${ex.status||''}<span class="sp"></span>${favBtn(o.id)}${precoBtn(o,o.objeto)}<button class="gh" onclick="detalhes(this,${o.id})">${ic('det')}Detalhes</button>${o.link_pncp?`<a class="gh" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">${ic('ext')}PNCP</a>`:''}<button class="sm pri" onclick="irProc(${o.id})">Iniciar processo${ic('play')}</button></div></div>`;
 const cardPca=(p,x)=>`<div class="card oc"><div><div class="h">${esc(p?.descricao||'')}</div><div class="meta">${esc(p?.pca_planos?.orgao_nome||'')} · ${esc(p?.pca_planos?.uf||'')}</div><div class="tags"><span class="tag w">PCA · previsão</span>${x.perfis_busca?.nome?`<span class="tag">${esc(x.perfis_busca.nome)}</span>`:''}<span class="tag">${brl(p?.valor_total)}</span><span class="m">desejada ${dt(p?.data_desejada)}</span></div>${x.justificativa?`<div class="just">${AI('Nota e justificativa geradas por IA (Gemini)')}${esc(x.justificativa)}</div>`:''}</div>${scoreRing(x.interesse??x.score,x.interesse_detalhe)}<div class="acts">${selHTML('mudarStatus',x.id,STATUS,x.status,STATUS_META)}<span class="sp"></span><button class="gh" onclick="irPreco(this.dataset.t)" data-t="${esc((p?.descricao||'').slice(0,80))}">${ic('preco')}Preço</button></div></div>`;
 
 async function histPNCP(t){t=String(t||'').trim();if(!t||!$('#histc'))return;$('#histc').hidden=false;await blocoMercado(t,null,'#hist',8);
@@ -775,6 +819,7 @@ function sim(){const n=+$('#sq').value||0,p=+$('#sp').value||0,c=+$('#sc').value
  $('#so').innerHTML=`<div class="pbox"><div class="card"><div class="m">Valor do contrato</div><div class="big">${brl2(ct)}</div></div><div class="card"><div class="m">Margem da empresa</div><div class="big ${mg>=0?'g':''}">${brl2(mg)}</div><div class="m">${pc.toFixed(1)}% sobre a venda</div></div><div class="card"><div class="m">Comissão sobre o contrato</div><div class="big">${brl2(ct*x/100)}</div></div><div class="card"><div class="m">Comissão sobre a margem</div><div class="big">${brl2(Math.max(mg,0)*x/100)}</div></div></div>`;}
 
 const PSTAT=['preparando','habilitacao','proposta','disputa','recurso','ganho','perdido','desistiu'];
+const PSTAT_META={preparando:{l:'Preparando'},habilitacao:{l:'Habilitação'},proposta:{l:'Proposta'},disputa:{l:'Disputa'},recurso:{l:'Recurso'},ganho:{l:'Ganho'},perdido:{l:'Perdido'},desistiu:{l:'Desistiu'}};
 
 async function iaApi(acao,op,extra={}){const {data:{session}}=await sb.auth.getSession();const r=await fetch('/api/ia',{method:'POST',headers:{authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:JSON.stringify({acao,oportunidade_id:op,...extra})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.erro||('erro '+r.status));return j;}
 const NIV={alto:'b',medio:'w',baixo:'ok'},SIT={ok:'ok',vencido:'b',falta:'b',verificar:'w'},VER={apta:'ok',atencao:'w',inapta:'b',indefinido:''};
@@ -931,7 +976,7 @@ async function listarProc(){
  const ab=data.filter(p=>!['ganho','perdido','desistiu'].includes(p.status)),vab=ab.reduce((a,p)=>a+Number(p.valor_proposta||0),0),cab=ab.reduce((a,p)=>a+comProc(p).com,0),gan=data.filter(p=>p.status==='ganho');
  $('#plist').innerHTML=(data.length?`<div class="grid"><div class="card"><div class="m">Em andamento</div><div class="kpi">${ab.length}</div></div><div class="card"><div class="m">Valor das propostas em andamento</div><div class="kpi">${brl(vab)}</div></div><div class="card"><div class="m">Comissão potencial</div><div class="kpi g">${brl(cab)}</div></div><div class="card"><div class="m">Ganhos</div><div class="kpi">${gan.length}</div></div></div>`:'')
  +(data.length?data.map(p=>{const c=comProc(p);return `<div class="card"><div class="row"><div><div class="t">${esc((p.titulo||'').slice(0,220))}</div><div class="m">${esc(p.empresas?.nome)}${p.empresas?.propria?' (minha)':''} · ${esc(p.orgao||'')} ${p.uf?'· '+esc(p.uf):''}${p.data_sessao?' · sessão '+new Date(p.data_sessao).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):''}</div>${p.link_pncp?`<a class="l" href="${esc(p.link_pncp)}" target="_blank" rel="noopener">abrir no PNCP ↗</a> `:''}<button class="sec sm" onclick="irPreco(this.dataset.t)" data-t="${esc((p.titulo||'').slice(0,80))}">Pesquisar preço</button> ${gcal(p)}</div>
- <select style="width:150px" onchange="updProc(${p.id},{status:this.value})">${opts(PSTAT,p.status)}</select></div>
+ <select style="width:150px" onchange="updProc(${p.id},{status:this.value})">${optsM(PSTAT,PSTAT_META,p.status)}</select></div>
  <div class="f2" style="grid-template-columns:repeat(4,1fr);margin-top:6px"><div><label>Valor da proposta</label><input type="number" step="0.01" value="${p.valor_proposta??''}" onchange="updProc(${p.id},{valor_proposta:this.value===''?null:Number(this.value)})"></div><div><label>Custo total</label><input type="number" step="0.01" value="${p.custo??''}" onchange="updProc(${p.id},{custo:this.value===''?null:Number(this.value)})"></div><div><label>Base da comissão</label><select onchange="updProc(${p.id},{base_tipo:this.value})">${opts(['contrato','margem'],p.base_tipo)}</select></div><div><label>Percentual (%)</label><input type="number" step="0.01" value="${p.percentual??1}" onchange="updProc(${p.id},{percentual:Number(this.value)})"></div></div>
  <div style="margin-top:8px"><span class="tag">margem ${brl(c.mg)}</span><span class="tag ok">comissão ${brl(c.com)}</span>${p.status==='ganho'&&!p.comissao_gerada?`<button class="sm" style="margin-left:6px" onclick="gerarCom(${p.id})">Gerar contrato de comissão</button>`:''}${p.comissao_gerada?'<span class="tag">comissão lançada</span>':''}${p.oportunidade_id?`<button class="sec sm" style="margin-left:6px" onclick="checkProc(this,${p.oportunidade_id},${p.empresa_id})">Checklist de habilitação (IA)</button>`:''}<button class="bad sm" style="float:right" onclick="delProc(${p.id})">Excluir</button></div><div class="iaout" hidden></div></div>`}).join(''):'<div class="card vazio">Nenhum processo por aqui. Abra um a partir de um edital (botão “Iniciar processo”) ou pelo formulário acima.</div>');}
 async function updProc(id,v){const {error}=await sb.from('processos').update(v).eq('id',id);if(error)alert('Erro: '+error.message);await listarProc();}
