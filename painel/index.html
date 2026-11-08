@@ -151,10 +151,8 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 #sbar .sbt{width:110px;height:7px;border-radius:99px;background:var(--pri2);overflow:hidden;flex:none}
 #sbar .sbt i{display:block;height:100%;background:linear-gradient(90deg,#2f5a94,#4f86c6);border-radius:99px}
 #sbar .sw{color:#b91c1c;font-weight:600}
-#sbar .spx{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding-top:7px;margin-top:1px;border-top:1px dashed #e2e8f0;font-size:12px;color:#64748b}
-#sbar .spx>em{font-style:normal;font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:11px;color:#64748b;margin-right:2px}
-#sbar .spx .ch{display:inline-flex;gap:6px;align-items:baseline;background:#f1f5f9;border-radius:999px;padding:3px 11px;white-space:nowrap}
-#sbar .spx .ch b{color:#1e293b}#sbar .spx .ch i{font-style:normal;color:#94a3b8}
+#sbar .sd.nx{background:#38bdf8}
+#sbar .sn{color:#64748b}#sbar .sn s{text-decoration:none;color:#cbd5e1;margin:0 2px}
 .tv #sbar{display:none}
 @media(max-width:860px){#sbar{margin-left:0;padding:7px 14px;position:static;font-size:12px;gap:4px 14px}#sbar .sbt{width:80px}}
 /* ===== Responsivo: celular e tablet (o desktop acima nao muda) ===== */
@@ -303,12 +301,14 @@ const HIST_DIAS=180;
 function agoSB(iso){const m=Math.max(0,Math.round((Date.now()-new Date(iso))/6e4));return m<1?'agora':m<60?m+' min':m<1440?Math.round(m/60)+' h':Math.round(m/1440)+' d';}
 // Agenda automatica (GitHub Actions, horario de Brasilia = UTC-3): 06:17 completa, 18:17 enxuta.
 const AGENDA=[{h:9,m:17,tipo:'completa'},{h:21,m:17,tipo:'enxuta'}];
-function proxExec(tipos){const n=Date.now();let best=null;for(let d=0;d<3;d++)for(const a of AGENDA){if(tipos&&!tipos.includes(a.tipo))continue;const t=new Date(n);t.setUTCDate(t.getUTCDate()+d);t.setUTCHours(a.h,a.m,0,0);if(t>n&&(!best||t<best))best=t;}return best;}
-function quandoSB(t){if(!t)return'—';const f=new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit'}),dia=x=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(x);
- const hoje=dia(new Date()),am=dia(new Date(Date.now()+864e5)),d=dia(t);const rot=d===hoje?'hoje':d===am?'amanhã':new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',weekday:'short',day:'2-digit',month:'2-digit'}).format(t);
- const m=Math.max(1,Math.round((t-Date.now())/6e4)),em=m<60?m+' min':Math.floor(m/60)+' h'+(m%60?' '+String(m%60).padStart(2,'0')+' min':'');return `<b>${rot} ${f.format(t)}</b> <i>em ${em}</i>`;}
-function agendaSB(){const c=(r,t)=>`<span class="ch">${r} ${quandoSB(t)}</span>`,qq=proxExec(),comp=proxExec(['completa']);
- return `<div class="spx"><em>Próximas execuções automáticas</em>${c('Coleta de editais',qq)}${c('Leitura dos editais',qq)}${c('Triagem e radar',qq)}${c('Alertas no Telegram',qq)}${c('Briefing, PCA e coleta completa',comp)}</div>`;}
+function proxExec(tipo){const n=Date.now();let best=null;for(let d=0;d<3;d++)for(const a of AGENDA){if(tipo&&a.tipo!==tipo)continue;const t=new Date(n);t.setUTCDate(t.getUTCDate()+d);t.setUTCHours(a.h,a.m,0,0);if(t>n&&(!best||t<best))best=t;}return best;}
+const _hSB=t=>new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',hour:'2-digit',minute:'2-digit'}).format(t);
+const _diaSB=t=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(t);
+function quandoSB(t){const d=_diaSB(t);return (d===_diaSB(new Date())?'':d===_diaSB(new Date(Date.now()+864e5))?'amanhã ':new Intl.DateTimeFormat('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit'}).format(t)+' ')+_hSB(t);}
+function faltaSB(t){const m=Math.max(1,Math.round((t-Date.now())/6e4));return m<60?'em '+m+' min':'em '+Math.round(m/60)+' h';}
+function agendaSB(){const q=proxExec(),c=proxExec('completa');if(!q)return'';
+ const dica=`Próximas execuções automáticas (horário de Brasília)\n\n${quandoSB(q)} — ${q.getTime()===c.getTime()?'coleta completa':'coleta enxuta'}: busca de editais, leitura dos editais, triagem, radar e alertas no Telegram${q.getTime()===c.getTime()?', briefing, PCA e histórico':''}\n${q.getTime()===c.getTime()?'':quandoSB(c)+' — coleta completa: tudo acima mais briefing, PCA, preços e histórico'}\n\nOs horários vêm do agendamento do GitHub e podem atrasar alguns minutos.`;
+ return `<span class="sg sn" title="${esc(dica)}"><i class="sd nx"></i>Próxima coleta <b>${quandoSB(q)}</b> ${faltaSB(q)}${q.getTime()===c.getTime()?'':`<s>·</s>completa <b>${quandoSB(c)}</b>`}</span>`;}
 async function barraStatus(){
  const el=document.getElementById('sbar');if(!el)return;
  try{
@@ -326,8 +326,9 @@ async function barraStatus(){
    const feitos=Math.min(HIST_DIAS,Math.round((hoje-d)/864e5)+1),pct=Math.round(feitos/HIST_DIAS*100),fim=feitos>=HIST_DIAS;
    h+=`<span class="sg">Histórico: <span class="sbt"><i style="width:${Math.max(2,pct)}%"></i></span> <b>${pct}%</b> · ${fim?'completo':'até '+d.toLocaleDateString('pt-BR')}</span>`;
   }
+  h+=agendaSB();
   if(erros.length)h+=`<span class="sg sw">⚠ ${erros.length} etapa(s) com erro: ${esc([...new Set(erros.map(c=>FASES[c.fonte]||c.fonte))].slice(0,2).join(', '))}</span>`;
-  el.innerHTML=h+agendaSB();el.hidden=false;
+  el.innerHTML=h;el.hidden=false;
  }catch(e){el.hidden=true;}
 }
 async function iniciar(){const {data}=await sb.auth.getSession();if(!data.session){$('#login').style.display='flex';return;}$('#login').style.display='none';$('#usr').textContent=data.session.user.email;$('#app').style.display='block';barraStatus();clearInterval(window.__sb);window.__sb=setInterval(()=>{if(!document.hidden)barraStatus();},60000);ir(location.hash.slice(1)||'home');}
