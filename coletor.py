@@ -430,7 +430,7 @@ def planos():
                     rows.append({
                         "orgao_cnpj": it["orgao_cnpj"], "ano": int(it["ano"]),
                         "orgao_nome": it.get("orgao_nome"), "esfera": it.get("esfera_nome"),
-                        "poder": it.get("poder_nome"), "uf": it.get("uf"),
+                        "poder": it.get("poder_nome"),
                         "valor_total": it.get("valor_global"),
                         "data_atualizacao": ts(it.get("data_atualizacao_pncp")),
                     })
@@ -440,6 +440,35 @@ def planos():
             if rows:
                 total += upsert("pca_planos", rows, "orgao_cnpj,ano")
     return total
+
+
+MAX_UF_PCA = int(os.getenv("MAX_UF_PCA", "250"))
+def preencher_uf_pca():
+    """A busca de PCA do PNCP nao traz UF. 1) deduz pelo CNPJ nos editais ja coletados; 2) o resto vem da BrasilAPI."""
+    r = requests.post(f"{SB}/rpc/preencher_uf_pca", headers=HDR, data="{}", timeout=600)
+    if r.status_code >= 300:
+        raise RuntimeError(f"preencher_uf_pca: {r.status_code} {r.text[:200]}")
+    por_edital = r.json()
+    r = requests.get(f"{SB}/pca_planos", headers=HDR, timeout=120, params={
+        "select": "id,orgao_cnpj", "uf": "is.null", "order": "valor_total.desc.nullslast", "limit": str(MAX_UF_PCA)})
+    r.raise_for_status()
+    feitos = 0
+    for p in r.json():
+        b = None
+        for espera in (0, 5, 20):
+            time.sleep(espera)
+            try:
+                b = requests.get(f"https://brasilapi.com.br/api/cnpj/v1/{p['orgao_cnpj']}", headers=UA, timeout=40)
+            except requests.RequestException:
+                continue
+            if b.status_code != 429:
+                break
+        if b is not None and b.status_code == 200 and b.json().get("uf"):
+            requests.patch(f"{SB}/pca_planos", params={"orgao_cnpj": f"eq.{p['orgao_cnpj']}", "uf": "is.null"}, headers=HDR,
+                           timeout=60, data=json.dumps({"uf": b.json()["uf"]}))
+            feitos += 1
+        time.sleep(0.6)
+    print(f"[pca] UF preenchida: {por_edital} planos pelos editais, {feitos} pela BrasilAPI", flush=True)
 
 
 PCA_VALOR_MIN = float(os.getenv("PCA_VALOR_MIN", "30000"))
@@ -508,6 +537,10 @@ def apagar(tabela, plano_id):
 
 def pca():
     n = planos()
+    try:
+        preencher_uf_pca()
+    except Exception as e:
+        AVISOS.append(("pca", f"UF dos orgaos nao preenchida ({str(e)[:120]})"))
     r = requests.get(f"{SB}/pca_planos", headers=HDR, timeout=120, params={
         "select": "id,orgao_cnpj,ano,data_atualizacao,itens_coletados_em",
         "ano": "in.(" + ",".join(ANOS_PCA) + ")", "order": "data_atualizacao.desc", "limit": 10000})

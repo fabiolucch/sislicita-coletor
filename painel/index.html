@@ -501,18 +501,42 @@ async oportunidades(){
  $('#fq').onkeydown=e=>{if(e.key==='Enter'){pg=0;go();}};if(window.ARG&&window.ARG.uf){$('#fu').value=window.ARG.uf;window.ARG=null;}await go();},
 
 async pca(){
- main.innerHTML=`<div class="top"><div><h2>PCA — previsão de contratações</h2><p class="sub">Demanda planejada pelos órgãos, em todas as áreas. O resumo agrupa por categoria e mês; itens de valor alto aparecem em detalhe. É a chance de chegar antes do edital.</p></div></div><div class="bar"><input id="fq" type="search" placeholder="Filtrar categoria ou grupo (ex.: alimentos, informática)…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select><select id="ft"><option value="r">Resumo por categoria</option><option value="i">Itens de valor alto</option></select><button onclick="go()">Buscar</button></div><div id="lista"></div>`;
- window.go=async()=>{const t=$('#fq').value.trim().replace(/[,()%]/g,' ');
-  if($('#ft').value==='i'){
-   let r=sb.from('pca_itens').select('descricao,valor_total,quantidade,unidade_medida,data_desejada,nome_unidade,pca_planos!inner(orgao_nome,uf,ano)').order('valor_total',{ascending:false}).limit(100);
-   if(t)r=r.textSearch('descricao_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)r=r.eq('pca_planos.uf',$('#fu').value);
-   const {data}=await q(r);$('#lista').innerHTML=data.length?data.map(i=>`<div class="card"><div class="t">${esc((i.descricao||'').slice(0,200))}</div><div class="m">${esc(i.pca_planos.orgao_nome)} · ${esc(i.pca_planos.uf)} · PCA ${i.pca_planos.ano}</div><span class="tag">${brl(i.valor_total)}</span><span class="tag">${esc(i.quantidade??'')} ${esc(i.unidade_medida||'')}</span><span class="tag w">desejada ${dt(i.data_desejada)}</span></div>`).join(''):'<div class="vazio">Nenhum item ainda. A coleta de PCA está em andamento.</div>';
+ const A0=window.ARG||{};window.ARG=null;
+ main.innerHTML=`<div class="top"><div><h2>PCA — previsão de contratações</h2><p class="sub">O que os órgãos planejam comprar, antes de o edital existir. Use para saber <b>quem</b> vai comprar, <b>quando</b> e <b>quanto</b>, e abordar o órgão com antecedência.</p></div></div>
+ <div class="bar"><input id="fq" class="grow" type="search" placeholder="O que procurar (ex.: carne bovina, software, limpeza hospitalar)…"><select id="fu"><option value="">UF (todas)</option>${opts(UFS)}</select>
+ <select id="fd"><option value="3">Próximos 3 meses</option><option value="6" selected>Próximos 6 meses</option><option value="12">Próximos 12 meses</option><option value="0">Todo o período</option></select>
+ <select id="ft"><option value="o">Órgãos que vão comprar</option><option value="i">Itens planejados (maior valor)</option><option value="m">Alinhados aos meus perfis</option></select><button onclick="go()">Buscar</button></div>
+ <div id="pmes"></div><div id="lista"></div>`;
+ const ini=()=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth(),1).toISOString().slice(0,10);};
+ const fim=m=>{const d=new Date();return new Date(d.getFullYear(),d.getMonth()+ +m+1,0).toISOString().slice(0,10);};
+ const per=()=>{const m=$('#fd').value;return m==='0'?{p_de:null,p_ate:null}:{p_de:ini(),p_ate:fim(m)};};
+ const erro=e=>`<div class="vazio">Não foi possível consultar agora (${esc(e?.message||'tempo esgotado')}). Tente filtrar por UF ou por um termo.</div>`;
+ const ymd=v=>v?String(v).slice(5,7)+'/'+String(v).slice(0,4):'—';
+ const barras=async(uf,t)=>{
+  const {data}=await sb.rpc('pca_meses',{p_uf:uf||null,p_termo:t||null});
+  const a=data||[];if(!a.length){$('#pmes').innerHTML='';return;}
+  const mx=Math.max(...a.map(x=>+x.valor||0),1);
+  $('#pmes').innerHTML=`<div class="card"><div class="m" style="margin-bottom:8px">Quando os órgãos pretendem comprar${t?` “${esc(t)}”`:''}${uf?` em ${esc(uf)}`:''} · próximos 12 meses (valor planejado)</div><div style="display:flex;gap:6px;align-items:flex-end;height:90px;overflow-x:auto">${a.map(x=>`<div style="flex:1;min-width:46px;text-align:center" title="${nBR(x.n_itens)} itens · ${brl(x.valor)}"><div style="background:var(--ac,#2563eb);opacity:.85;border-radius:4px 4px 0 0;height:${Math.max(4,Math.round((+x.valor||0)/mx*64))}px"></div><div class="m" style="font-size:11px">${ymd(x.mes)}</div></div>`).join('')}</div></div>`;};
+ window.go=async()=>{
+  const t=$('#fq').value.trim().replace(/[,()%]/g,' '),uf=$('#fu').value,v=$('#ft').value,P=per();
+  $('#lista').innerHTML='<div class="vazio">Carregando…</div>';
+  if(v!=='m')barras(uf,t);else $('#pmes').innerHTML='';
+  if(v==='i'){
+   const {data,error}=await sb.rpc('pca_itens_buscar',{p_uf:uf||null,p_termo:t||null,...P,p_limite:100});
+   if(error)return $('#lista').innerHTML=erro(error);
+   $('#lista').innerHTML=data.length?`<div class="m" style="margin:0 0 8px">${data.length} itens de maior valor planejado${uf?` em ${esc(uf)}`:''}.</div>`+data.map(i=>`<div class="card"><div class="t">${esc((i.descricao||'').slice(0,220))}</div><div class="m">${esc(i.orgao_nome)} · ${esc(i.uf)} · PCA ${i.ano}${i.nome_unidade?' · '+esc(i.nome_unidade):''}</div><span class="tag">${brl(i.valor_total)}</span>${i.quantidade!=null?`<span class="tag">${nBR(i.quantidade)} ${esc(i.unidade_medida||'')}</span>`:''}<span class="tag w">desejada ${dt(i.data_desejada)}</span><button class="gh" onclick="irPreco(this.dataset.t)" data-t="${esc((i.descricao||'').slice(0,80))}">${ic('preco')}Preço</button></div>`).join(''):'<div class="vazio">Nenhum item encontrado nesse período. Amplie o período ou mude o termo.</div>';
+  }else if(v==='m'){
+   const SELM='id,interesse,interesse_detalhe,score,status,justificativa,perfil_id,perfis_busca(nome),pca_itens!inner(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))';
+   let rows=(await q(sb.from('radar').select(SELM).not('pca_item_id','is',null).neq('status','descartado').order('interesse',{ascending:false,nullsFirst:false}).limit(400))).data||[];
+   rows=rows.filter(x=>{const p=x.pca_itens;if(uf&&p?.pca_planos?.uf!==uf)return false;if(t&&!(p?.descricao||'').toLowerCase().includes(t.toLowerCase()))return false;if(P.p_de&&p?.data_desejada&&(p.data_desejada<P.p_de||p.data_desejada>P.p_ate))return false;return true;});
+   $('#lista').innerHTML=rows.length?`<div class="m" style="margin:0 0 8px">${rows.length} previsões que o filtro de IA considerou aderentes aos seus perfis, da maior nota para a menor.</div>`+rows.map(x=>cardPca(x.pca_itens,x)).join(''):'<div class="vazio">Nenhuma previsão aderente aos perfis nesse filtro. Rode a triagem do PCA (Serviços) ou amplie o período.</div>';
   }else{
-   let r=sb.from('pca_demanda').select('classificacao_nome,grupo_contratacao,categoria,mes,n_itens,valor_total,pca_planos!inner(orgao_nome,uf,ano)').order('valor_total',{ascending:false,nullsFirst:false}).limit(100);
-   if(t)r=r.or(`classificacao_nome.ilike.%${t}%,grupo_contratacao.ilike.%${t}%`);if($('#fu').value)r=r.eq('pca_planos.uf',$('#fu').value);
-   const {data}=await q(r);$('#lista').innerHTML=data.length?`<div class="card"><table><tr><th>Categoria</th><th>Órgão</th><th>UF</th><th>Mês</th><th>Itens</th><th>Valor</th></tr>${data.map(d=>`<tr><td>${esc(d.classificacao_nome||d.grupo_contratacao||'—')}<div class="m">${esc(d.categoria)}</div></td><td>${esc(d.pca_planos.orgao_nome)}</td><td>${esc(d.pca_planos.uf)}</td><td>${d.mes&&d.mes>'1901'?esc(d.mes.slice(0,7)):'—'}</td><td>${d.n_itens}</td><td>${brl(d.valor_total)}</td></tr>`).join('')}</table></div>`:'<div class="vazio">Nenhum dado ainda. A coleta de PCA está em andamento.</div>';
+   const {data,error}=await sb.rpc('pca_orgaos',{p_uf:uf||null,p_termo:t||null,...P,p_limite:60});
+   if(error)return $('#lista').innerHTML=erro(error);
+   $('#lista').innerHTML=data.length?`<div class="m" style="margin:0 0 8px">Órgãos com maior valor planejado${t?` para “${esc(t)}”`:''}${uf?` em ${esc(uf)}`:''}. Quanto antes você chegar ao órgão, maior a chance de entrar na especificação.</div>`+data.map(o=>`<div class="card"><div class="t">${esc(o.orgao_nome)}</div><div class="m">${esc(o.uf)} · ${nBR(o.n_itens)} ${o.n_itens==1?'item':'itens'} planejados${o.proxima?` · primeira compra prevista ${ymd(o.proxima)}`:''}</div><span class="tag">${brl(o.valor)}</span><div class="m" style="margin-top:6px">Maior item: ${esc((o.exemplo||'').slice(0,160))}</div></div>`).join(''):'<div class="vazio">Nenhum órgão encontrado nesse período. Amplie o período ou mude o termo.</div>';
   }};
- $('#fq').onkeydown=e=>{if(e.key==='Enter')go();};await go();},
+ $('#fq').onkeydown=e=>{if(e.key==='Enter')go();};['fu','fd','ft'].forEach(i=>$('#'+i).onchange=go);
+ if(A0.uf)$('#fu').value=A0.uf;await go();},
 
 async funil(){
  const {data}=await q(sb.from('matches').select('id,etapa,score,prospects(razao_social,uf),radar(oportunidades(objeto))').limit(500));
