@@ -851,7 +851,7 @@ async function detalhes(btn,id){const card=btn.closest('.oc,.tg-i'),d=card.query
   sb.from('edital_analise').select('*').eq('oportunidade_id',id).maybeSingle(),
   sb.from('oportunidade_itens').select('*').eq('oportunidade_id',id).order('numero_item').limit(15),
   sb.from('empresas').select('id,nome,propria').order('propria',{ascending:false}).order('nome'),
-  sb.from('oportunidades').select('objeto,ia_termo,uf,valor_estimado,valor_sigiloso,data_fim_proposta').eq('id',id).maybeSingle()]);
+  sb.from('oportunidades').select('objeto,ia_termo,uf,orgao_nome,valor_estimado,valor_sigiloso,data_fim_proposta').eq('id',id).maybeSingle()]);
  d.__ctx={id,its:it.data||[],emps:em.data||[],op:opr.data};
  pintarDet(d,an.data);
  if(!an.data)analisarAgora(d);                         // ainda sem análise: roda a IA na hora
