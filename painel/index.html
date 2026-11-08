@@ -522,8 +522,11 @@ async pca(){
   $('#pmes').innerHTML=`<div class="card"><div class="m" style="margin-bottom:8px">Quando os órgãos pretendem comprar${t?` “${esc(t)}”`:''}${uf?` em ${esc(uf)}`:''} · próximos 12 meses (valor planejado)</div><div style="display:flex;gap:6px;align-items:flex-end;height:90px;overflow-x:auto">${a.map(x=>`<div style="flex:1;min-width:46px;text-align:center" title="${nBR(x.n_itens)} itens · ${brl(x.valor)}"><div style="background:var(--ac,#2563eb);opacity:.85;border-radius:4px 4px 0 0;height:${Math.max(4,Math.round((+x.valor||0)/mx*64))}px"></div><div class="m" style="font-size:11px">${ymd(x.mes)}</div></div>`).join('')}</div></div>`;};
  const enr=async()=>{
   const els=[...document.querySelectorAll('#lista .ve')];if(!els.length)return;
-  const {data}=await sb.rpc('pca_virou_edital',{p:els.map(e=>({c:e.dataset.c,t:e.dataset.t}))});
-  (data||[]).forEach(r=>{const e=els[r.i];if(!e)return;
+  const chave=new Map(),lista=[];
+  els.forEach(e=>{const k=e.dataset.c+'|'+e.dataset.t;if(!chave.has(k)){if(lista.length>=80)return;chave.set(k,lista.length);lista.push({c:e.dataset.c,t:e.dataset.t});}});
+  const {data}=await sb.rpc('pca_virou_edital',{p:lista});
+  const res=new Map((data||[]).map(r=>[r.i,r]));
+  els.forEach(e=>{const idx=chave.get(e.dataset.c+'|'+e.dataset.t);const r=idx==null?null:res.get(idx);if(!r)return;
    e.innerHTML=`<div class="just" style="margin-top:8px"><b>Já virou edital:</b> ${r.n} edital(is) aberto(s) deste órgão sobre isso, o mais próximo encerra em ${dt(r.proximo)}. <a class="l" onclick="ir('oportunidades',{cnpj:'${esc(e.dataset.c)}',nome:this.dataset.n,uf:''})" data-n="${esc(e.dataset.n||'')}">Ver editais</a></div>`;});};
  let seq=0;window.go=async()=>{
   const eu=++seq,t=$('#fq').value.trim().replace(/[,()%]/g,' '),uf=$('#fu').value,v=$('#ft').value,P=per();

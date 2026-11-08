@@ -52,11 +52,13 @@ select 'ok16';
 create or replace function public.pca_virou_edital(p jsonb)
 returns table(i int, n bigint, proximo date, primeiro_id bigint)
 language sql stable set statement_timeout = '20s' as $$
-  select (x.ord - 1)::int, count(o.id), min(o.data_fim_proposta)::date, (array_agg(o.id order by o.data_fim_proposta))[1]
+  with ab as materialized (
+    select o.id, o.orgao_cnpj, o.data_fim_proposta, o.objeto_tsv from public.oportunidades o
+    where o.data_fim_proposta >= now() and o.orgao_cnpj in (select e->>'c' from jsonb_array_elements(p) e))
+  select (x.ord - 1)::int, count(ab.id), min(ab.data_fim_proposta)::date, (array_agg(ab.id order by ab.data_fim_proposta))[1]
   from jsonb_array_elements(p) with ordinality x(e, ord)
-  join lateral (select id, data_fim_proposta from public.oportunidades o
-                where o.orgao_cnpj = x.e->>'c' and o.data_fim_proposta >= now() and nullif(trim(x.e->>'t'), '') is not null
-                  and o.objeto_tsv @@ websearch_to_tsquery('portuguese', x.e->>'t')) o on true
+  join ab on ab.orgao_cnpj = x.e->>'c' and nullif(trim(x.e->>'t'), '') is not null
+         and ab.objeto_tsv @@ websearch_to_tsquery('portuguese', x.e->>'t')
   group by x.ord;
 $$;
 grant execute on function public.pca_virou_edital(jsonb) to authenticated;
