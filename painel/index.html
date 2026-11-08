@@ -512,28 +512,29 @@ async pca(){
  const per=()=>{const m=$('#fd').value;return m==='0'?{p_de:null,p_ate:null}:{p_de:ini(),p_ate:fim(m)};};
  const erro=e=>`<div class="vazio">Não foi possível consultar agora (${esc(e?.message||'tempo esgotado')}). Tente filtrar por UF ou por um termo.</div>`;
  const ymd=v=>v?String(v).slice(5,7)+'/'+String(v).slice(0,4):'—';
- const barras=async(uf,t)=>{
-  const {data}=await sb.rpc('pca_meses',{p_uf:uf||null,p_termo:t||null});
+ const barras=async(uf,t,eu)=>{
+  const {data}=await sb.rpc('pca_meses',{p_uf:uf||null,p_termo:t||null});if(eu!==seq)return;
   const a=data||[];if(!a.length){$('#pmes').innerHTML='';return;}
   const mx=Math.max(...a.map(x=>+x.valor||0),1);
   $('#pmes').innerHTML=`<div class="card"><div class="m" style="margin-bottom:8px">Quando os órgãos pretendem comprar${t?` “${esc(t)}”`:''}${uf?` em ${esc(uf)}`:''} · próximos 12 meses (valor planejado)</div><div style="display:flex;gap:6px;align-items:flex-end;height:90px;overflow-x:auto">${a.map(x=>`<div style="flex:1;min-width:46px;text-align:center" title="${nBR(x.n_itens)} itens · ${brl(x.valor)}"><div style="background:var(--ac,#2563eb);opacity:.85;border-radius:4px 4px 0 0;height:${Math.max(4,Math.round((+x.valor||0)/mx*64))}px"></div><div class="m" style="font-size:11px">${ymd(x.mes)}</div></div>`).join('')}</div></div>`;};
- window.go=async()=>{
-  const t=$('#fq').value.trim().replace(/[,()%]/g,' '),uf=$('#fu').value,v=$('#ft').value,P=per();
+ let seq=0;window.go=async()=>{
+  const eu=++seq,t=$('#fq').value.trim().replace(/[,()%]/g,' '),uf=$('#fu').value,v=$('#ft').value,P=per();
+  const L=h=>{if(eu===seq)$('#lista').innerHTML=h;};
   $('#lista').innerHTML='<div class="vazio">Carregando…</div>';
-  if(v!=='m')barras(uf,t);else $('#pmes').innerHTML='';
+  if(v!=='m')barras(uf,t,eu);else $('#pmes').innerHTML='';
   if(v==='i'){
    const {data,error}=await sb.rpc('pca_itens_buscar',{p_uf:uf||null,p_termo:t||null,...P,p_limite:100});
-   if(error)return $('#lista').innerHTML=erro(error);
-   $('#lista').innerHTML=data.length?`<div class="m" style="margin:0 0 8px">${data.length} itens de maior valor planejado${uf?` em ${esc(uf)}`:''}.</div>`+data.map(i=>`<div class="card"><div class="t">${esc((i.descricao||'').slice(0,220))}</div><div class="m">${esc(i.orgao_nome)} · ${esc(i.uf)} · PCA ${i.ano}${i.nome_unidade?' · '+esc(i.nome_unidade):''}</div><span class="tag">${brl(i.valor_total)}</span>${i.quantidade!=null?`<span class="tag">${nBR(i.quantidade)} ${esc(i.unidade_medida||'')}</span>`:''}<span class="tag w">desejada ${dt(i.data_desejada)}</span><button class="gh" onclick="irPreco(this.dataset.t)" data-t="${esc((i.descricao||'').slice(0,80))}">${ic('preco')}Preço</button></div>`).join(''):'<div class="vazio">Nenhum item encontrado nesse período. Amplie o período ou mude o termo.</div>';
+   if(error)return L(erro(error));
+   L(data.length?`<div class="m" style="margin:0 0 8px">${data.length} itens de maior valor planejado${uf?` em ${esc(uf)}`:''}.</div>`+data.map(i=>`<div class="card"><div class="t">${esc((i.descricao||'').slice(0,220))}</div><div class="m">${esc(i.orgao_nome)} · ${esc(i.uf)} · PCA ${i.ano}${i.nome_unidade?' · '+esc(i.nome_unidade):''}</div><span class="tag">${brl(i.valor_total)}</span>${i.quantidade!=null?`<span class="tag">${nBR(i.quantidade)} ${esc(i.unidade_medida||'')}</span>`:''}<span class="tag w">desejada ${dt(i.data_desejada)}</span><button class="gh" onclick="irPreco(this.dataset.t)" data-t="${esc((i.descricao||'').slice(0,80))}">${ic('preco')}Preço</button></div>`).join(''):'<div class="vazio">Nenhum item encontrado nesse período. Amplie o período ou mude o termo.</div>');
   }else if(v==='m'){
    const SELM='id,interesse,interesse_detalhe,score,status,justificativa,perfil_id,perfis_busca(nome),pca_itens!inner(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))';
    let rows=(await q(sb.from('radar').select(SELM).not('pca_item_id','is',null).neq('status','descartado').order('interesse',{ascending:false,nullsFirst:false}).limit(400))).data||[];
    rows=rows.filter(x=>{const p=x.pca_itens;if(uf&&p?.pca_planos?.uf!==uf)return false;if(t&&!(p?.descricao||'').toLowerCase().includes(t.toLowerCase()))return false;if(P.p_de&&p?.data_desejada&&(p.data_desejada<P.p_de||p.data_desejada>P.p_ate))return false;return true;});
-   $('#lista').innerHTML=rows.length?`<div class="m" style="margin:0 0 8px">${rows.length} previsões que o filtro de IA considerou aderentes aos seus perfis, da maior nota para a menor.</div>`+rows.map(x=>cardPca(x.pca_itens,x)).join(''):'<div class="vazio">Nenhuma previsão aderente aos perfis nesse filtro. Rode a triagem do PCA (Serviços) ou amplie o período.</div>';
+   L(rows.length?`<div class="m" style="margin:0 0 8px">${rows.length} previsões que o filtro de IA considerou aderentes aos seus perfis, da maior nota para a menor.</div>`+rows.map(x=>cardPca(x.pca_itens,x)).join(''):'<div class="vazio">Nenhuma previsão aderente aos perfis nesse filtro. Rode a triagem do PCA (Serviços) ou amplie o período.</div>');
   }else{
    const {data,error}=await sb.rpc('pca_orgaos',{p_uf:uf||null,p_termo:t||null,...P,p_limite:60});
-   if(error)return $('#lista').innerHTML=erro(error);
-   $('#lista').innerHTML=data.length?`<div class="m" style="margin:0 0 8px">Órgãos com maior valor planejado${t?` para “${esc(t)}”`:''}${uf?` em ${esc(uf)}`:''}. Quanto antes você chegar ao órgão, maior a chance de entrar na especificação.</div>`+data.map(o=>`<div class="card"><div class="t">${esc(o.orgao_nome)}</div><div class="m">${esc(o.uf)} · ${nBR(o.n_itens)} ${o.n_itens==1?'item':'itens'} planejados${o.proxima?` · primeira compra prevista ${ymd(o.proxima)}`:''}</div><span class="tag">${brl(o.valor)}</span><div class="m" style="margin-top:6px">Maior item: ${esc((o.exemplo||'').slice(0,160))}</div></div>`).join(''):'<div class="vazio">Nenhum órgão encontrado nesse período. Amplie o período ou mude o termo.</div>';
+   if(error)return L(erro(error));
+   L(data.length?`<div class="m" style="margin:0 0 8px">Órgãos com maior valor planejado${t?` para “${esc(t)}”`:''}${uf?` em ${esc(uf)}`:''}. Quanto antes você chegar ao órgão, maior a chance de entrar na especificação.</div>`+data.map(o=>`<div class="card"><div class="t">${esc(o.orgao_nome)}</div><div class="m">${esc(o.uf)} · ${nBR(o.n_itens)} ${o.n_itens==1?'item':'itens'} planejados${o.proxima?` · primeira compra prevista ${ymd(o.proxima)}`:''}</div><span class="tag">${brl(o.valor)}</span><div class="m" style="margin-top:6px">Maior item: ${esc((o.exemplo||'').slice(0,160))}</div></div>`).join(''):'<div class="vazio">Nenhum órgão encontrado nesse período. Amplie o período ou mude o termo.</div>');
   }};
  $('#fq').onkeydown=e=>{if(e.key==='Enter')go();};['fu','fd','ft'].forEach(i=>$('#'+i).onchange=go);
  if(A0.uf)$('#fu').value=A0.uf;await go();},
