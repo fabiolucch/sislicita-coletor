@@ -210,7 +210,7 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .tw{overflow-x:auto}.tw table{min-width:380px}
 @media(max-width:700px){.sv-d{flex-direction:column;align-items:flex-start}}
 
-.pf h4{margin:18px 0 4px;font-size:14.5px}.pf-n{font-weight:700;font-size:16px;max-width:420px}.pf-on{margin:0;white-space:nowrap;font-weight:600}.darq{margin:0}.darq-l{display:flex;flex-wrap:wrap;gap:8px}.darq-b{display:inline-flex;align-items:center;gap:6px;background:#fff;color:var(--pri);border:1px solid #cfdcf0;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer}.darq-b:hover{background:#eef3fa}.darq-b svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.darq-b:disabled{opacity:.6;cursor:wait}.darq .dh{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin-bottom:6px}.darq-i{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}.pf-rr{margin:12px 0}.pf-rr>label{display:block;font-weight:600;margin-bottom:4px}.pf-rr>.m{margin-top:4px}.pf-ch{display:flex;flex-wrap:wrap;gap:6px 16px;margin:4px 0 6px}.pf-ch label{margin:0;font-weight:400;display:flex;align-items:center;gap:6px}
+.pf h4{margin:18px 0 4px;font-size:14.5px}.pf-n{font-weight:700;font-size:16px;max-width:420px}.pf-on{margin:0;white-space:nowrap;font-weight:600}.impg{margin-top:10px;padding-top:10px;border-top:1px dashed #e2e8f0}.impg textarea{width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px;line-height:1.5}.darq{margin:0}.darq-l{display:flex;flex-wrap:wrap;gap:8px}.darq-b{display:inline-flex;align-items:center;gap:6px;background:#fff;color:var(--pri);border:1px solid #cfdcf0;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer}.darq-b:hover{background:#eef3fa}.darq-b svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.darq-b:disabled{opacity:.6;cursor:wait}.darq .dh{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin-bottom:6px}.darq-i{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}.pf-rr{margin:12px 0}.pf-rr>label{display:block;font-weight:600;margin-bottom:4px}.pf-rr>.m{margin-top:4px}.pf-ch{display:flex;flex-wrap:wrap;gap:6px 16px;margin:4px 0 6px}.pf-ch label{margin:0;font-weight:400;display:flex;align-items:center;gap:6px}
 .tg-f{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0 8px}.tg-f div{background:var(--bg);border-radius:10px;padding:8px 10px;min-width:0}.tg-f b{display:block;font-size:19px}.tg-f span{font-size:12px;color:var(--mut)}.tg-f .ok b{color:#15803d}.tg-f .w b{color:#b45309}
 .tg-bar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--pri2);margin-bottom:8px}.tg-bar i{display:block;height:100%}
 .tg-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
@@ -889,7 +889,58 @@ async function analisarAgora(d){const c=d.__ctx,b=d.querySelector('.danl');
 
 function blocosMercado(d){const c=d.__ctx,t=termoDe(c.op);
  blocoPreco(t,c.op,d.querySelector('.pz'));
- blocoMercado(t,null,d.querySelector('.mk'),5);}
+ blocoMercado(t,null,d.querySelector('.mk'),5);
+ blocoOrgao(t,c.op,d.querySelector('.hog'));}
+
+// Historico deste orgao para este objeto + quao concentrada e a concorrencia no setor
+const MES_PT=['','janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+async function blocoOrgao(t,op,el){if(!el)return;if(!t||!op?.orgao_nome){el.innerHTML='<div class="m">Sem termo de busca para consultar o histórico.</div>';return;}
+ el.innerHTML='<span class="m">Consultando o histórico deste órgão no PNCP…</span>';
+ const {data,error}=await sb.rpc('historico_orgao',{q:t,p_orgao:op.orgao_nome,p_uf:op.uf||null});
+ if(error){el.innerHTML=`<div class="m">Não consegui consultar agora (${esc(error.message)}).</div>`;return;}
+ const o=data?.orgao||{},s=data?.setor||{};
+ const meses=(o.meses||[]).filter(m=>m.n>1).map(m=>MES_PT[+m.mes]).slice(0,2);
+ const lider=(s.top||[])[0],share=s.share_lider!=null?Math.round(s.share_lider*100):null;
+ const concent=share==null?null:share>=50?['b','concentrada']:share>=30?['w','média']:['ok','pulverizada'];
+ el.innerHTML=`<div class="dkv">
+  <div><span>Contratos deste órgão para este objeto</span><b>${o.contratos||0}${o.contratos?` · ${brl(o.valor_tipico)} típico`:''}</b></div>
+  ${o.ultimo?`<div><span>Último contrato</span><b>${dt(o.ultimo+'T12:00')}</b></div>`:''}
+  ${meses.length?`<div><span>Costuma comprar em</span><b>${meses.join(' e ')}</b></div>`:''}
+  ${o.desconto_mediano!=null?`<div><span>Desconto típico neste órgão</span><b>${pct(o.desconto_mediano)}</b></div>`:''}
+  <div><span>Fornecedores que já venderam isso${op.uf?' em '+esc(op.uf):''}</span><b>${s.fornecedores||0} em ${s.contratos||0} contrato(s)</b></div>
+  ${concent?`<div><span>Concorrência</span><b class="${concent[0]==='b'?'bw':''}">${concent[1]}${lider?` · líder ${share}%`:''}</b></div>`:''}</div>
+ ${(o.fornecedores||[]).length?`<div class="m" style="margin-top:6px">Quem já venceu neste órgão: ${o.fornecedores.map(f=>`<b>${esc(f.nome)}</b> (${f.n}×)`).join(' · ')}.</div>`:''}
+ ${lider&&share>=40?`<div class="m">⚠ <b>${esc(lider.nome)}</b> ganhou ${share}% dos contratos parecidos${op.uf?' em '+esc(op.uf):''}: provável fornecedor habitual, espere disputa de preço.</div>`:''}
+ <div class="m" style="margin-top:6px">Base: contratos e compras homologadas do PNCP dos últimos meses, buscados pelo termo “${esc(t)}”. Não mostra quantas empresas disputaram, e sim quantas venceram.</div>`;}
+
+// Clausulas restritivas + impugnacao
+async function verDirecionamento(bt){const d=bt.closest('.det'),box=bt.closest('.dirc');
+ bt.disabled=true;box.innerHTML='<div class="m">Lendo o edital à procura de cláusulas restritivas… isso leva alguns segundos.</div>';
+ try{const j=await iaApi('direcionamento',d.__ctx.id);d.__dir=j;
+  const it=j.itens||[];
+  box.innerHTML=`${AI('Leitura do edital por IA (Gemini). Confira cada ponto no documento antes de usar.')}<span class="tag ${NIV[j.nivel]||''}">restrição ${esc(j.nivel||'indefinida')}</span> <span class="tag ${j.fonte==='edital'?'ok':'w'}">${j.fonte==='edital'?'lido do edital':'lido só pelo objeto'}</span>
+  ${it.length?`<div class="drk" style="margin-top:8px">${it.map(x=>`<div class="dr ${esc(x.nivel||'medio')}"><b>${esc(x.tema||'Cláusula')}${x.clausula?` · item ${esc(x.clausula)}`:''}</b><span>${x.trecho?`“${esc(x.trecho)}” — `:''}${esc(x.problema||'')}${x.base_legal?` <i>(${esc(x.base_legal)})</i>`:''}${x.pedido?`<br><b>Pedir:</b> ${esc(x.pedido)}`:''}</span></div>`).join('')}</div>`:'<div class="m" style="margin-top:8px">Nenhuma cláusula claramente restritiva foi encontrada.</div>'}
+  <p class="dres">${esc(j.conclusao||'')}</p>
+  <div class="row2"><button class="sm" onclick="verImpugnacao(this)">${AI()}Prazo e minuta de impugnação</button><button class="gh" onclick="verDirecionamento(this)">Analisar de novo</button></div>`;
+ }catch(e){box.innerHTML=`<div class="m" style="color:#b91c1c">${esc(e.message)}</div><button class="gh" onclick="verDirecionamento(this)">Tentar de novo</button>`;}}
+
+async function verImpugnacao(bt){const d=bt.closest('.det'),box=bt.closest('.dirc');
+ const antes=box.innerHTML;bt.disabled=true;bt.textContent='Redigindo a impugnação…';
+ try{const j=await iaApi('impugnacao',d.__ctx.id,{pontos:(d.__dir?.itens||[]).slice(0,6)});
+  const p=j.prazo||{},lim=p.limite?p.limite.split('-').reverse().join('/'):null;
+  const st=p.no_prazo===false?['b','prazo encerrado']:p.dias_uteis<=1?['w','último dia útil']:['ok','no prazo'];
+  window.__imp=j.minuta||'';
+  box.innerHTML=antes+`<div class="impg">${AI('Peça redigida por IA (Gemini). Revisão por advogado antes de protocolar.')}
+   <div class="dkv"><div><span>Prazo para impugnar</span><b>${lim?`até ${lim}`:'—'} <span class="tag ${st[0]}">${st[1]}</span></b></div>
+   ${p.dias_uteis!=null&&p.no_prazo?`<div><span>Faltam</span><b>${p.dias_uteis} dia(s) útil(eis)</b></div>`:''}
+   ${p.abertura?`<div><span>Abertura da sessão</span><b>${dt(p.abertura)}</b></div>`:''}</div>
+   <div class="m" style="margin-top:4px">${esc(p.base||'')}</div>
+   <textarea rows="16" style="margin-top:8px">${esc(j.minuta||'')}</textarea>
+   <div class="row2"><button class="sm" onclick="navigator.clipboard.writeText(window.__imp).then(()=>toast('Minuta copiada'))">Copiar minuta</button>
+   <button class="gh" onclick="baixarTxt('impugnacao.txt',window.__imp)">${ic('dl')}Baixar .txt</button></div>
+   <div class="m" style="margin-top:6px">Rascunho: confira cada citação legal e os dados do processo antes de protocolar. Feriados municipais e estaduais não entram no cálculo do prazo.</div></div>`;
+ }catch(e){box.innerHTML=antes+`<div class="m" style="color:#b91c1c">${esc(e.message)}</div>`;}}
+function baixarTxt(nome,txt){const u=URL.createObjectURL(new Blob([txt||''],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),8000);}
 
 // Referência do edital x o que o governo realmente pagou em contratos parecidos = espaço de margem.
 async function blocoPreco(t,op,el){if(!el)return;if(!t){el.innerHTML='';return;}
@@ -941,7 +992,9 @@ function pintarDet(d,a){const c=d.__ctx,x=a?.dados||{},h=x.habilitacao||{},its=c
   <div class="dfoot"><a class="l" style="cursor:pointer" onclick="analisarAgora(this.closest('.det'))">analisar de novo</a></div>`
   :'<div class="m">Lendo o edital com a IA… isso leva alguns segundos.</div>')+`</div>`
  +(its.length?`<h4>Itens (${its.length}${its.length===15?'+':''})</h4><table class="tb">${its.map(i=>`<tr><td>${i.numero_item}</td><td>${esc((i.descricao||'').slice(0,110))}</td><td>${i.quantidade??''} ${esc(i.unidade||'')}</td><td>${i.valor_unitario!=null?brl2(i.valor_unitario):'sigiloso'}</td></tr>`).join('')}</table>`:'')
- +`<div class="darq"></div><h4>Pergunte ao edital</h4><div class="ask"><input placeholder="Ex.: aceita atestado de outro estado? qual o prazo de entrega?" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button class="sm" onclick="runIA(this,'pergunta',${id},{pergunta:this.previousElementSibling.value})">${AI()}Perguntar</button></div>
+ +`<h4>Este órgão já comprou isso?</h4><div class="hog"></div>
+ <h4>Cláusulas que restringem a competição</h4><div class="dirc"><button class="gh" onclick="verDirecionamento(this)">${AI()}Procurar cláusulas restritivas no edital</button><div class="m" style="margin-top:4px">A IA lê o edital e aponta exigências que podem direcionar a disputa, com o dispositivo legal de cada uma.</div></div>
+ <div class="darq"></div><h4>Pergunte ao edital</h4><div class="ask"><input placeholder="Ex.: aceita atestado de outro estado? qual o prazo de entrega?" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button class="sm" onclick="runIA(this,'pergunta',${id},{pergunta:this.previousElementSibling.value})">${AI()}Perguntar</button></div>
  <div class="iaout" hidden></div>
  <h4>Preço: referência, quanto já foi pago e margem</h4><div class="pz"></div>
  <h4>Quem já vende isso para o governo</h4><div class="mk"></div>

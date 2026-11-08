@@ -54,6 +54,42 @@ const b64 = buf => {                               // base64 em blocos, para nao
 
 const PNCP_MAX = 8 * 1024 * 1024;                  // teto do que mandamos ao Gemini de uma vez
 
+// ---- prazo de impugnacao: 3 dias uteis antes da abertura (Lei 14.133/2021, art. 164)
+function pascoa(a) {
+  const f = Math.floor, c = f(a / 100), n = a % 19,
+    i0 = f((c - f(c / 4) - f((8 * c + 13) / 25) + 19 * n + 15) % 30),
+    i = i0 - f(i0 / 28) * (1 - f(29 / (i0 + 1)) * f((21 - n) / 11)),
+    j0 = (a + f(a / 4) + i + 2 - c + f(c / 4)) % 7,
+    l = i - j0, m = 3 + f((l + 40) / 44), d = l + 28 - 31 * f(m / 4);
+  return new Date(Date.UTC(a, m - 1, d));
+}
+function feriados(ano) {
+  const p = pascoa(ano), dia = (dt, n) => new Date(dt.getTime() + n * 864e5).toISOString().slice(0, 10);
+  return new Set([`${ano}-01-01`, `${ano}-04-21`, `${ano}-05-01`, `${ano}-09-07`, `${ano}-10-12`,
+    `${ano}-11-02`, `${ano}-11-15`, `${ano}-11-20`, `${ano}-12-25`,
+    dia(p, -48), dia(p, -47), dia(p, -2), dia(p, 60)]);   // carnaval, sexta-feira santa, corpus christi
+}
+function diasUteisAntes(iso, n) {
+  if (!iso) return null;
+  let d = new Date(iso); d.setUTCHours(12, 0, 0, 0);
+  let restam = n;
+  while (restam > 0) {
+    d = new Date(d.getTime() - 864e5);
+    const s = d.getUTCDay(), f = feriados(d.getUTCFullYear());
+    if (s !== 0 && s !== 6 && !f.has(d.toISOString().slice(0, 10))) restam--;
+  }
+  return d.toISOString().slice(0, 10);
+}
+function diasUteisEntre(aIso, bIso) {
+  let a = new Date(aIso + "T12:00:00Z"), b = new Date(bIso + "T12:00:00Z"), n = 0, s = a <= b ? 1 : -1;
+  while (a.toISOString().slice(0, 10) !== b.toISOString().slice(0, 10)) {
+    a = new Date(a.getTime() + s * 864e5);
+    const w = a.getUTCDay();
+    if (w !== 0 && w !== 6 && !feriados(a.getUTCFullYear()).has(a.toISOString().slice(0, 10))) n += s;
+  }
+  return n;
+}
+
 async function pdfsDoEdital(numero) {
   const m = /^(\d{14})-\d+-(\d+)\/(\d{4})$/.exec(numero || "");
   if (!m) return [];
@@ -225,6 +261,65 @@ ${corpo}`;
         n: x.n, titulo: x.a.titulo || "documento", tipo: x.a.tipoDocumentoNome || "", data: x.a.dataPublicacaoPncp || "",
       }));
       return J({ ok: true, arquivos: lista });
+    }
+    if (b.acao === "direcionamento" || b.acao === "impugnacao") {
+      // Le o edital (texto salvo ou PDF do PNCP) e procura clausulas restritivas.
+      const [tx] = await get(`edital_textos?oportunidade_id=eq.${id}&select=texto,arquivo`);
+      const pdfs = tx?.texto ? [] : await pdfsDoEdital(op.numero_controle_pncp).catch(() => []);
+      const fonte = tx?.texto || pdfs.length ? "edital" : "objeto";
+      const corpo = pdfs.length
+        ? `O EDITAL COMPLETO VAI ANEXADO EM PDF. OBJETO: ${(op.objeto || "").slice(0, 1200)}`
+        : tx?.texto ? `TEXTO DO EDITAL (${tx.arquivo || ""}):\n${recortar(tx.texto)}`
+        : `SÓ O OBJETO (o edital não foi baixado):\n${ctx}\nANÁLISE JÁ FEITA: ${resumoEdital.slice(0, 2500)}`;
+
+      if (b.acao === "direcionamento") {
+        const prompt = `Você é advogado de licitações e defende FORNECEDORES. Procure no edital abaixo cláusulas que restrinjam a competição além do necessário ou que pareçam desenhadas para um fornecedor específico.
+Procure especificamente: marca, modelo ou fabricante exigido sem "ou equivalente"; atestado de capacidade técnica desproporcional (quantidade/valor muito acima do objeto, exigência de atestado do mesmo órgão, de um único contrato ou de prazo longo demais); exigência de instalação, filial, sede ou visita técnica na cidade como condição de participação; índices contábeis fora do usual; capital social ou patrimônio líquido acima de 10% do valor estimado; garantia de proposta acima de 1%; prazo de entrega incompatível; amostra exigida de todos antes do julgamento; agrupamento de itens distintos em um lote só; qualificação exigida da empresa em vez do profissional; exigência de certificação sem previsão legal.
+NÃO invente: só aponte o que estiver no documento. Se o documento não permitir avaliar, diga isso.
+Responda SOMENTE JSON:
+{"nivel":"alto"|"medio"|"baixo"|"indefinido",
+ "itens":[{"clausula":"item/cláusula do edital, ex.: 9.2.1","tema":"curto","trecho":"citação literal de até 220 caracteres","problema":"por que restringe a competição, 1 a 2 frases","base_legal":"dispositivo da Lei 14.133/2021 ou súmula/acórdão do TCU aplicável","pedido":"o que pedir: supressão, retificação ou esclarecimento"}],
+ "conclusao":"2 a 3 frases para o consultor decidir se vale impugnar",
+ "vale_impugnar": true|false}
+Ordene os itens do mais grave para o menos grave e traga no máximo 6.
+
+${corpo}`;
+        const res = pdfs.length ? await geminiPartes(env, [{ text: prompt }, ...pdfs]) : await gemini(env, prompt, true);
+        const d = Array.isArray(res) ? (res[0] || {}) : (res || {});
+        return J({ ok: true, fonte, ...d });
+      }
+
+      // ---- impugnacao: prazo + minuta
+      const abertura = op.data_fim_proposta;
+      const hoje = new Date().toISOString().slice(0, 10);
+      const limite = diasUteisAntes(abertura, 3);
+      const prazo = {
+        abertura, limite,
+        dias_uteis: limite ? diasUteisEntre(hoje, limite) : null,
+        no_prazo: limite ? limite >= hoje : null,
+        base: "Lei 14.133/2021, art. 164: qualquer pessoa pode impugnar o edital ou pedir esclarecimento até 3 dias úteis antes da data de abertura; a resposta sai em até 3 dias úteis e antes da abertura.",
+      };
+      const pontos = Array.isArray(b.pontos) && b.pontos.length
+        ? JSON.stringify(b.pontos).slice(0, 4000)
+        : "(não informados: identifique você mesmo no edital os pontos restritivos mais graves)";
+      const prompt = `Redija uma IMPUGNAÇÃO AO EDITAL completa, em português do Brasil, no padrão forense brasileiro, pronta para a empresa assinar e protocolar.
+Estrutura obrigatória, nesta ordem:
+1. Endereçamento ao pregoeiro/agente de contratação e ao órgão, com o número da licitação e do processo.
+2. Qualificação da impugnante com campos entre colchetes para a empresa preencher ([RAZÃO SOCIAL], [CNPJ], [ENDEREÇO], [REPRESENTANTE], [E-MAIL]).
+3. TEMPESTIVIDADE: diga que a abertura é em ${abertura ? new Date(abertura).toLocaleDateString("pt-BR") : "[DATA]"} e o prazo final para impugnar é ${limite ? limite.split("-").reverse().join("/") : "[DATA]"}, citando o art. 164 da Lei 14.133/2021.
+4. DOS FATOS: o que o edital exige, em poucos parágrafos.
+5. DO DIREITO: um subtítulo por ponto impugnado, cada um citando o item do edital, transcrevendo o trecho entre aspas, explicando a restrição à competitividade e fundamentando em dispositivos da Lei 14.133/2021 (em especial arts. 5º, 9º, 11, 37, 40, 62, 67 e 72, conforme o caso) e em jurisprudência do TCU quando couber. Só cite acórdão ou súmula se tiver certeza do número; na dúvida, escreva apenas "entendimento consolidado do TCU".
+6. DOS PEDIDOS: pedidos numerados (recebimento e processamento, suspensão da sessão se necessário, retificação ou supressão de cada cláusula, republicação com reabertura do prazo).
+7. Fecho com local, data e assinatura entre colchetes.
+Seja objetivo e técnico, sem adjetivos. Não invente fatos nem números do edital.
+Responda SOMENTE JSON: {"minuta":"texto completo da peça, com quebras de linha","resumo":"1 frase sobre o que a peça pede","pontos_usados":["lista curta dos pontos impugnados"]}
+
+PONTOS A IMPUGNAR: ${pontos}
+
+${corpo}`;
+      const res = pdfs.length ? await geminiPartes(env, [{ text: prompt }, ...pdfs]) : await gemini(env, prompt, true);
+      const d = Array.isArray(res) ? (res[0] || {}) : (res || {});
+      return J({ ok: true, fonte, prazo, ...d });
     }
     if (b.acao === "checklist") {
       const eid = parseInt(b.empresa_id, 10);
