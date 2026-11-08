@@ -301,15 +301,31 @@ def vetores():
 
 
 def triagem():
-    """Da nota a todos os editais abertos para cada perfil ativo (filtro v2) e atualiza o radar."""
-    r = requests.post(f"{SB}/rpc/triar_todos", headers=HDR, data="{}", timeout=900)
-    if r.status_code >= 300:
-        raise RuntimeError(f"triar_todos: {r.status_code} {r.text[:300]}")
-    res = r.json() or {}
-    print(f"[triagem] alta por perfil: {res}", flush=True)
-    total = 0
-    for v in res.values():  # por perfil: {"editais": n_alta, "pca": n_alta}
-        total += sum(int(x or 0) for x in v.values()) if isinstance(v, dict) else int(v or 0)
+    """Da nota a todos os editais abertos para cada perfil ativo (filtro v2) e atualiza o radar.
+    Um perfil por chamada: cada RPC roda em transacao propria (a tabela temporaria _tri nao pode
+    ser recriada dentro da mesma transacao, o que quebrava com 2+ perfis em triar_todos)."""
+    pr = requests.get(f"{SB}/perfis_busca", headers=HDR, timeout=60,
+                      params={"select": "id,nome,emb_desc", "ativo": "eq.true", "emb_desc": "not.is.null"})
+    pr.raise_for_status()
+    total, erros = 0, []
+    for p in pr.json():
+        try:
+            for rpc, obrigatorio in (("triar_perfil", True), ("triar_pca", False), ("radar_v2", True)):
+                r = requests.post(f"{SB}/rpc/{rpc}", headers=HDR, data=json.dumps({"p_id": p["id"]}), timeout=900)
+                if r.status_code >= 300:
+                    if obrigatorio:
+                        raise RuntimeError(f"{rpc}: {r.status_code} {r.text[:200]}")
+                    print(f"[triagem] {p['nome']}: {rpc} ignorado ({r.status_code})", flush=True)
+                    continue
+                if rpc == "radar_v2":
+                    n = r.json()
+                    total += int(n) if isinstance(n, (int, float)) else 0
+                    print(f"[triagem] {p['nome']}: {n} no radar", flush=True)
+        except Exception as e:
+            erros.append(f"{p['nome']}: {e}")
+            print(f"[triagem] erro em {p['nome']}: {e}", flush=True)
+    if erros:
+        raise RuntimeError("triagem: " + " | ".join(erros)[:400])
     return total
 
 # ------------------------------------------------------------------ cobertura
