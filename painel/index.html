@@ -208,7 +208,7 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .tw{overflow-x:auto}.tw table{min-width:380px}
 @media(max-width:700px){.sv-d{flex-direction:column;align-items:flex-start}}
 
-.pf h4{margin:18px 0 4px;font-size:14.5px}.pf-n{font-weight:700;font-size:16px;max-width:420px}.pf-on{margin:0;white-space:nowrap;font-weight:600}.pf-rr{margin:12px 0}.pf-rr>label{display:block;font-weight:600;margin-bottom:4px}.pf-rr>.m{margin-top:4px}.pf-ch{display:flex;flex-wrap:wrap;gap:6px 16px;margin:4px 0 6px}.pf-ch label{margin:0;font-weight:400;display:flex;align-items:center;gap:6px}
+.pf h4{margin:18px 0 4px;font-size:14.5px}.pf-n{font-weight:700;font-size:16px;max-width:420px}.pf-on{margin:0;white-space:nowrap;font-weight:600}.darq{margin:0 0 12px}.darq .dh{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin-bottom:6px}.darq-i{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}.pf-rr{margin:12px 0}.pf-rr>label{display:block;font-weight:600;margin-bottom:4px}.pf-rr>.m{margin-top:4px}.pf-ch{display:flex;flex-wrap:wrap;gap:6px 16px;margin:4px 0 6px}.pf-ch label{margin:0;font-weight:400;display:flex;align-items:center;gap:6px}
 .tg-f{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0 8px}.tg-f div{background:var(--bg);border-radius:10px;padding:8px 10px;min-width:0}.tg-f b{display:block;font-size:19px}.tg-f span{font-size:12px;color:var(--mut)}.tg-f .ok b{color:#15803d}.tg-f .w b{color:#b45309}
 .tg-bar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--pri2);margin-bottom:8px}.tg-bar i{display:block;height:100%}
 .tg-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
@@ -796,6 +796,19 @@ async function detalhes(btn,id){const card=btn.closest('.oc,.tg-i'),d=card.query
  pintarDet(d,an.data);
  if(!an.data)analisarAgora(d);                         // ainda sem análise: roda a IA na hora
  else blocosMercado(d);}
+
+// Documentos do edital no PNCP, com link direto para baixar (o painel nao guarda os arquivos).
+async function arquivosEdital(d){
+ let box=d.querySelector('.darq');
+ if(!box){box=document.createElement('div');box.className='darq';d.prepend(box);}
+ if(d.__arq){pintarArq(box,d.__arq);return;}
+ box.innerHTML='<div class="m">Buscando os documentos do edital…</div>';
+ try{const j=await iaApi('arquivos',d.__ctx.id);d.__arq=j.arquivos||[];}catch(e){box.innerHTML=`<div class="m">Não consegui listar os documentos agora (${esc(e.message)}). Use o botão PNCP.</div>`;return;}
+ pintarArq(box,d.__arq);}
+function pintarArq(box,l){
+ if(!l.length){box.innerHTML='<div class="m">O PNCP não lista documentos para este edital. Use o botão PNCP.</div>';return;}
+ box.innerHTML='<div class="dh">Documentos para baixar</div>'+l.map(a=>`<div class="darq-i"><a class="gh" href="${esc(a.url)}" target="_blank" rel="noopener" download>${ic('ext')}Baixar</a> <b>${esc(a.titulo)}</b>${a.tipo?` <span class="m">· ${esc(a.tipo)}</span>`:''}</div>`).join('');}
+const _pintarDet=pintarDet;pintarDet=function(d,a){_pintarDet(d,a);arquivosEdital(d);};
 
 async function analisarAgora(d){const c=d.__ctx,b=d.querySelector('.danl');
  if(b)b.innerHTML='<div class="m">Lendo o edital com a IA… isso leva alguns segundos.</div>';

@@ -201,6 +201,17 @@ ${corpo}`;
       });
       return J({ ok: true, dados: d, risco, resumo: d.resumo || "", fonte });
     }
+    if (b.acao === "arquivos") {
+      // Lista os documentos do edital no PNCP, com o link direto de download de cada um.
+      const m = /^(\d{14})-\d+-(\d+)\/(\d{4})$/.exec(op.numero_controle_pncp || "");
+      if (!m) return J({ ok: true, arquivos: [] });
+      const r = await fetch(`https://pncp.gov.br/pncp-api/v1/orgaos/${m[1]}/compras/${m[3]}/${parseInt(m[2], 10)}/arquivos`, { headers: { accept: "application/json" } });
+      if (!r.ok) return J({ erro: `PNCP respondeu ${r.status}` }, 502);
+      const lista = (await r.json() || []).filter(a => a.statusAtivo !== false).map(a => ({
+        titulo: a.titulo || "documento", tipo: a.tipoDocumentoNome || "", url: a.url || a.uri || "", data: a.dataPublicacaoPncp || "",
+      })).filter(a => a.url.startsWith("https://pncp.gov.br/"));
+      return J({ ok: true, arquivos: lista });
+    }
     if (b.acao === "checklist") {
       const eid = parseInt(b.empresa_id, 10);
       if (!eid) return J({ erro: "informe empresa_id" }, 400);
