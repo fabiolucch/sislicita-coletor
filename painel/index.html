@@ -367,7 +367,7 @@ async home(){
  const [D,cm,top,BR]=await Promise.all([q(sb.rpc('dashboard_resumo')).then(r=>r.data),
   q(sb.from('contratos_comissao').select('base_valor,percentual,valor_estimado_comissao,valor_recebido')).then(r=>r.data),
   q(sb.from('radar').select('id,score,status,justificativa,perfis_busca(nome),oportunidades!inner(id,objeto,orgao_nome,municipio,uf,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_resumo,ia_categoria,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome)').gte('oportunidades.data_fim_proposta',agora).neq('status','descartado').order('score',{ascending:false}).limit(8)).then(r=>r.data),
-  q(sb.from('briefings').select('*,perfis_busca(nome)').order('gerado_em',{ascending:false}).limit(12)).then(r=>r.data).catch(()=>[])]);
+  q(sb.from('briefings').select('*,perfis_busca(nome,ativo)').order('gerado_em',{ascending:false}).limit(60)).then(r=>{const v=new Set();return (r.data||[]).filter(b=>{if(!b.perfis_busca?.ativo||v.has(b.perfil_id))return false;v.add(b.perfil_id);return true;});}).catch(()=>[])]);
  window.__AL=((await sb.from('alertas').select('tipo,titulo').gte('criado_em',new Date(Date.now()-3*864e5).toISOString()).order('id',{ascending:false}).limit(4)).data)||[];
  const vb=new Set(),brs=(BR||[]).filter(b=>vb.has(b.perfil_id)?false:vb.add(b.perfil_id)).slice(0,3),bid=[...new Set(brs.flatMap(b=>(b.destaques||[]).map(d=>d.id)))],bop=bid.length?Object.fromEntries(((await sb.from('oportunidades').select('id,objeto,orgao_nome,uf').in('id',bid)).data||[]).map(o=>[o.id,o])):{};
  const est=cm.reduce((s,c)=>s+(c.base_valor==null?Number(c.valor_estimado_comissao||0):Number(c.base_valor)*Number(c.percentual??1)/100),0),rec=cm.reduce((s,c)=>s+Number(c.valor_recebido||0),0);

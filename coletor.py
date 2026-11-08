@@ -1325,6 +1325,10 @@ def briefing():
             raise RuntimeError(f"briefing: {rp.status_code} {rp.text[:200]}")
         feitos += 1
         ritmo()
+    # briefings de perfis desativados nao interessam mais
+    inat = requests.get(f"{SB}/perfis_busca", headers=HDR, timeout=60, params={"select": "id", "ativo": "eq.false"})
+    if inat.ok and inat.json():
+        requests.delete(f"{SB}/briefings", headers=HDR, timeout=60, params={"perfil_id": "in.(" + ",".join(str(x["id"]) for x in inat.json()) + ")"})
     requests.delete(f"{SB}/briefings", headers=HDR, timeout=60, params={"gerado_em": "lt." + (agora - timedelta(days=30)).isoformat()})
     return feitos
 
