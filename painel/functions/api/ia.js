@@ -57,7 +57,7 @@ const PNCP_MAX = 8 * 1024 * 1024;                  // teto do que mandamos ao Ge
 async function pdfsDoEdital(numero) {
   const m = /^(\d{14})-\d+-(\d+)\/(\d{4})$/.exec(numero || "");
   if (!m) return [];
-  const r = await fetch(`https://pncp.gov.br/pncp-api/v1/orgaos/${m[1]}/compras/${m[3]}/${parseInt(m[2], 10)}/arquivos`, { headers: { accept: "application/json" } });
+  const r = await fetch(`https://pncp.gov.br/pncp-api/v1/orgaos/${m[1]}/compras/${m[3]}/${parseInt(m[2], 10)}/arquivos`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(8000) });
   if (!r.ok) return [];
   const tipo = a => (a.tipoDocumentoNome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const arqs = (await r.json() || []).filter(a => a.statusAtivo !== false && ["edital", "termo de referencia", "projeto basico"].includes(tipo(a)))
@@ -65,7 +65,7 @@ async function pdfsDoEdital(numero) {
   const partes = []; let total = 0;
   for (const a of arqs.slice(0, 2)) {
     const url = a.url || a.uri; if (!url) continue;
-    const d = await fetch(url); if (!d.ok) continue;
+    const d = await fetch(url, { signal: AbortSignal.timeout(20000) }); if (!d.ok) continue;
     const buf = await d.arrayBuffer();
     if (!buf.byteLength || total + buf.byteLength > PNCP_MAX) continue;
     const bytes = new Uint8Array(buf.slice(0, 5));
@@ -205,14 +205,17 @@ ${corpo}`;
       // Lista os documentos do edital no PNCP; "baixar" entrega o arquivo pelo proprio dominio do painel.
       const m = /^(\d{14})-\d+-(\d+)\/(\d{4})$/.exec(op.numero_controle_pncp || "");
       if (!m) return J({ ok: true, arquivos: [] });
-      const r = await fetch(`https://pncp.gov.br/pncp-api/v1/orgaos/${m[1]}/compras/${m[3]}/${parseInt(m[2], 10)}/arquivos`, { headers: { accept: "application/json" } });
+      let r;
+      try { r = await fetch(`https://pncp.gov.br/pncp-api/v1/orgaos/${m[1]}/compras/${m[3]}/${parseInt(m[2], 10)}/arquivos`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(10000) }); }
+      catch { return J({ erro: "o PNCP não respondeu a tempo (instabilidade deles). Tente de novo em alguns minutos." }, 504); }
       if (!r.ok) return J({ erro: `PNCP respondeu ${r.status}` }, 502);
       const todos = (await r.json()) || [];
       const urlDe = a => a.url || a.uri || "";
       if (b.acao === "baixar") {
         const a = todos[parseInt(b.n, 10)];
         if (!a || !urlDe(a).startsWith("https://pncp.gov.br/")) return J({ erro: "documento não encontrado" }, 404);
-        const d = await fetch(urlDe(a));
+        let d;
+        try { d = await fetch(urlDe(a), { signal: AbortSignal.timeout(25000) }); } catch { return J({ erro: "o PNCP não respondeu a tempo. Tente de novo em alguns minutos." }, 504); }
         if (!d.ok) return J({ erro: `PNCP respondeu ${d.status}` }, 502);
         const cd = d.headers.get("content-disposition") || "";
         const nome = (/filename\*?=(?:UTF-8'')?"?([^";]+)/i.exec(cd)?.[1]) || `${(a.titulo || "documento").replace(/[^\w.-]+/g, "_")}.pdf`;
