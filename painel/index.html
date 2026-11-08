@@ -807,7 +807,16 @@ async function arquivosEdital(d){
  pintarArq(box,d.__arq);}
 function pintarArq(box,l){
  if(!l.length){box.innerHTML='<div class="m">O PNCP não lista documentos para este edital. Use o botão PNCP.</div>';return;}
- box.innerHTML='<div class="dh">Documentos para baixar</div>'+l.map(a=>`<div class="darq-i"><a class="gh" href="${esc(a.url)}" target="_blank" rel="noopener" download>${ic('ext')}Baixar</a> <b>${esc(a.titulo)}</b>${a.tipo?` <span class="m">· ${esc(a.tipo)}</span>`:''}</div>`).join('');}
+ box.innerHTML='<div class="dh">Documentos para baixar</div>'+l.map(a=>`<div class="darq-i"><button class="gh" data-n="${a.n}">${ic('ext')}Baixar</button> <b>${esc(a.titulo)}</b>${a.tipo?` <span class="m">· ${esc(a.tipo)}</span>`:''}</div>`).join('');
+ box.querySelectorAll('button[data-n]').forEach(bt=>bt.onclick=async()=>{
+  const t=bt.innerHTML;bt.disabled=true;bt.textContent='Baixando…';
+  try{const {data:{session}}=await sb.auth.getSession();
+   const r=await fetch('/api/ia',{method:'POST',headers:{authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:JSON.stringify({acao:'baixar',oportunidade_id:box.parentElement.__ctx.id,n:+bt.dataset.n})});
+   if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.erro||('erro '+r.status));}
+   const nome=decodeURIComponent(r.headers.get('x-nome')||'edital.pdf');const u=URL.createObjectURL(await r.blob());
+   const a=document.createElement('a');a.href=u;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);
+  }catch(e){alert('Não consegui baixar: '+e.message);}
+  bt.disabled=false;bt.innerHTML=t;});}
 const _pintarDet=pintarDet;pintarDet=function(d,a){_pintarDet(d,a);arquivosEdital(d);};
 
 async function analisarAgora(d){const c=d.__ctx,b=d.querySelector('.danl');

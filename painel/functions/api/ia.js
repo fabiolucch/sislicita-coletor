@@ -201,15 +201,26 @@ ${corpo}`;
       });
       return J({ ok: true, dados: d, risco, resumo: d.resumo || "", fonte });
     }
-    if (b.acao === "arquivos") {
-      // Lista os documentos do edital no PNCP, com o link direto de download de cada um.
+    if (b.acao === "arquivos" || b.acao === "baixar") {
+      // Lista os documentos do edital no PNCP; "baixar" entrega o arquivo pelo proprio dominio do painel.
       const m = /^(\d{14})-\d+-(\d+)\/(\d{4})$/.exec(op.numero_controle_pncp || "");
       if (!m) return J({ ok: true, arquivos: [] });
       const r = await fetch(`https://pncp.gov.br/pncp-api/v1/orgaos/${m[1]}/compras/${m[3]}/${parseInt(m[2], 10)}/arquivos`, { headers: { accept: "application/json" } });
       if (!r.ok) return J({ erro: `PNCP respondeu ${r.status}` }, 502);
-      const lista = (await r.json() || []).filter(a => a.statusAtivo !== false).map(a => ({
-        titulo: a.titulo || "documento", tipo: a.tipoDocumentoNome || "", url: a.url || a.uri || "", data: a.dataPublicacaoPncp || "",
-      })).filter(a => a.url.startsWith("https://pncp.gov.br/"));
+      const todos = (await r.json()) || [];
+      const urlDe = a => a.url || a.uri || "";
+      if (b.acao === "baixar") {
+        const a = todos[parseInt(b.n, 10)];
+        if (!a || !urlDe(a).startsWith("https://pncp.gov.br/")) return J({ erro: "documento não encontrado" }, 404);
+        const d = await fetch(urlDe(a));
+        if (!d.ok) return J({ erro: `PNCP respondeu ${d.status}` }, 502);
+        const cd = d.headers.get("content-disposition") || "";
+        const nome = (/filename\*?=(?:UTF-8'')?"?([^";]+)/i.exec(cd)?.[1]) || `${(a.titulo || "documento").replace(/[^\w.-]+/g, "_")}.pdf`;
+        return new Response(d.body, { headers: { "content-type": d.headers.get("content-type") || "application/octet-stream", "x-nome": encodeURIComponent(decodeURIComponent(nome)), "access-control-expose-headers": "x-nome" } });
+      }
+      const lista = todos.map((a, n) => ({ n, a })).filter(x => x.a.statusAtivo !== false && urlDe(x.a)).map(x => ({
+        n: x.n, titulo: x.a.titulo || "documento", tipo: x.a.tipoDocumentoNome || "", data: x.a.dataPublicacaoPncp || "",
+      }));
       return J({ ok: true, arquivos: lista });
     }
     if (b.acao === "checklist") {
