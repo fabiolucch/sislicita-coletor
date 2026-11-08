@@ -1822,10 +1822,11 @@ if __name__ == "__main__":
             print(f"[{nome}] ERRO: {e}", file=sys.stderr)
             resumo.append((nome, 0, str(e)[:200]))
         gravar_uso()
-    try:  # resumo do Inicio fica em cache (consulta pesada fora do navegador)
-        requests.post(f"{SB}/rpc/atualizar_dashboard", headers=HDR, data="{}", timeout=400).raise_for_status()
-    except Exception as e:
-        print(f"[dashboard] cache nao atualizado: {e}", file=sys.stderr)
+    for rpc in ("atualizar_dashboard", "atualizar_servico"):  # resumos do Inicio e da aba Servicos ficam em cache
+        try:
+            requests.post(f"{SB}/rpc/{rpc}", headers=HDR, data="{}", timeout=400).raise_for_status()
+        except Exception as e:
+            print(f"[{rpc}] cache nao atualizado: {e}", file=sys.stderr)
     try:
         fechar_execucao(modo, resumo, falhou, time.time() - inicio)
     except Exception as e:
