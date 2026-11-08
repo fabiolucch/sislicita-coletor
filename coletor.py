@@ -307,7 +307,10 @@ def triagem():
         raise RuntimeError(f"triar_todos: {r.status_code} {r.text[:300]}")
     res = r.json() or {}
     print(f"[triagem] alta por perfil: {res}", flush=True)
-    return sum(int(v or 0) for v in res.values())
+    total = 0
+    for v in res.values():  # por perfil: {"editais": n_alta, "pca": n_alta}
+        total += sum(int(x or 0) for x in v.values()) if isinstance(v, dict) else int(v or 0)
+    return total
 
 # ------------------------------------------------------------------ cobertura
 COB_DIAS = int(os.getenv("COB_DIAS", "14"))
