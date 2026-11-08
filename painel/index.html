@@ -208,7 +208,7 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .tw{overflow-x:auto}.tw table{min-width:380px}
 @media(max-width:700px){.sv-d{flex-direction:column;align-items:flex-start}}
 
-.pf h4{margin:18px 0 4px;font-size:14.5px}.pf-n{font-weight:700;font-size:16px;max-width:420px}.pf-on{margin:0;white-space:nowrap;font-weight:600}.darq{margin:0 0 12px}.darq .dh{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin-bottom:6px}.darq-i{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}.pf-rr{margin:12px 0}.pf-rr>label{display:block;font-weight:600;margin-bottom:4px}.pf-rr>.m{margin-top:4px}.pf-ch{display:flex;flex-wrap:wrap;gap:6px 16px;margin:4px 0 6px}.pf-ch label{margin:0;font-weight:400;display:flex;align-items:center;gap:6px}
+.pf h4{margin:18px 0 4px;font-size:14.5px}.pf-n{font-weight:700;font-size:16px;max-width:420px}.pf-on{margin:0;white-space:nowrap;font-weight:600}.darq{margin:0}.darq-l{display:flex;flex-wrap:wrap;gap:8px}.darq-b{display:inline-flex;align-items:center;gap:6px;background:#fff;color:var(--pri);border:1px solid #cfdcf0;border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer}.darq-b:hover{background:#eef3fa}.darq-b svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}.darq-b:disabled{opacity:.6;cursor:wait}.darq .dh{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin-bottom:6px}.darq-i{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0}.pf-rr{margin:12px 0}.pf-rr>label{display:block;font-weight:600;margin-bottom:4px}.pf-rr>.m{margin-top:4px}.pf-ch{display:flex;flex-wrap:wrap;gap:6px 16px;margin:4px 0 6px}.pf-ch label{margin:0;font-weight:400;display:flex;align-items:center;gap:6px}
 .tg-f{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0 8px}.tg-f div{background:var(--bg);border-radius:10px;padding:8px 10px;min-width:0}.tg-f b{display:block;font-size:19px}.tg-f span{font-size:12px;color:var(--mut)}.tg-f .ok b{color:#15803d}.tg-f .w b{color:#b45309}
 .tg-bar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--pri2);margin-bottom:8px}.tg-bar i{display:block;height:100%}
 .tg-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
@@ -791,7 +791,7 @@ async function detalhes(btn,id){const card=btn.closest('.oc,.tg-i'),d=card.query
   sb.from('edital_analise').select('*').eq('oportunidade_id',id).maybeSingle(),
   sb.from('oportunidade_itens').select('*').eq('oportunidade_id',id).order('numero_item').limit(15),
   sb.from('empresas').select('id,nome,propria').order('propria',{ascending:false}).order('nome'),
-  sb.from('oportunidades').select('objeto,ia_termo,uf,valor_estimado,valor_sigiloso').eq('id',id).maybeSingle()]);
+  sb.from('oportunidades').select('objeto,ia_termo,uf,valor_estimado,valor_sigiloso,data_fim_proposta').eq('id',id).maybeSingle()]);
  d.__ctx={id,its:it.data||[],emps:em.data||[],op:opr.data};
  pintarDet(d,an.data);
  if(!an.data)analisarAgora(d);                         // ainda sem análise: roda a IA na hora
@@ -799,15 +799,17 @@ async function detalhes(btn,id){const card=btn.closest('.oc,.tg-i'),d=card.query
 
 // Documentos do edital no PNCP, com link direto para baixar (o painel nao guarda os arquivos).
 async function arquivosEdital(d){
- let box=d.querySelector('.darq');
- if(!box){box=document.createElement('div');box.className='darq';d.prepend(box);}
+ const box=d.querySelector('.darq');if(!box)return;
  if(d.__arq){pintarArq(box,d.__arq);return;}
  box.innerHTML='<div class="m">Buscando os documentos do edital…</div>';
  try{const j=await iaApi('arquivos',d.__ctx.id);d.__arq=j.arquivos||[];}catch(e){box.innerHTML=`<div class="m">Não consegui listar os documentos agora (${esc(e.message)}). Use o botão PNCP.</div>`;return;}
  pintarArq(box,d.__arq);}
+IC.dl='<path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>';
 function pintarArq(box,l){
- if(!l.length){box.innerHTML='<div class="m">O PNCP não lista documentos para este edital. Use o botão PNCP.</div>';return;}
- box.innerHTML='<div class="dh">Documentos para baixar</div>'+l.map(a=>`<div class="darq-i"><button class="gh" data-n="${a.n}">${ic('ext')}Baixar</button> <b>${esc(a.titulo)}</b>${a.tipo?` <span class="m">· ${esc(a.tipo)}</span>`:''}</div>`).join('');
+ if(!l.length){box.innerHTML='<h4>Documentos do edital</h4><div class="m">O PNCP não lista documentos para este edital. Use o botão PNCP.</div>';return;}
+ const cont={},tot={};l.forEach(a=>{const k=a.tipo||'Anexo';tot[k]=(tot[k]||0)+1;});
+ box.innerHTML='<h4>Documentos do edital</h4><div class="darq-l">'+l.map(a=>{const k=a.tipo||'Anexo';cont[k]=(cont[k]||0)+1;const nome=tot[k]>1?`${k} ${cont[k]}`:k;
+  return `<button class="darq-b" data-n="${a.n}" title="${esc(a.titulo)}">${ic('dl')}${esc(nome)}</button>`;}).join('')+'</div><div class="m" style="margin-top:4px">Os arquivos vêm direto do PNCP.</div>';
  box.querySelectorAll('button[data-n]').forEach(bt=>bt.onclick=async()=>{
   const t=bt.innerHTML;bt.disabled=true;bt.textContent='Baixando…';
   try{const {data:{session}}=await sb.auth.getSession();
@@ -862,21 +864,24 @@ function pintarDet(d,a){const c=d.__ctx,x=a?.dados||{},h=x.habilitacao||{},its=c
  const r=a?.risco,nv=r==null?null:(r>=66?'alto':r>=36?'medio':'baixo');
  const kv=(rot,v)=>v?`<div><span>${rot}</span><b>${esc(v)}</b></div>`:'';
  const kb=(rot,v,alertaSeSim)=>v==null?'':`<div><span>${rot}</span><b class="${v?(alertaSeSim?'bw':'bo'):'bn'}">${v?'Sim':'Não'}</b></div>`;
- const cond=[kv('Critério de julgamento',x.criterio_julgamento),kv('Prazo de entrega',x.prazo_entrega),kv('Local de entrega',x.local_entrega),kv('Vigência',x.vigencia),kv('Pagamento',x.pagamento),kv('Garantia exigida',x.garantia),
+ const cond=[kv('Critério de julgamento',x.criterio_julgamento),kv('Local de entrega',x.local_entrega),kv('Pagamento',x.pagamento),kv('Garantia exigida',x.garantia),
   kb('Exige amostra',x.exige_amostra,true),kb('Exige visita técnica',x.exige_visita_tecnica,true),kb('Exclusivo ME/EPP',x.exclusivo_me_epp,false)].join('');
+ const fim=c.op?.data_fim_proposta,dd=fim?dias(fim):null;
+ const prazos=[fim?`<div><span>Propostas até</span><b>${dt(fim)}${dd!=null?` <small class="${dd<0?'bw':dd<=3?'bw':'m'}">(${dd<0?'encerrado':dd===0?'hoje':'em '+dd+' dia'+(dd>1?'s':'')})</small>`:''}</b></div>`:'',kv('Prazo de entrega',x.prazo_entrega),kv('Vigência do contrato',x.vigencia)].join('');
  const riscos=x.riscos||[],exJF=[...(h.juridica||[]),...(h.fiscal_trabalhista||[])],exTE=[...(h.tecnica||[]),...(h.economico_financeira||[])];
  d.innerHTML=`<div class="danl">`+(a?`<div class="dsum">${r!=null?`<div class="dscore ${nv}"><b>${r}</b><span>risco</span></div>`:''}
   <div><div class="dtop">${AI('Análise do edital gerada por IA (Gemini)')}<b>${r!=null?NVL[nv]:'Análise do edital'}</b><span class="tag ${a.fonte==='edital'?'ok':'w'}">${a.fonte==='edital'?'lido do edital completo':'lido só pelo objeto'}</span></div>
   <p class="dres">${esc(a.resumo||x.resumo||'')}</p>
   ${x.oportunidade?`<p class="dres"><b>Vale a pena? </b>${esc(x.oportunidade)}</p>`:''}
   ${x.perfil_fornecedor?`<p class="dres m"><b>Quem atende isso: </b>${esc(x.perfil_fornecedor)}</p>`:''}</div></div>
+  ${prazos?`<h4>Prazos</h4><div class="dkv">${prazos}</div>`:''}
   ${cond?`<h4>Condições principais</h4><div class="dkv">${cond}</div>`:''}
   ${riscos.length?`<h4>Pontos de atenção</h4><div class="drk">${riscos.map(z=>`<div class="dr ${esc(z.nivel||'medio')}"><b>${esc(z.tema||'Atenção')}</b><span>${esc(z.descricao||'')}</span></div>`).join('')}</div>`:''}
   ${(exJF.length||exTE.length)?`<h4>Exigências para participar</h4><div class="dex"><div><h5>Jurídica, fiscal e trabalhista</h5>${lista(exJF)}</div><div><h5>Técnica e econômico-financeira</h5>${lista(exTE)}</div></div>`:''}
   <div class="dfoot"><a class="l" style="cursor:pointer" onclick="analisarAgora(this.closest('.det'))">analisar de novo</a></div>`
   :'<div class="m">Lendo o edital com a IA… isso leva alguns segundos.</div>')+`</div>`
  +(its.length?`<h4>Itens (${its.length}${its.length===15?'+':''})</h4><table class="tb">${its.map(i=>`<tr><td>${i.numero_item}</td><td>${esc((i.descricao||'').slice(0,110))}</td><td>${i.quantidade??''} ${esc(i.unidade||'')}</td><td>${i.valor_unitario!=null?brl2(i.valor_unitario):'sigiloso'}</td></tr>`).join('')}</table>`:'')
- +`<h4>Pergunte ao edital</h4><div class="ask"><input placeholder="Ex.: aceita atestado de outro estado? qual o prazo de entrega?" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button class="sm" onclick="runIA(this,'pergunta',${id},{pergunta:this.previousElementSibling.value})">${AI()}Perguntar</button></div>
+ +`<div class="darq"></div><h4>Pergunte ao edital</h4><div class="ask"><input placeholder="Ex.: aceita atestado de outro estado? qual o prazo de entrega?" onkeydown="if(event.key==='Enter')this.nextElementSibling.click()"><button class="sm" onclick="runIA(this,'pergunta',${id},{pergunta:this.previousElementSibling.value})">${AI()}Perguntar</button></div>
  <div class="iaout" hidden></div>
  <h4>Preço: referência, quanto já foi pago e margem</h4><div class="pz"></div>
  <h4>Quem já vende isso para o governo</h4><div class="mk"></div>
