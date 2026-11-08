@@ -563,8 +563,10 @@ async usuarios(){
 async servicos(){return renderServicos();},
 async coletas(){
  const {data}=await q(sb.from('coletas_log').select('*').order('id',{ascending:false}).limit(30));
- const [o,p,r]=await Promise.all(['oportunidades','pca_itens','radar'].map(t=>q(sb.from(t).select('id',{count:'exact',head:true}))));
- main.innerHTML=`<div class="top"><div><h2>Coletas</h2><p class="sub">Situação das leituras automáticas do PNCP.</p></div></div><div class="grid" style="margin-bottom:14px"><div class="card"><div class="m">Editais</div><div class="kpi">${o.count}</div></div><div class="card"><div class="m">Itens de PCA</div><div class="kpi">${p.count}</div></div><div class="card"><div class="m">No radar</div><div class="kpi">${r.count}</div></div></div>
+ // contagem estimada: 'exact' em oportunidades (com o historico) estoura o tempo do banco
+ const cnt=async t=>{for(const c of ['estimated','exact']){const {count,error}=await sb.from(t).select('id',{count:c,head:true});if(!error&&count!=null)return count;}return null;};
+ const [o,p,r]=await Promise.all(['oportunidades','pca_itens','radar'].map(cnt));
+ main.innerHTML=`<div class="top"><div><h2>Coletas</h2><p class="sub">Situação das leituras automáticas do PNCP.</p></div></div><div class="grid" style="margin-bottom:14px"><div class="card"><div class="m">Editais</div><div class="kpi">${o==null?'—':nBR(o)}</div></div><div class="card"><div class="m">Itens de PCA</div><div class="kpi">${p==null?'—':nBR(p)}</div></div><div class="card"><div class="m">No radar</div><div class="kpi">${r==null?'—':nBR(r)}</div></div></div>
  <div class="card"><table><tr><th>Etapa</th><th>Início</th><th>Registros</th><th>Status</th><th>Erro</th></tr>${data.map(c=>`<tr><td>${esc(c.fonte)}</td><td>${new Date(c.iniciado_em).toLocaleString('pt-BR')}</td><td>${c.registros}</td><td><span class="tag ${c.status==='ok'?'ok':c.status==='erro'?'b':'w'}">${esc(c.status)}</span></td><td class="m">${esc((c.erro||'').slice(0,120))}</td></tr>`).join('')}</table></div>
  <p class="m">A coleta roda automaticamente no GitHub Actions às 06:17 e 18:17 (Brasília).</p>`;}
 };
