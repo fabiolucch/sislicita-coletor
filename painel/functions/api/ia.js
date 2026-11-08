@@ -272,6 +272,10 @@ ${corpo}`;
         : tx?.texto ? `TEXTO DO EDITAL (${tx.arquivo || ""}):\n${recortar(tx.texto)}`
         : `SÓ O OBJETO (o edital não foi baixado):\n${ctx}\nANÁLISE JÁ FEITA: ${resumoEdital.slice(0, 2500)}`;
 
+      if (b.acao === "direcionamento" && fonte === "objeto") {
+        return J({ ok: true, fonte, indisponivel: true, nivel: "indefinido", itens: [],
+          conclusao: "O texto do edital ainda não está disponível (o PNCP não devolveu o arquivo). Sem ele não dá para apontar cláusulas restritivas. A coleta baixa os editais do radar a cada rodada; tente de novo depois." });
+      }
       if (b.acao === "direcionamento") {
         const prompt = `Você é advogado de licitações e defende FORNECEDORES. Procure no edital abaixo cláusulas que restrinjam a competição além do necessário ou que pareçam desenhadas para um fornecedor específico.
 Procure especificamente: marca, modelo ou fabricante exigido sem "ou equivalente"; atestado de capacidade técnica desproporcional (quantidade/valor muito acima do objeto, exigência de atestado do mesmo órgão, de um único contrato ou de prazo longo demais); exigência de instalação, filial, sede ou visita técnica na cidade como condição de participação; índices contábeis fora do usual; capital social ou patrimônio líquido acima de 10% do valor estimado; garantia de proposta acima de 1%; prazo de entrega incompatível; amostra exigida de todos antes do julgamento; agrupamento de itens distintos em um lote só; qualificação exigida da empresa em vez do profissional; exigência de certificação sem previsão legal.
@@ -299,6 +303,10 @@ ${corpo}`;
         no_prazo: limite ? limite >= hoje : null,
         base: "Lei 14.133/2021, art. 164: qualquer pessoa pode impugnar o edital ou pedir esclarecimento até 3 dias úteis antes da data de abertura; a resposta sai em até 3 dias úteis e antes da abertura.",
       };
+      if (fonte === "objeto" && !(Array.isArray(b.pontos) && b.pontos.length)) {
+        return J({ ok: true, fonte, prazo, indisponivel: true,
+          resumo: "O texto do edital ainda não foi baixado, então não dá para redigir a peça com citação de cláusulas. O prazo abaixo já está calculado." });
+      }
       const pontos = Array.isArray(b.pontos) && b.pontos.length
         ? JSON.stringify(b.pontos).slice(0, 4000)
         : "(não informados: identifique você mesmo no edital os pontos restritivos mais graves)";

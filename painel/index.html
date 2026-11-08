@@ -925,6 +925,7 @@ async function verDirecionamento(bt){const d=bt.closest('.det'),box=bt.closest('
  bt.disabled=true;box.innerHTML='<div class="m">Lendo o edital à procura de cláusulas restritivas… isso leva alguns segundos.</div>';
  try{const j=await iaApi('direcionamento',d.__ctx.id);d.__dir=j;
   const it=j.itens||[];
+  if(j.indisponivel){box.innerHTML=`<div class="m">${esc(j.conclusao||'')}</div><div class="row2"><button class="sm" onclick="verImpugnacao(this)">Ver só o prazo de impugnação</button><button class="gh" onclick="verDirecionamento(this)">Tentar de novo</button></div>`;return;}
   box.innerHTML=`${AI('Leitura do edital por IA (Gemini). Confira cada ponto no documento antes de usar.')}<span class="tag ${NIV[j.nivel]||''}">restrição ${esc(j.nivel||'indefinida')}</span> <span class="tag ${j.fonte==='edital'?'ok':'w'}">${j.fonte==='edital'?'lido do edital':'lido só pelo objeto'}</span>
   ${it.length?`<div class="drk" style="margin-top:8px">${it.map(x=>`<div class="dr ${esc(x.nivel||'medio')}"><b>${esc(x.tema||'Cláusula')}${x.clausula?` · item ${esc(x.clausula)}`:''}</b><span>${x.trecho?`“${esc(x.trecho)}” — `:''}${esc(x.problema||'')}${x.base_legal?` <i>(${esc(x.base_legal)})</i>`:''}${x.pedido?`<br><b>Pedir:</b> ${esc(x.pedido)}`:''}</span></div>`).join('')}</div>`:'<div class="m" style="margin-top:8px">Nenhuma cláusula claramente restritiva foi encontrada.</div>'}
   <p class="dres">${esc(j.conclusao||'')}</p>
@@ -942,9 +943,9 @@ async function verImpugnacao(bt){const d=bt.closest('.det'),box=bt.closest('.dir
    ${p.dias_uteis!=null&&p.no_prazo?`<div><span>Faltam</span><b>${p.dias_uteis} dia(s) útil(eis)</b></div>`:''}
    ${p.abertura?`<div><span>Abertura da sessão</span><b>${dt(p.abertura)}</b></div>`:''}</div>
    <div class="m" style="margin-top:4px">${esc(p.base||'')}</div>
-   <textarea rows="16" style="margin-top:8px">${esc(j.minuta||'')}</textarea>
+   ${j.minuta?`<textarea rows="16" style="margin-top:8px">${esc(j.minuta)}</textarea>
    <div class="row2"><button class="sm" onclick="navigator.clipboard.writeText(window.__imp).then(()=>toast('Minuta copiada'))">Copiar minuta</button>
-   <button class="gh" onclick="baixarTxt('impugnacao.txt',window.__imp)">${ic('dl')}Baixar .txt</button></div>
+   <button class="gh" onclick="baixarTxt('impugnacao.txt',window.__imp)">${ic('dl')}Baixar .txt</button></div>`:`<div class="m" style="margin-top:6px">${esc(j.resumo||'')}</div>`}
    <div class="m" style="margin-top:6px">Rascunho: confira cada citação legal e os dados do processo antes de protocolar. Feriados municipais e estaduais não entram no cálculo do prazo.</div></div>`;
  }catch(e){box.innerHTML=antes+`<div class="m" style="color:#b91c1c">${esc(e.message)}</div>`;}}
 function baixarTxt(nome,txt){const u=URL.createObjectURL(new Blob([txt||''],{type:'text/plain;charset=utf-8'}));const a=document.createElement('a');a.href=u;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),8000);}
