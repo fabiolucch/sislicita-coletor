@@ -1669,6 +1669,7 @@ def vigia():
 # ------------------------------------------------------------------ alertas no Telegram
 TG = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 ALERTA_SCORE = int(os.getenv("ALERTA_SCORE", "65"))
+ALERTA_PCA_SCORE = int(os.getenv("ALERTA_PCA_SCORE", "80"))   # previsoes do PCA nao tem "interesse", so a nota da IA (score)
 PAINEL = os.getenv("PAINEL_URL", "https://sislicita.pages.dev")
 
 
@@ -1787,8 +1788,12 @@ def alertas():
     # 2) oportunidades novas com score alto (editais e previsoes do PCA, em mensagens separadas)
     rr = requests.get(f"{SB}/radar", headers=HDR, timeout=120, params={
         "select": "id,score,interesse,justificativa,perfis_busca(nome),oportunidades(objeto,orgao_nome,uf,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))",
-        "notificado_em": "is.null", "interesse": f"gte.{ALERTA_SCORE}", "status": "neq.descartado", "order": "interesse.desc", "limit": "80"}).json()
-    if isinstance(rr, list) and rr:
+        "notificado_em": "is.null", "oportunidade_id": "not.is.null", "interesse": f"gte.{ALERTA_SCORE}", "status": "neq.descartado", "order": "interesse.desc", "limit": "40"}).json()
+    rp = requests.get(f"{SB}/radar", headers=HDR, timeout=120, params={
+        "select": "id,score,interesse,justificativa,perfis_busca(nome),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))",
+        "notificado_em": "is.null", "pca_item_id": "not.is.null", "score": f"gte.{ALERTA_PCA_SCORE}", "status": "neq.descartado", "order": "score.desc", "limit": "300"}).json()
+    rr = (rr if isinstance(rr, list) else []) + (rp if isinstance(rp, list) else [])
+    if rr:
         eds = [x for x in rr if x.get("oportunidades")]
         pcas = [x for x in rr if not x.get("oportunidades") and x.get("pca_itens")]
         if eds:
@@ -1811,11 +1816,11 @@ def alertas():
             grupos.setdefault((pl.get("orgao_nome") or "?", pl.get("uf") or ""), []).append((x, p))
         if grupos:
             blocos = []
-            for (org, uf), itens in sorted(grupos.items(), key=lambda kv: -max(i[0]["interesse"] or 0 for i in kv[1]))[:8]:
+            for (org, uf), itens in sorted(grupos.items(), key=lambda kv: -max(i[0]["score"] or 0 for i in kv[1]))[:8]:
                 linhas_i = []
                 for x, p in itens[:3]:
                     d = (p.get("data_desejada") or "")[:10]
-                    linhas_i.append(f"  • <b>{x['interesse']}</b> · {h((p.get('descricao') or '')[:110])} · R$ {p.get('valor_total') or 0:,.0f}".replace(",", ".") + (f" · prevista {d[5:7]}/{d[:4]}" if d else ""))
+                    linhas_i.append(f"  • <b>{x['score']}</b> · {h((p.get('descricao') or '')[:110])} · R$ {p.get('valor_total') or 0:,.0f}".replace(",", ".") + (f" · prevista {d[5:7]}/{d[:4]}" if d else ""))
                 mais = f"\n  …e mais {len(itens) - 3} deste órgão" if len(itens) > 3 else ""
                 blocos.append(f"🏛️ <b>{h(org)}</b>{('/' + h(uf)) if uf else ''}\n" + "\n".join(linhas_i) + mais)
             total = sum(len(v) for v in grupos.values())
