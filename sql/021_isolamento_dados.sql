@@ -124,20 +124,29 @@ begin
     if novo = d then raise exception 'nao consegui proteger %', f.proname; end if;
     execute novo;
   end loop;
-  -- relatório do serviço: só plataforma
-  for f in select p.oid, p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'servico_resumo' loop
-    d := pg_get_functiondef(f.oid);
-    continue when d like '%_servico_ou_admin%';
-    novo := regexp_replace(d, '\mbegin\M', E'begin\n  if not public._servico_ou_admin() then raise exception ''restrito a plataforma''; end if;', 'i');
-    if novo = d then raise exception 'nao consegui proteger servico_resumo'; end if;
-    execute novo;
-  end loop;
   -- rotinas de manutenção global: só serviço
   for f in select p.oid, p.proname, pg_get_function_identity_arguments(p.oid) as args from pg_proc p join pg_namespace n on n.oid = p.pronamespace
            where n.nspname = 'public' and p.proname in ('calcular_interesse','triar_todos','limpar_antigos','limpar_mercado') loop
     execute format('revoke execute on function public.%I(%s) from public, anon, authenticated', f.proname, f.args);
     execute format('grant execute on function public.%I(%s) to service_role', f.proname, f.args);
   end loop;
+end $p$;
+
+-- relatório do serviço (Serviço): só plataforma
+create or replace function public.servico_resumo() returns jsonb
+language sql stable security definer set search_path = public set statement_timeout = '10s' as $$
+  select case when public._servico_ou_admin()
+    then coalesce((select dados from public.servico_cache where id = 1), '{}'::jsonb) || jsonb_build_object('cache_em', (select atualizado_em from public.servico_cache where id = 1))
+    else '{}'::jsonb end;
+$$;
+do $p$
+declare pol record;
+begin
+  for pol in select policyname from pg_policies where schemaname = 'public' and tablename = 'servico_cache' loop
+    execute format('drop policy %I on public.servico_cache', pol.policyname);
+  end loop;
+  alter table public.servico_cache enable row level security;
+  create policy servico_cache_ler on public.servico_cache for select to authenticated using (public._servico_ou_admin());
 end $p$;
 
 -- E. papel legado (telas Serviço/Usuários): administrador = administrador da plataforma
