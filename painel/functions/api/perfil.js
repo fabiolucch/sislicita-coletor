@@ -46,8 +46,8 @@ async function garantirVetorEdital(env, auth, id) {
   const o = (await (await sb(auth, `oportunidades?id=eq.${id}&select=objeto`)).json())[0];
   if (!o || !o.objeto) throw new Error("edital sem objeto");
   const emb = await vetor(env, o.objeto, "RETRIEVAL_DOCUMENT");
-  const r = await sb(auth, "edital_emb", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates" }, body: JSON.stringify({ oportunidade_id: id, emb }) });
-  if (!r.ok && r.status !== 409) throw new Error("gravar vetor: " + (await r.text()).slice(0, 160));
+  const r = await sb(auth, "rpc/salvar_vetor_edital", { method: "POST", body: JSON.stringify({ p_op: id, p_emb: JSON.stringify(emb) }) });
+  if (!r.ok) throw new Error("gravar vetor: " + (await r.text()).slice(0, 160));
 }
 
 async function sugerir(env, texto) {

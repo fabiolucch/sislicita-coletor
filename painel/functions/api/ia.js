@@ -295,10 +295,10 @@ ${corpo}`;
       const d = Array.isArray(res) ? (res[0] || {}) : (res || {});
       let risco = parseInt(d.risco_geral, 10);
       risco = isNaN(risco) ? null : Math.max(0, Math.min(100, risco));
-      await fetch(`${SB}/rest/v1/edital_analise?on_conflict=oportunidade_id`, {
+      await fetch(`${SB}/rest/v1/rpc/salvar_analise`, {
         method: "POST",
-        headers: { ...H, "content-type": "application/json", prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify([{ oportunidade_id: id, dados: d, risco, resumo: (d.resumo || "").slice(0, 700), fonte }]),
+        headers: { ...H, "content-type": "application/json" },
+        body: JSON.stringify({ p_op: id, p_dados: d, p_risco: risco, p_resumo: (d.resumo || "").slice(0, 700), p_fonte: fonte }),
       });
       return J({ ok: true, dados: d, risco, resumo: d.resumo || "", fonte, pncp_fora: pncpFora, motivo: fonte === "objeto" ? motivo : "" });
     }
