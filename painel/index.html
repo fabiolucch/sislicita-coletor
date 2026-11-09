@@ -510,7 +510,7 @@ async oportunidades(){
   const N=30,eu=window.__goSeq=(window.__goSeq||0)+1;
   const t=$('#fq').value.trim(),sit=$('#fs').value,d1=$('#d1').value,d2=$('#d2').value,agora=new Date().toISOString();
   let ord=$('#fo2').value,av=[];
-  const estreita=!!t||!!window.__ORG||(d1&&d2&&(new Date(d2)-new Date(d1))<=45*864e5)||sit==='a';
+  const estreita=!!t||!!window.__ORG||(d1&&d2&&(new Date(d2)-new Date(d1))<=45*864e5);
   if(ord==='val'&&sit!=='a'&&!t&&!window.__ORG){ord='enc';av.push('Ordenar por maior valor só está disponível para editais abertos ou com um assunto/órgão definido; ordenei por encerramento.');}
   let r=sb.from('oportunidades').select('id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,data_publicacao,link_pncp,situacao,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome',{count:estreita?'exact':'estimated'}).range(pg*N,pg*N+N-1);
   r=ord==='pub'?r.order('data_publicacao',{ascending:false}):ord==='val'?r.order('valor_estimado',{ascending:false,nullsFirst:false}):r.order('data_fim_proposta',{ascending:sit==='a'});
