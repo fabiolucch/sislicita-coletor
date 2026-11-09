@@ -841,7 +841,7 @@ const precoBtn=(o,t)=>{const ok=o&&o.ia_catalogo_codigo;const a=ok?`onclick="irP
 window.__FAV=window.__FAV||new Set();
 async function carregarFav(){try{const {data}=await q(sb.from('favoritos').select('oportunidade_id'));window.__FAV=new Set((data||[]).map(x=>x.oportunidade_id));}catch(e){}return window.__FAV;}
 async function favoritar(bt,id){const on=window.__FAV.has(id);bt.disabled=true;
- const {error}=on?await sb.from('favoritos').delete().eq('oportunidade_id',id):await sb.from('favoritos').upsert({oportunidade_id:id});
+ const {error}=on?await sb.from('favoritos').delete().eq('oportunidade_id',id):await sb.from('favoritos').upsert({oportunidade_id:id},{onConflict:'organizacao_id,oportunidade_id',ignoreDuplicates:true});
  bt.disabled=false;if(error)return alert('Não consegui salvar o favorito: '+error.message);
  on?window.__FAV.delete(id):window.__FAV.add(id);
  document.querySelectorAll(`.gh.fav[onclick*="favoritar(this,${id})"]`).forEach(b=>b.classList.toggle('on',!on));
