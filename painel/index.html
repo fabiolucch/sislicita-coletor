@@ -934,7 +934,7 @@ async function detalhes(btn,id){const card=btn.closest('.oc,.tg-i'),d=card.query
  const encerrado=opr.data?.data_fim_proposta&&new Date(opr.data.data_fim_proposta)<new Date();
  if(!an.data&&encerrado){                              // encerrado e sem análise: só lê com a IA se o usuário pedir
   const b=d.querySelector('.danl');
-  if(b)b.innerHTML='<div class="m" style="margin-bottom:6px">Edital encerrado: a IA só lê o PDF se você pedir (nada é guardado além do resumo da análise).</div><button class="sec sm" onclick="analisarAgora(this.closest(\'.det\'))">'+AI()+'Ler o edital com IA</button>';
+  if(b)b.innerHTML='<div class="m" style="margin-bottom:6px">Edital encerrado: a IA só lê o PDF se você pedir (nada é guardado além do resumo da análise).</div><button class="sec sm" onclick="analisarAgora(this.closest(\'.det\'),true)">'+AI()+'Ler o edital com IA</button>';
   blocosMercado(d);}
  else if(!an.data)analisarAgora(d);                    // aberto sem análise: roda a IA na hora
  else blocosMercado(d);}
@@ -964,12 +964,13 @@ function pintarArq(box,l){
 const _pintarDet=pintarDet;pintarDet=function(d,a){_pintarDet(d,a);arquivosEdital(d);
  const fim=d.__ctx?.op?.data_fim_proposta;                    // encerrado e ainda sem leitura do edital: botão em destaque
  if(fim&&new Date(fim)<new Date()&&a&&a.fonte!=='edital'){const f=d.querySelector('.danl .dfoot');
-  if(f)f.innerHTML='<button class="sec sm" onclick="analisarAgora(this.closest(\'.det\'))">'+AI()+'Ler o edital com IA</button> <span class="m">Baixa o PDF no PNCP e analisa; nada é guardado além do resumo.</span>';}};
+  if(f)f.innerHTML='<button class="sec sm" onclick="analisarAgora(this.closest(\'.det\'),true)">'+AI()+'Ler o edital com IA</button> <span class="m">Baixa o PDF no PNCP e analisa; nada é guardado além do resumo.</span>';}};
 
-async function analisarAgora(d){const c=d.__ctx,b=d.querySelector('.danl');
+const AVISO_PNCP='<div style="background:#fee2e2;border:1px solid #dc2626;color:#991b1b;border-radius:8px;padding:10px 12px;margin:0 0 8px;font-weight:600">❗ O PNCP está fora do ar ou instável agora, por isso o edital não pôde ser lido. Tente de novo em alguns minutos.</div>';
+async function analisarAgora(d,exigir){const c=d.__ctx,b=d.querySelector('.danl');
  if(b)b.innerHTML='<div class="m">Lendo o edital com a IA… isso leva alguns segundos.</div>';
- try{const j=await iaApi('analisar',c.id);pintarDet(d,{dados:j.dados,risco:j.risco,resumo:j.resumo,fonte:j.fonte});}
- catch(e){if(b)b.innerHTML=`<div class="dwarn">Não deu para analisar agora: ${esc(e.message)} · <a class="l" style="cursor:pointer" onclick="analisarAgora(this.closest('.det'))">tentar de novo</a></div>`;}
+ try{const j=await iaApi('analisar',c.id,exigir?{exigir_edital:true}:{});pintarDet(d,{dados:j.dados,risco:j.risco,resumo:j.resumo,fonte:j.fonte});if(j.pncp_fora)d.querySelector('.danl')?.insertAdjacentHTML('afterbegin',AVISO_PNCP);}
+ catch(e){if(b)b.innerHTML=e.message==='PNCP_FORA'?AVISO_PNCP+`<button class="sec sm" onclick="analisarAgora(this.closest('.det'),true)">Tentar de novo</button>`:`<div class="dwarn">Não deu para analisar agora: ${esc(e.message)} · <a class="l" style="cursor:pointer" onclick="analisarAgora(this.closest('.det'))">tentar de novo</a></div>`;}
  blocosMercado(d);}
 
 function blocosMercado(d){const c=d.__ctx,t=termoDe(c.op);
