@@ -52,7 +52,23 @@ const b64 = buf => {                               // base64 em blocos, para nao
   return btoa(s);
 };
 
-const PNCP_MAX = 8 * 1024 * 1024;                  // teto do que mandamos ao Gemini de uma vez
+const PNCP_MAX = 4 * 1024 * 1024;                  // acima disso o PDF vai pela API de arquivos do Gemini, nao inline
+const MAX_PDF = 40 * 1024 * 1024;                  // teto por PDF lido
+
+// Sobe um PDF grande para a API de arquivos do Gemini (some sozinho em 48 h; nada e guardado por nos).
+async function gemArquivo(env, buf) {
+  const f = 'x-goog-api-key';
+  const corpo = new Blob(['--lim\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{"file":{"display_name":"edital"}}\r\n--lim\r\nContent-Type: application/pdf\r\n\r\n', buf, '\r\n--lim--']);
+  const r = await fetch('https://generativelanguage.googleapis.com/upload/v1beta/files?uploadType=multipart', { method: 'POST', headers: { [f]: env.GEMINI_API_KEY, 'content-type': 'multipart/related; boundary=lim' }, body: corpo });
+  if (!r.ok) throw new Error(`envio do PDF à IA falhou (${r.status})`);
+  let a = (await r.json()).file;
+  for (let i = 0; i < 15 && a?.state && a.state !== 'ACTIVE'; i++) {
+    if (a.state === 'FAILED') throw new Error('a IA não conseguiu processar o PDF');
+    await new Promise(x => setTimeout(x, 2000));
+    a = await (await fetch(`https://generativelanguage.googleapis.com/v1beta/${a.name}`, { headers: { [f]: env.GEMINI_API_KEY } })).json();
+  }
+  return { fileData: { mimeType: 'application/pdf', fileUri: a.uri } };
+}
 
 // ---- prazo de impugnacao: 3 dias uteis antes da abertura (Lei 14.133/2021, art. 164)
 function pascoa(a) {
@@ -108,7 +124,7 @@ async function pdfsDoZip(buf) {
   itens.sort((a, b) => pontos(a.nome) - pontos(b.nome) || a.us - b.us);
   const saida = [];
   for (const it of itens) {
-    if (saida.length >= 2 || !it.us || it.us > PNCP_MAX) continue;
+    if (saida.length >= 2 || !it.us || it.us > MAX_PDF) continue;
     const nl = v.getUint16(it.off + 26, true), el = v.getUint16(it.off + 28, true), ini = it.off + 30 + nl + el;
     const dados = u.subarray(ini, ini + it.cs);
     let pdf;
@@ -121,7 +137,7 @@ async function pdfsDoZip(buf) {
 }
 
 // Baixa o edital no PNCP (PDF direto ou PDF dentro de .zip). O motivo de nao ter achado vai em partes.motivo.
-async function pdfsDoEdital(numero) {
+async function pdfsDoEdital(numero, env) {
   const m = /^(\d{14})-\d+-(\d+)\/(\d{4})$/.exec(numero || "");
   const vazio = motivo => Object.assign([], { motivo });
   if (!m) return vazio("o edital não tem número de controle do PNCP");
@@ -144,14 +160,14 @@ async function pdfsDoEdital(numero) {
     const buf = await d.arrayBuffer();
     const cab = new TextDecoder().decode(new Uint8Array(buf.slice(0, 4)));
     let pdfs = [];
-    if (cab === "%PDF") pdfs = buf.byteLength <= PNCP_MAX ? [buf] : [];
+    if (cab === "%PDF") pdfs = buf.byteLength <= MAX_PDF ? [buf] : [];
     else if (cab.startsWith("PK")) pdfs = await pdfsDoZip(buf).catch(() => []);
     else { motivo = "o arquivo do edital não é PDF nem ZIP com PDF (ex.: Word)"; continue; }
     if (!pdfs.length) { motivo = motivo || "o arquivo do edital é grande demais ou não contém PDF legível"; continue; }
     for (const pdf of pdfs) {
-      if (total + pdf.byteLength > PNCP_MAX * 1.5) continue;
+      if (total + pdf.byteLength > MAX_PDF) continue;
       total += pdf.byteLength;
-      partes.push({ inlineData: { mimeType: "application/pdf", data: b64(pdf) } });
+      partes.push(pdf.byteLength > PNCP_MAX ? await gemArquivo(env, pdf) : { inlineData: { mimeType: "application/pdf", data: b64(pdf) } });
     }
   }
   return partes.length ? partes : vazio(motivo || "não consegui extrair o PDF do edital");
@@ -248,7 +264,7 @@ export async function onRequestPost({ request, env }) {
       const [tx] = await get(`edital_textos?oportunidade_id=eq.${id}&select=texto,arquivo`);
       // sem texto salvo: baixa o PDF no PNCP e manda ao Gemini, que le PDF direto
       let pncpFora = false;
-      const pdfs = tx?.texto ? [] : await pdfsDoEdital(op.numero_controle_pncp).catch(e => { if (e.message === "PNCP_FORA") pncpFora = true; return Object.assign([], { motivo: "" }); });
+      const pdfs = tx?.texto ? [] : await pdfsDoEdital(op.numero_controle_pncp, env).catch(e => { if (e.message === "PNCP_FORA") pncpFora = true; return Object.assign([], { motivo: "" }); });
       const motivo = pdfs.motivo || "";
       // leitura pedida pelo botao: com o PNCP fora do ar nao devolve analise "so pelo objeto", avisa
       if (pncpFora && b.exigir_edital) return J({ erro: "PNCP_FORA" }, 503);
@@ -314,7 +330,7 @@ ${corpo}`;
     if (b.acao === "direcionamento" || b.acao === "impugnacao") {
       // Le o edital (texto salvo ou PDF do PNCP) e procura clausulas restritivas.
       const [tx] = await get(`edital_textos?oportunidade_id=eq.${id}&select=texto,arquivo`);
-      const pdfs = tx?.texto ? [] : await pdfsDoEdital(op.numero_controle_pncp).catch(() => []);
+      const pdfs = tx?.texto ? [] : await pdfsDoEdital(op.numero_controle_pncp, env).catch(() => []);
       const fonte = tx?.texto || pdfs.length ? "edital" : "objeto";
       const corpo = pdfs.length
         ? `O EDITAL COMPLETO VAI ANEXADO EM PDF. OBJETO: ${(op.objeto || "").slice(0, 1200)}`
