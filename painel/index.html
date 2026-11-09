@@ -946,7 +946,8 @@ function pintarArq(box,l){
  if(!l.length){box.innerHTML='<h4>Documentos do edital</h4><div class="m">O PNCP não lista documentos para este edital. Use o botão PNCP.</div>';return;}
  const cont={},tot={};l.forEach(a=>{const k=a.tipo||'Anexo';tot[k]=(tot[k]||0)+1;});
  box.innerHTML='<h4>Documentos do edital</h4><div class="darq-l">'+l.map(a=>{const k=a.tipo||'Anexo';cont[k]=(cont[k]||0)+1;const nome=tot[k]>1?`${k} ${cont[k]}`:k;
-  return `<button class="darq-b" data-n="${a.n}" title="${esc(a.titulo)}">${ic('dl')}${esc(nome)}</button>`;}).join('')+'</div><div class="m" style="margin-top:4px">Os arquivos vêm direto do PNCP.</div>';
+  return `<button class="darq-b" data-n="${a.n}" title="${esc(a.titulo)}">${ic('dl')}${esc(nome)}</button>`;}).join('')+'</div><div class="m" style="margin-top:4px">Os arquivos vêm direto do PNCP.</div><div class="gbox" style="margin-top:8px"></div>';
+ gboxEdital(box);
  box.querySelectorAll('button[data-n]').forEach(bt=>bt.onclick=async()=>{
   const t=bt.innerHTML;bt.disabled=true;bt.textContent='Baixando…';
   try{const {data:{session}}=await sb.auth.getSession();
@@ -956,6 +957,13 @@ function pintarArq(box,l){
    const a=document.createElement('a');a.href=u;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);
   }catch(e){alert('Não consegui baixar: '+e.message);}
   bt.disabled=false;bt.innerHTML=t;});}
+async function gboxEdital(box){const g=box.querySelector('.gbox'),d=box.parentElement,id=d.__ctx.id;if(!g)return;
+ const {data:t}=await sb.from('edital_textos').select('guardado,extraido_em').eq('oportunidade_id',id).maybeSingle();
+ if(t?.guardado){g.innerHTML=`<span class="tag ok">Guardado no seu banco</span> <span class="m">texto salvo em ${dt(t.extraido_em)}; não é apagado pela limpeza automática.</span>`;return;}
+ g.innerHTML='<button class="sec sm">Ler e guardar este edital no meu banco</button> <span class="m">A IA lê o PDF e o texto fica salvo (também para editais encerrados).</span>';
+ g.querySelector('button').onclick=async e=>{const b=e.target;b.disabled=true;b.textContent='Lendo o edital… (pode levar até 1 minuto)';
+  try{await iaApi('guardar',id);b.closest('.gbox').innerHTML='<span class="tag ok">Guardado no seu banco</span>';analisarAgora(d);}
+  catch(er){g.innerHTML=`<div class="dwarn">Não consegui guardar: ${esc(er.message)} · <a class="l" style="cursor:pointer" onclick="gboxEdital(this.closest('.darq'))">tentar de novo</a></div>`;}};}
 const _pintarDet=pintarDet;pintarDet=function(d,a){_pintarDet(d,a);arquivosEdital(d);};
 
 async function analisarAgora(d){const c=d.__ctx,b=d.querySelector('.danl');
