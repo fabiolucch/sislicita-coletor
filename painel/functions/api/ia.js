@@ -237,21 +237,6 @@ ${corpo}`;
       });
       return J({ ok: true, dados: d, risco, resumo: d.resumo || "", fonte });
     }
-    if (b.acao === "guardar") {
-      // Baixa os PDFs do edital no PNCP, transcreve o texto com o Gemini e grava em edital_textos (fixo, sem limpeza).
-      const pdfs = await pdfsDoEdital(op.numero_controle_pncp).catch(() => []);
-      if (!pdfs.length) return J({ erro: "Não achei PDF do edital no PNCP (ou ele é grande demais / não é PDF). Use os botões de download." }, 422);
-      const res = await geminiPartes(env, [{ text: 'Transcreva o texto COMPLETO e fiel dos documentos PDF anexados (edital e anexos), na ordem, sem resumir e sem comentar. Responda SOMENTE JSON: {"texto":"..."}' }, ...pdfs]);
-      const texto = String((Array.isArray(res) ? res[0]?.texto : res?.texto) || "").slice(0, 400000);
-      if (texto.length < 800) return J({ erro: "A IA não conseguiu extrair o texto do PDF (pode ser imagem escaneada)." }, 422);
-      const r = await fetch(`${SB}/rest/v1/edital_textos?on_conflict=oportunidade_id`, {
-        method: "POST",
-        headers: { ...H, "content-type": "application/json", prefer: "resolution=merge-duplicates,return=minimal" },
-        body: JSON.stringify([{ oportunidade_id: id, arquivo: "edital (PNCP)", texto, guardado: true, extraido_em: new Date().toISOString() }]),
-      });
-      if (!r.ok) return J({ erro: `não consegui gravar no banco (${r.status})` }, 502);
-      return J({ ok: true, caracteres: texto.length });
-    }
     if (b.acao === "arquivos" || b.acao === "baixar") {
       // Lista os documentos do edital no PNCP; "baixar" entrega o arquivo pelo proprio dominio do painel.
       const m = /^(\d{14})-\d+-(\d+)\/(\d{4})$/.exec(op.numero_controle_pncp || "");
