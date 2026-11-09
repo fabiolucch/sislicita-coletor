@@ -380,7 +380,7 @@ async home(){
  const agora=new Date().toISOString();
  const [D,cm,top,BR]=await Promise.all([q(sb.rpc('dashboard_resumo')).then(r=>r.data),
   q(sb.from('contratos_comissao').select('base_valor,percentual,valor_estimado_comissao,valor_recebido')).then(r=>r.data),
-  q(sb.from('radar').select('id,score,status,justificativa,perfis_busca(nome),oportunidades!inner(id,objeto,orgao_nome,municipio,uf,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_resumo,ia_categoria,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome)').gte('oportunidades.data_fim_proposta',agora).neq('status','descartado').order('score',{ascending:false}).limit(8)).then(r=>r.data),
+  q(sb.from('radar').select('id,score,status,justificativa,perfis_busca(nome),oportunidades!inner(id,objeto,orgao_nome,municipio,uf,modalidade,srp,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_resumo,ia_categoria,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome)').gte('oportunidades.data_fim_proposta',agora).neq('status','descartado').order('score',{ascending:false}).limit(8)).then(r=>r.data),
   q(sb.from('briefings').select('*,perfis_busca(nome,ativo)').order('gerado_em',{ascending:false}).limit(60)).then(r=>{const v=new Set();return (r.data||[]).filter(b=>{if(!b.perfis_busca?.ativo||v.has(b.perfil_id))return false;v.add(b.perfil_id);return true;});}).catch(()=>[])]);
  window.__AL=((await sb.from('alertas').select('tipo,titulo').gte('criado_em',new Date(Date.now()-3*864e5).toISOString()).order('id',{ascending:false}).limit(4)).data)||[];
  const vb=new Set(),brs=(BR||[]).filter(b=>vb.has(b.perfil_id)?false:vb.add(b.perfil_id)).slice(0,3),bid=[...new Set(brs.flatMap(b=>(b.destaques||[]).map(d=>d.id)))],bop=bid.length?Object.fromEntries(((await sb.from('oportunidades').select('id,objeto,orgao_nome,uf').in('id',bid)).data||[]).map(o=>[o.id,o])):{};
@@ -461,11 +461,11 @@ async radar(){
  const abasPf=[['','Todos os perfis',tot],...perfis.filter(x=>cnt[x.id]||x.ativo).map(x=>[x.id,x.nome+(x.ativo?'':' (parado)'),cnt[x.id]||0]),['fav','★ Favoritos',window.__FAV.size]];
  main.innerHTML=`<div class="top"><div><h2>Radar de oportunidades</h2><p class="sub">Ordenado pela nota de interesse. No computador, passe o mouse na nota para ver a composição; no celular, abra Detalhes.</p></div><details class="leg"><summary>Como a nota é calculada</summary><div class="legc"><table class="tb"><tr><th>Fator</th><th>Peso</th><th>O que mede</th></tr><tr><td>Aderência ao perfil</td><td>35%</td><td>o quanto o objeto é do seu setor (IA quando já avaliou, senão palavras-chave)</td></tr><tr><td>Tamanho do negócio</td><td>25%</td><td>comissão potencial, em escala log: R$ 30 mil = 0, R$ 1 mi = 60, R$ 10 mi = 100</td></tr><tr><td>Folga de preço</td><td>15%</td><td>desconto típico da disputa nesse objeto (30% ou mais = folga grande)</td></tr><tr><td>Prazo</td><td>15%</td><td>dá para mobilizar uma empresa a tempo (5 a 20 dias é o ideal)</td></tr><tr><td>Risco do edital</td><td>10%</td><td>o quanto é restritivo, invertido (edital analisado pela IA)</td></tr></table><div class="legf"><b>Faixas:</b> <span class="tag ok">65+</span> olhar hoje · <span class="tag w">50 a 64</span> vale conferir · <span class="tag">35 a 49</span> só se sobrar tempo · <span class="tag b">abaixo de 35</span> provavelmente não compensa. O que ainda não se sabe entra como neutro (50), então a nota tende a subir conforme a IA analisa o edital e a base de preços cresce.</div></div></details></div>${abasPf.length>2?`<div class="tg-tabs" id="rtabs">${abasPf.map(a=>`<button data-pf="${a[0]}" class="${a[0]===(A0.perfil||'')?'':'sec'} sm" onclick="abaRadar('${a[0]}')">${esc(a[1])} <span class="m">${nBR(a[2])}</span></button>`).join('')}</div>`:''}<div class="bar"><select id="fp" ${abasPf.length>2?'style="display:none"':''}><option value="">Todos os perfis</option>${perfis.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')}<option value="fav">★ Favoritos</option></select>
  <select id="fs"><option value="">Status (todos)</option>${optsM(STATUS,STATUS_META)}</select><select id="ff"><option value="">Edital + PCA</option><option value="e">Só editais</option><option value="p">Só PCA</option></select>
- <select id="fu"><option value="">UF (todas)</option>${opts(UFS)}</select>${selOrd('fo')}<input id="fq" type="search" placeholder="Buscar no objeto…"></div><div id="lista"></div>`;
+ <select id="fu"><option value="">UF (todas)</option>${opts(UFS)}</select><select id="fsg"><option value="">Preço referencial: todos</option><option value="s">Só sigiloso</option><option value="n">Só com valor informado</option></select><select id="frp"><option value="">Registro de preços: todos</option><option value="s">Só registro de preços</option><option value="n">Sem registro de preços</option></select>${selOrd('fo')}<input id="fq" type="search" placeholder="Buscar no objeto…"></div><div id="lista"></div>`;
  const carregar=async()=>{
   const favAba=$('#fp').value==='fav';
-  const SEL='id,score,interesse,interesse_detalhe,status,justificativa,observacoes,perfil_id,perfis_busca(nome),oportunidades(id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))';
-  const OPC='id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_categoria,ia_resumo,ia_atencao,ia_termo';
+  const SEL='id,score,interesse,interesse_detalhe,status,justificativa,observacoes,perfil_id,perfis_busca(nome),oportunidades(id,objeto,orgao_nome,uf,municipio,modalidade,srp,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome),pca_itens(descricao,valor_total,data_desejada,pca_planos(orgao_nome,uf))';
+  const OPC='id,objeto,orgao_nome,uf,municipio,modalidade,srp,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_categoria,ia_resumo,ia_atencao,ia_termo';
   let rows=[];
   if(favAba){
    const ids=[...window.__FAV];
@@ -482,11 +482,11 @@ async radar(){
    rows=(await q(r)).data||[];
   }
   const uf=$('#fu').value,t=$('#fq').value.toLowerCase();
-  rows=rows.filter(x=>{const o=x.oportunidades,p=x.pca_itens;const u=o?o.uf:p?.pca_planos?.uf;const tx=(o?o.objeto:p?.descricao||'').toLowerCase();return(!uf||u===uf)&&(!t||tx.includes(t));});
+  rows=rows.filter(x=>{const o=x.oportunidades,p=x.pca_itens;const u=o?o.uf:p?.pca_planos?.uf;const tx=(o?o.objeto:p?.descricao||'').toLowerCase();const sg=$('#fsg').value,rp=$('#frp').value;if(sg&&(!o||!!o.valor_sigiloso!==(sg==='s')))return false;if(rp&&(!o||(o.srp===true)!==(rp==='s')))return false;return(!uf||u===uf)&&(!t||tx.includes(t));});
   rows=ordenar(rows,$('#fo').value,x=>x.oportunidades||{orgao_nome:x.pca_itens?.pca_planos?.orgao_nome,data_fim_proposta:x.pca_itens?.data_desejada,valor_estimado:x.pca_itens?.valor_total});
   $('#lista').innerHTML=rows.length?rows.map(x=>{const o=x.oportunidades,p=x.pca_itens;
    return o?cardOp(o,{score:x.interesse??x.score,det:x.interesse_detalhe,perfil:x.perfis_busca?.nome,just:x.justificativa,status:x.id?selHTML('mudarStatus',x.id,STATUS,x.status,STATUS_META,o.id):''}):cardPca(p,x);}).join(''):`<div class="vazio">${favAba?'Nenhum edital favoritado ainda. Clique na estrela de um card para guardá-lo aqui.':'Nada por aqui ainda. Rode a coleta e o radar, ou ajuste os filtros.'}</div>`;};
- ['fp','fs','ff','fu','fo'].forEach(i=>$('#'+i).onchange=carregar);let tm;$('#fq').oninput=()=>{clearTimeout(tm);tm=setTimeout(carregar,300);};if(A0.perfil)$('#fp').value=A0.perfil;
+ ['fp','fs','ff','fu','fo','fsg','frp'].forEach(i=>$('#'+i).onchange=carregar);let tm;$('#fq').oninput=()=>{clearTimeout(tm);tm=setTimeout(carregar,300);};if(A0.perfil)$('#fp').value=A0.perfil;
  window.abaRadar=id=>{$('#fp').value=id;document.querySelectorAll('#rtabs button').forEach(b=>b.classList.toggle('sec',b.dataset.pf!==id));carregar();};
  await carregar();},
 
@@ -499,6 +499,8 @@ async oportunidades(){
  <select id="fs"><option value="a">Abertos agora</option><option value="e">Encerrados</option><option value="t">Abertos e encerrados</option></select>
  <label class="m" style="display:flex;gap:6px;align-items:center;margin:0">Publicados de <input id="d1" type="date"></label><label class="m" style="display:flex;gap:6px;align-items:center;margin:0">até <input id="d2" type="date"></label>
  <input id="vmin" type="number" placeholder="Valor mín."><input id="vmax" type="number" placeholder="Valor máx.">
+ <select id="fsg"><option value="">Preço referencial: todos</option><option value="s">Só sigiloso</option><option value="n">Só com valor informado</option></select>
+ <select id="frp"><option value="">Registro de preços: todos</option><option value="s">Só registro de preços</option><option value="n">Sem registro de preços</option></select>
  <select id="fo2"><option value="enc">Ordenar: encerramento</option><option value="pub">Ordenar: publicação (recentes)</option><option value="val">Ordenar: maior valor</option></select><button onclick="pg=0;go()">Buscar</button></div><div id="aviso"></div><div id="lista"></div><div class="pg" id="pg"></div>`;
  const iso8=v=>v&&String(v).length===8?`${v.slice(6,8)}/${v.slice(4,6)}/${v.slice(0,4)}`:null;
  let HM=null;
@@ -512,7 +514,7 @@ async oportunidades(){
   let ord=$('#fo2').value,av=[];
   const estreita=!!t||!!window.__ORG||(d1&&d2&&(new Date(d2)-new Date(d1))<=45*864e5);
   if(ord==='val'&&sit!=='a'&&!t&&!window.__ORG){ord='enc';av.push('Ordenar por maior valor só está disponível para editais abertos ou com um assunto/órgão definido; ordenei por encerramento.');}
-  let r=sb.from('oportunidades').select('id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,data_publicacao,link_pncp,situacao,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome',{count:estreita?'exact':'estimated'}).range(pg*N,pg*N+N-1);
+  let r=sb.from('oportunidades').select('id,objeto,orgao_nome,uf,municipio,modalidade,srp,valor_estimado,valor_sigiloso,data_fim_proposta,data_publicacao,link_pncp,situacao,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome',{count:estreita?'exact':'estimated'}).range(pg*N,pg*N+N-1);
   r=ord==='pub'?r.order('data_publicacao',{ascending:false,nullsFirst:false}):ord==='val'?r.order('valor_estimado',{ascending:false,nullsFirst:false}):r.order('data_fim_proposta',{ascending:sit==='a',nullsFirst:false});
   if(t)r=r.textSearch('objeto_tsv',t,{type:'websearch',config:'portuguese'});
   if($('#fu').value)r=r.eq('uf',$('#fu').value);
@@ -521,6 +523,7 @@ async oportunidades(){
   if(sit==='a')r=r.gte('data_fim_proposta',agora);if(sit==='e')r=r.lt('data_fim_proposta',agora);
   if(d1)r=r.gte('data_publicacao',d1);if(d2)r=r.lte('data_publicacao',d2);
   if($('#vmin').value)r=r.gte('valor_estimado',$('#vmin').value);if($('#vmax').value)r=r.lte('valor_estimado',$('#vmax').value);
+  if($('#fsg').value)r=r.eq('valor_sigiloso',$('#fsg').value==='s');if($('#frp').value)r=r.eq('srp',$('#frp').value==='s');
   if(d1&&HM){const lim=`${HM.slice(0,4)}-${HM.slice(4,6)}-${HM.slice(6,8)}`;if(d1<lim)av.push(`Sua data inicial (${dt(d1)}) é anterior à cobertura completa da base (${iso8(HM)}). Antes dessa data, só aparecem editais que ainda estavam abertos quando a coleta começou.`);}
   $('#lista').innerHTML='<div class="vazio">Pesquisando…</div>';
   let data,count;try{({data,count}=await q(r));}catch(e){if(eu===window.__goSeq){$('#aviso').innerHTML='';$('#lista').innerHTML='<div class="vazio">A pesquisa demorou demais. Estreite com um assunto, UF ou período de publicação.</div>';$('#pg').innerHTML='';}return;}
@@ -721,7 +724,7 @@ async function renderTriagem(){
  main.innerHTML=h;
  const selO=$('#tg-o');if(selO)selO.onchange=()=>{window.__TG.ord=selO.value;window.__TG.pag=0;renderTriagem();};
  await carregarFav();
- const cols='id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp';
+ const cols='id,objeto,orgao_nome,uf,municipio,modalidade,srp,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp';
  let rows=[];
  if(T.aba==='exemplos'){const ids=[...pos,...neg];if(ids.length){let qy=sb.from('oportunidades').select(cols).in('id',ids);if(T.busca)qy=qy.ilike('objeto','%'+T.busca+'%');const r=(await q(qy)).data||[];const tr=(await q(sb.from('triagem').select('oportunidade_id,nota,motivo').eq('perfil_id',p.id).in('oportunidade_id',ids))).data||[];const tm=Object.fromEntries(tr.map(t=>[t.oportunidade_id,t]));rows=r.map(o=>({nota:tm[o.id]?.nota,motivo:tm[o.id]?.motivo||'Encerrado ou fora da triagem',o}));}}
  else{const fx={alta:'alta',revisao:'revisao',quase:'baixa',regra:'regra'}[T.aba];const ord=T.ord||'nota';
@@ -855,9 +858,10 @@ function ordenar(rows,modo,get){const o=get||(x=>x);
  return f?[...rows].sort(f):rows;}
 const selOrd=(id,sel)=>`<select id="${id}">${Object.entries(ORD).map(([k,v])=>`<option value="${k}" ${k===sel?'selected':''}>Ordenar: ${esc(v)}</option>`).join('')}</select>`;
 const favBtn=id=>`<button class="gh fav${(window.__FAV||new Set()).has(id)?' on':''}" title="Favoritar" onclick="favoritar(this,${id})">${ic('star')}</button>`;
-const cardOp=(o,ex={})=>`<div class="card oc"><div><div class="h" title="${esc(o.objeto||'')}">${esc(o.objeto||'')}</div><div class="meta">${esc(o.orgao_nome||'')} · ${esc(o.municipio?o.municipio+'/':'')}${esc(o.uf||'')}${o.modalidade?' · '+esc(o.modalidade):''}</div>
+const cardOp=(o,ex={})=>`<div class="card oc"><div><div class="h" title="${esc(o.objeto||'')}">${esc(o.objeto||'')}</div><div class="meta">${esc(o.orgao_nome||'')} · ${esc(o.municipio?o.municipio+'/':'')}${esc(o.uf||'')}</div>
+ <div class="tags" style="margin-top:4px">${o.modalidade?`<span class="tag" style="background:#e0e7ff;color:#3730a3;font-weight:600">${esc(o.modalidade)}</span>`:''}${o.srp===true?'<span class="tag ok" style="font-weight:600">Registro de preços</span>':o.srp===false?'<span class="tag">Não é registro de preços</span>':''}</div>
  ${o.ia_resumo?`<div class="ia">${AI()}${esc(o.ia_resumo)}</div>`:''}
- <div class="tags">${ex.perfil?`<span class="tag">${esc(ex.perfil)}</span>`:''}${o.ia_categoria?`<span class="tag">${AI()}${esc(o.ia_categoria)}</span>`:''}<span class="tag">${o.valor_sigiloso?'valor sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m">encerra ${dt(o.data_fim_proposta)}</span>${o.ia_atencao?`<span class="tag w">${AI()}${esc(o.ia_atencao)}</span>`:''}</div>
+ <div class="tags">${ex.perfil?`<span class="tag">${esc(ex.perfil)}</span>`:''}${o.ia_categoria?`<span class="tag">${AI()}${esc(o.ia_categoria)}</span>`:''}<span class="tag ${o.valor_sigiloso?'w':''}">${o.valor_sigiloso?'preço referencial sigiloso':brl(o.valor_estimado)}</span>${prazo(o.data_fim_proposta)}<span class="m">encerra ${dt(o.data_fim_proposta)}</span>${o.ia_atencao?`<span class="tag w">${AI()}${esc(o.ia_atencao)}</span>`:''}</div>
  ${ex.just?`<div class="just">${AI('Nota e justificativa geradas por IA (Gemini)')}${esc(ex.just)}</div>`:''}</div>${scoreRing(ex.score,ex.det)}
  <div class="det" hidden></div>
  <div class="acts">${ex.status||''}<span class="sp"></span>${favBtn(o.id)}${precoBtn(o,o.objeto)}<button class="gh" onclick="detalhes(this,${o.id})">${ic('det')}Detalhes</button>${o.link_pncp?`<a class="gh" href="${esc(o.link_pncp)}" target="_blank" rel="noopener">${ic('ext')}PNCP</a>`:''}<button class="sm pri" onclick="irProc(${o.id})">Iniciar processo${ic('play')}</button></div></div>`;
