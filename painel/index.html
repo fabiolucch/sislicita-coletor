@@ -931,7 +931,12 @@ async function detalhes(btn,id){const card=btn.closest('.oc,.tg-i'),d=card.query
   sb.from('oportunidades').select('objeto,ia_termo,uf,orgao_nome,valor_estimado,valor_sigiloso,data_fim_proposta').eq('id',id).maybeSingle()]);
  d.__ctx={id,its:it.data||[],emps:em.data||[],op:opr.data};
  pintarDet(d,an.data);
- if(!an.data)analisarAgora(d);                         // ainda sem análise: roda a IA na hora
+ const encerrado=opr.data?.data_fim_proposta&&new Date(opr.data.data_fim_proposta)<new Date();
+ if(!an.data&&encerrado){                              // encerrado e sem análise: só lê com a IA se o usuário pedir
+  const b=d.querySelector('.danl');
+  if(b)b.innerHTML='<div class="m" style="margin-bottom:6px">Edital encerrado: a IA só lê o PDF se você pedir (nada é guardado além do resumo da análise).</div><button class="sec sm" onclick="analisarAgora(this.closest(\'.det\'))">'+AI()+'Ler o edital com IA</button>';
+  blocosMercado(d);}
+ else if(!an.data)analisarAgora(d);                    // aberto sem análise: roda a IA na hora
  else blocosMercado(d);}
 
 // Documentos do edital no PNCP, com link direto para baixar (o painel nao guarda os arquivos).
