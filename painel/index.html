@@ -513,7 +513,7 @@ async oportunidades(){
   const estreita=!!t||!!window.__ORG||(d1&&d2&&(new Date(d2)-new Date(d1))<=45*864e5);
   if(ord==='val'&&sit!=='a'&&!t&&!window.__ORG){ord='enc';av.push('Ordenar por maior valor só está disponível para editais abertos ou com um assunto/órgão definido; ordenei por encerramento.');}
   let r=sb.from('oportunidades').select('id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,data_publicacao,link_pncp,situacao,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome',{count:estreita?'exact':'estimated'}).range(pg*N,pg*N+N-1);
-  r=ord==='pub'?r.order('data_publicacao',{ascending:false}):ord==='val'?r.order('valor_estimado',{ascending:false,nullsFirst:false}):r.order('data_fim_proposta',{ascending:sit==='a'});
+  r=ord==='pub'?r.order('data_publicacao',{ascending:false,nullsFirst:false}):ord==='val'?r.order('valor_estimado',{ascending:false,nullsFirst:false}):r.order('data_fim_proposta',{ascending:sit==='a',nullsFirst:false});
   if(t)r=r.textSearch('objeto_tsv',t,{type:'websearch',config:'portuguese'});
   if($('#fu').value)r=r.eq('uf',$('#fu').value);
   if($('#fm').value!=='')r=r.ilike('modalidade',MODS[+$('#fm').value][1]);
@@ -527,6 +527,12 @@ async oportunidades(){
   if(eu!==window.__goSeq)return;
   $('#aviso').innerHTML=av.map(a=>`<div class="just" style="margin:0 0 10px">${esc(a)}</div>`).join('');
   $('#lista').innerHTML=data.length?data.map(o=>cardOp(o)).join(''):'<div class="vazio">Nenhum edital encontrado com esses filtros.</div>';
+  if(sit==='a'&&(t||$('#fu').value||$('#fm').value!=='')){
+   let h2=sb.from('oportunidades').select('id',{count:'exact',head:true}).lt('data_fim_proposta',agora);
+   if(t)h2=h2.textSearch('objeto_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)h2=h2.eq('uf',$('#fu').value);if($('#fm').value!=='')h2=h2.ilike('modalidade',MODS[+$('#fm').value][1]);if(window.__ORG)h2=h2.eq('orgao_cnpj',window.__ORG);
+   if(d1)h2=h2.gte('data_publicacao',d1);if(d2)h2=h2.lte('data_publicacao',d2);if($('#vmin').value)h2=h2.gte('valor_estimado',$('#vmin').value);if($('#vmax').value)h2=h2.lte('valor_estimado',$('#vmax').value);
+   try{const {count:ce}=await q(h2);if(eu===window.__goSeq&&ce)$('#aviso').insertAdjacentHTML('beforeend',`<div class="just" style="margin:0 0 10px">Esta pesquisa está só nos editais <b>abertos</b>. Há também <b>${nBR(ce)}</b> encerrado(s) com os mesmos filtros. <a class="l" onclick="$('#fs').value='t';pg=0;go()">Ver abertos e encerrados</a></div>`);}catch(e){}
+  }
   const aprox=estreita?'':'≈ ';
   $('#pg').innerHTML=`<button class="sec" ${pg?'':'disabled'} onclick="pg--;go()">‹</button><span class="m">${aprox}${nBR(count??0)} resultados · pág. ${pg+1}</span><button class="sec" ${(pg+1)*N>=(count||0)?'disabled':''} onclick="pg++;go()">›</button>`;};
  $('#fq').onkeydown=e=>{if(e.key==='Enter'){pg=0;go();}};
