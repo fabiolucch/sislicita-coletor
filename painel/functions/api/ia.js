@@ -421,9 +421,15 @@ ${corpo}`;
       const perg = String(b.pergunta || "").slice(0, 500).trim();
       if (!perg) return J({ erro: "escreva a pergunta" }, 400);
       const [tx] = await get(`edital_textos?oportunidade_id=eq.${id}&select=texto,arquivo`);
-      if (!tx?.texto) return J({ erro: "o texto deste edital ainda não foi baixado (roda na etapa docs da coleta)" }, 404);
-      const prompt = `Responda à pergunta de um consultor de licitações usando SOMENTE o texto do edital abaixo. Seja direto (até 6 frases), cite o item/cláusula quando houver e diga claramente se o edital não trata do assunto. Não dê parecer jurídico definitivo.\nResponda SOMENTE JSON: {"resposta":"","trechos":["citações curtas (até 200 caracteres) do edital que sustentam a resposta"],"encontrado":true}\nPERGUNTA: ${perg}\n\nEDITAL (${tx.arquivo || ""}):\n${tx.texto.slice(0, 120000)}`;
-      return J({ ok: true, ...(await gemini(env, prompt, true)) });
+      const cab = `Responda à pergunta de um consultor de licitações usando SOMENTE o edital. Seja direto (até 6 frases), cite o item/cláusula quando houver e diga claramente se o edital não trata do assunto. Não dê parecer jurídico definitivo.\nResponda SOMENTE JSON: {"resposta":"","trechos":["citações curtas (até 200 caracteres) do edital que sustentam a resposta"],"encontrado":true}\nPERGUNTA: ${perg}\n\n`;
+      if (tx?.texto) return J({ ok: true, ...(await gemini(env, cab + `EDITAL (${tx.arquivo || ""}):\n${tx.texto.slice(0, 120000)}`, true)) });
+      // sem texto salvo (ex.: edital encerrado): le o PDF direto no PNCP, so para responder
+      let pdfs;
+      try { pdfs = await pdfsDoEdital(op.numero_controle_pncp, env); }
+      catch (e) { return J({ erro: e.message === "PNCP_FORA" ? "PNCP_FORA" : String(e.message || e) }, e.message === "PNCP_FORA" ? 503 : 502); }
+      if (!pdfs.length) return J({ erro: `Não consegui ler o PDF do edital: ${pdfs.motivo || "sem arquivo"}.` }, 422);
+      const res = await geminiPartes(env, [{ text: cab + "O EDITAL VAI ANEXADO EM PDF." }, ...pdfs]);
+      return J({ ok: true, ...(Array.isArray(res) ? res[0] || {} : res || {}) });
     }
     if (b.acao === "proposta") {
       const [emp] = b.empresa_id ? await get(`empresas?id=eq.${parseInt(b.empresa_id, 10)}&select=*`) : [];
