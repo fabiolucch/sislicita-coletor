@@ -291,7 +291,7 @@ async function escolherSel(el,val){
 }
 const P={market:'<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',building:'<path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/>',brief:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M3 13h18"/>',home:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',radar:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12l6-6"/>',list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',cal:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',tag:'<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1"/>',funnel:'<path d="M3 4h18l-7 8v7l-4 2v-9z"/>',coin:'<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.2 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2m0 8v2"/>',sliders:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',db:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/>'};
 const svg=k=>`<svg viewBox="0 0 24 24">${P[k]}</svg>`;
-const GRUPOS=[['Visão geral',[['home','Início','home'],['radar','Radar','radar'],['triagem','Triagem','funnel'],['perfis','Perfis de busca','sliders']]],['Oportunidades',[['oportunidades','Editais abertos','list'],['pca','PCA (previsão)','cal'],['precos','Preços','tag'],['mercado','Mercado e fornecedores','market']]],['Negócios',[['processos','Meus processos','brief'],['empresas','Empresas','building'],['funil','Funil','funnel'],['comissoes','Comissões','coin']]],['Sistema',[['servicos','Serviços','sliders'],['coletas','Coletas','db'],['usuarios','Usuários e alertas','users']]]];
+const GRUPOS=[['Visão geral',[['home','Início','home'],['radar','Radar','radar'],['triagem','Triagem','funnel'],['perfis','Perfis de busca','sliders']]],['Oportunidades',[['oportunidades','Pesquisa de editais','list'],['pca','PCA (previsão)','cal'],['precos','Preços','tag'],['mercado','Mercado e fornecedores','market']]],['Negócios',[['processos','Meus processos','brief'],['empresas','Empresas','building'],['funil','Funil','funnel'],['comissoes','Comissões','coin']]],['Sistema',[['servicos','Serviços','sliders'],['coletas','Coletas','db'],['usuarios','Usuários e alertas','users']]]];
 const TELAS=Object.fromEntries(GRUPOS.flatMap(g=>g[1]).map(x=>[x[0],x[1]]));
 let tela='home';
 
@@ -491,17 +491,50 @@ async radar(){
  await carregar();},
 
 async oportunidades(){
- main.innerHTML=`<div class="top"><div><h2>Editais abertos</h2><p class="sub">Contratações do PNCP. Com “só abertos” marcado, aparecem as que ainda recebem proposta; desmarcado, inclui o histórico já encerrado (mais recentes primeiro).</p></div></div><div id="orgchip"></div><div class="bar"><input id="fq" type="search" placeholder="Buscar no objeto (ex.: carne bovina)…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select>
- <input id="vmin" type="number" placeholder="Valor mín."><input id="vmax" type="number" placeholder="Valor máx."><label style="margin:0;align-self:center"><input id="ab" type="checkbox" checked style="width:auto"> só abertos</label><button onclick="pg=0;go()">Buscar</button></div><div id="lista"></div><div class="pg" id="pg"></div>`;
- window.pg=0;window.go=async()=>{const N=30;let r=sb.from('oportunidades').select('id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,situacao,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome',{count:'exact'}).order('data_fim_proposta',{ascending:$('#ab').checked}).range(pg*N,pg*N+N-1);
-  const t=$('#fq').value.trim();if(t)r=r.textSearch('objeto_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)r=r.eq('uf',$('#fu').value);if(window.__ORG)r=r.eq('orgao_cnpj',window.__ORG);
-  if($('#vmin').value)r=r.gte('valor_estimado',$('#vmin').value);if($('#vmax').value)r=r.lte('valor_estimado',$('#vmax').value);if($('#ab').checked)r=r.gte('data_fim_proposta',new Date().toISOString());
-  const {data,count}=await q(r);$('#lista').innerHTML=data.length?data.map(o=>cardOp(o)).join(''):'<div class="vazio">Sem resultados.</div>';
-  $('#pg').innerHTML=`<button class="sec" ${pg?'':'disabled'} onclick="pg--;go()">‹</button><span class="m">${count??0} resultados · pág. ${pg+1}</span><button class="sec" ${(pg+1)*N>=(count||0)?'disabled':''} onclick="pg++;go()">›</button>`;};
+ const A=window.ARG||{};window.ARG=null;
+ const MODS=[['Pregão eletrônico','%Preg%Eletr%'],['Pregão presencial','%Preg%Presen%'],['Concorrência eletrônica','%Concorr%Eletr%'],['Concorrência presencial','%Concorr%Presen%'],['Dispensa','%Dispensa%'],['Credenciamento','%Credenc%']];
+ main.innerHTML=`<div class="top"><div><h2>Pesquisa de editais</h2><p class="sub">Pesquise os editais abertos e os já encerrados que estão no seu banco de dados, por assunto, Estado, modalidade, valor e período de publicação.</p></div></div><div id="cob" class="m" style="margin:-4px 0 12px"></div><div id="orgchip"></div>
+ <div class="bar"><input id="fq" class="grow" type="search" placeholder="Buscar no objeto (ex.: carne bovina)…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select>
+ <select id="fm"><option value="">Modalidade</option>${MODS.map((m,i)=>`<option value="${i}">${m[0]}</option>`).join('')}</select>
+ <select id="fs"><option value="a">Abertos agora</option><option value="e">Encerrados</option><option value="t">Abertos e encerrados</option></select>
+ <label class="m" style="display:flex;gap:6px;align-items:center;margin:0">Publicados de <input id="d1" type="date"></label><label class="m" style="display:flex;gap:6px;align-items:center;margin:0">até <input id="d2" type="date"></label>
+ <input id="vmin" type="number" placeholder="Valor mín."><input id="vmax" type="number" placeholder="Valor máx.">
+ <select id="fo2"><option value="enc">Ordenar: encerramento</option><option value="pub">Ordenar: publicação (recentes)</option><option value="val">Ordenar: maior valor</option></select><button onclick="pg=0;go()">Buscar</button></div><div id="aviso"></div><div id="lista"></div><div class="pg" id="pg"></div>`;
+ const iso8=v=>v&&String(v).length===8?`${v.slice(6,8)}/${v.slice(4,6)}/${v.slice(0,4)}`:null;
+ let HM=null;
+ (async()=>{try{const e=(await q(sb.from('coleta_estado').select('chave,valor').eq('chave','historico_min'))).data||[];HM=e[0]?.valor||null;
+  const mn=(await q(sb.from('oportunidades').select('data_publicacao').not('data_publicacao','is',null).order('data_publicacao',{ascending:true}).limit(1))).data||[];
+  $('#cob').innerHTML=HM?`<b>Cobertura da base:</b> editais publicados desde <b>${iso8(HM)}</b> até hoje estão completos. Antes dessa data só existem os editais que ainda estavam abertos quando a coleta começou${mn[0]?` (o mais antigo foi publicado em ${dt(mn[0].data_publicacao)})`:''}.`:`<b>Cobertura da base:</b> o histórico de editais encerrados ainda não começou a ser coletado; hoje a base tem os editais abertos${mn[0]?`, o mais antigo publicado em ${dt(mn[0].data_publicacao)}`:''}.`;}catch(e){}})();
+ window.pg=0;
+ window.go=async()=>{
+  const N=30,eu=window.__goSeq=(window.__goSeq||0)+1;
+  const t=$('#fq').value.trim(),sit=$('#fs').value,d1=$('#d1').value,d2=$('#d2').value,agora=new Date().toISOString();
+  let ord=$('#fo2').value,av=[];
+  const estreita=!!t||!!window.__ORG||(d1&&d2&&(new Date(d2)-new Date(d1))<=45*864e5)||sit==='a';
+  if(ord==='val'&&sit!=='a'&&!t&&!window.__ORG){ord='enc';av.push('Ordenar por maior valor só está disponível para editais abertos ou com um assunto/órgão definido; ordenei por encerramento.');}
+  let r=sb.from('oportunidades').select('id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,data_publicacao,link_pncp,situacao,ia_categoria,ia_resumo,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome',{count:estreita?'exact':'estimated'}).range(pg*N,pg*N+N-1);
+  r=ord==='pub'?r.order('data_publicacao',{ascending:false}):ord==='val'?r.order('valor_estimado',{ascending:false,nullsFirst:false}):r.order('data_fim_proposta',{ascending:sit==='a'});
+  if(t)r=r.textSearch('objeto_tsv',t,{type:'websearch',config:'portuguese'});
+  if($('#fu').value)r=r.eq('uf',$('#fu').value);
+  if($('#fm').value!=='')r=r.ilike('modalidade',MODS[+$('#fm').value][1]);
+  if(window.__ORG)r=r.eq('orgao_cnpj',window.__ORG);
+  if(sit==='a')r=r.gte('data_fim_proposta',agora);if(sit==='e')r=r.lt('data_fim_proposta',agora);
+  if(d1)r=r.gte('data_publicacao',d1);if(d2)r=r.lte('data_publicacao',d2);
+  if($('#vmin').value)r=r.gte('valor_estimado',$('#vmin').value);if($('#vmax').value)r=r.lte('valor_estimado',$('#vmax').value);
+  if(d1&&HM){const lim=`${HM.slice(0,4)}-${HM.slice(4,6)}-${HM.slice(6,8)}`;if(d1<lim)av.push(`Sua data inicial (${dt(d1)}) é anterior à cobertura completa da base (${iso8(HM)}). Antes dessa data, só aparecem editais que ainda estavam abertos quando a coleta começou.`);}
+  $('#lista').innerHTML='<div class="vazio">Pesquisando…</div>';
+  let data,count;try{({data,count}=await q(r));}catch(e){if(eu===window.__goSeq){$('#aviso').innerHTML='';$('#lista').innerHTML='<div class="vazio">A pesquisa demorou demais. Estreite com um assunto, UF ou período de publicação.</div>';$('#pg').innerHTML='';}return;}
+  if(eu!==window.__goSeq)return;
+  $('#aviso').innerHTML=av.map(a=>`<div class="just" style="margin:0 0 10px">${esc(a)}</div>`).join('');
+  $('#lista').innerHTML=data.length?data.map(o=>cardOp(o)).join(''):'<div class="vazio">Nenhum edital encontrado com esses filtros.</div>';
+  const aprox=estreita?'':'≈ ';
+  $('#pg').innerHTML=`<button class="sec" ${pg?'':'disabled'} onclick="pg--;go()">‹</button><span class="m">${aprox}${nBR(count??0)} resultados · pág. ${pg+1}</span><button class="sec" ${(pg+1)*N>=(count||0)?'disabled':''} onclick="pg++;go()">›</button>`;};
  $('#fq').onkeydown=e=>{if(e.key==='Enter'){pg=0;go();}};
- window.__ORG=null;const chip=nome=>{$('#orgchip').innerHTML=window.__ORG?`<div class="m" style="margin:0 0 10px">Mostrando só o órgão <b>${esc(nome)}</b>, com o histórico de editais já encerrados. <a class="l" onclick="window.__ORG=null;$('#orgchip').innerHTML='';pg=0;go()">ver todos os órgãos</a></div>`:'';};
- if(window.ARG&&window.ARG.cnpj){window.__ORG=window.ARG.cnpj;$('#ab').checked=false;chip(window.ARG.nome||window.ARG.cnpj);}
- if(window.ARG&&window.ARG.uf){$('#fu').value=window.ARG.uf;}window.ARG=null;await go();},
+ ['fu','fm','fs','fo2','d1','d2'].forEach(i=>$('#'+i).onchange=()=>{pg=0;go();});
+ window.__ORG=null;const chip=nome=>{$('#orgchip').innerHTML=window.__ORG?`<div class="m" style="margin:0 0 10px">Mostrando só o órgão <b>${esc(nome)}</b>. <a class="l" onclick="window.__ORG=null;$('#orgchip').innerHTML='';pg=0;go()">ver todos os órgãos</a></div>`:'';};
+ if(A.cnpj){window.__ORG=A.cnpj;$('#fs').value='t';chip(A.nome||A.cnpj);}
+ if(A.uf)$('#fu').value=A.uf;
+ await go();},
 
 async pca(){
  const A0=window.ARG||{};window.ARG=null;
