@@ -2,23 +2,6 @@
 -- Tudo que pertence ao cliente (perfis, radar, empresas, processos, comissões, favoritos, alertas, briefings, triagem)
 -- passa a ser visível/alterável só por quem tem vínculo ativo com a organização dona (e, para leitura, pela plataforma).
 
--- A. funções auxiliares
-create or replace function public.meus_perfis() returns setof uuid language sql stable security definer set search_path = public as $$
-  select id from perfis_busca where public.pode_ler_org(organizacao_id);
-$$;
-create or replace function public.perfis_editaveis() returns setof uuid language sql stable security definer set search_path = public as $$
-  select id from perfis_busca where public.pode_editar_org(organizacao_id);
-$$;
--- chamada de serviço (coletor/SQL editor) ou administrador da plataforma
-create or replace function public._servico_ou_admin() returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce(auth.role(), '') = 'service_role' or session_user in ('postgres', 'supabase_admin') or public.eh_admin_plataforma();
-$$;
-create or replace function public._perfil_ok(p uuid) returns boolean language sql stable security definer set search_path = public as $$
-  select coalesce(coalesce(auth.role(), '') = 'service_role' or session_user in ('postgres', 'supabase_admin')
-    or public.pode_editar_org((select organizacao_id from perfis_busca where id = p)), false);
-$$;
-grant execute on function public.meus_perfis(), public.perfis_editaveis(), public._servico_ou_admin(), public._perfil_ok(uuid) to authenticated, service_role;
-
 -- B. coluna organizacao_id (default = organização ativa de quem grava) + migração dos dados atuais
 do $b$
 declare t text; o uuid := (select id from organizacoes where tipo = 'plataforma' order by criado_em limit 1);
@@ -43,6 +26,23 @@ begin
     alter table public.favoritos add primary key (organizacao_id, oportunidade_id);
   end if;
 end $f$;
+
+-- A. funções auxiliares
+create or replace function public.meus_perfis() returns setof uuid language sql stable security definer set search_path = public as $$
+  select id from perfis_busca where public.pode_ler_org(organizacao_id);
+$$;
+create or replace function public.perfis_editaveis() returns setof uuid language sql stable security definer set search_path = public as $$
+  select id from perfis_busca where public.pode_editar_org(organizacao_id);
+$$;
+-- chamada de serviço (coletor/SQL editor) ou administrador da plataforma
+create or replace function public._servico_ou_admin() returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(auth.role(), '') = 'service_role' or session_user in ('postgres', 'supabase_admin') or public.eh_admin_plataforma();
+$$;
+create or replace function public._perfil_ok(p uuid) returns boolean language sql stable security definer set search_path = public as $$
+  select coalesce(coalesce(auth.role(), '') = 'service_role' or session_user in ('postgres', 'supabase_admin')
+    or public.pode_editar_org((select organizacao_id from perfis_busca where id = p)), false);
+$$;
+grant execute on function public.meus_perfis(), public.perfis_editaveis(), public._servico_ou_admin(), public._perfil_ok(uuid) to authenticated, service_role;
 
 -- C. políticas RLS (as antigas "todos os autenticados" são removidas)
 do $p$
