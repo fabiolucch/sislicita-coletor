@@ -90,32 +90,71 @@ function diasUteisEntre(aIso, bIso) {
   return n;
 }
 
+// Extrai os PDFs de dentro de um .zip (muitos editais do PNCP vem zipados). Leitor minimo: diretorio central + deflate-raw.
+async function pdfsDoZip(buf) {
+  const v = new DataView(buf), u = new Uint8Array(buf);
+  let e = -1;
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65600); i--) if (v.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) return [];
+  const n = v.getUint16(e + 10, true); let p = v.getUint32(e + 16, true); const itens = [];
+  for (let k = 0; k < n && v.getUint32(p, true) === 0x02014b50; k++) {
+    const met = v.getUint16(p + 10, true), cs = v.getUint32(p + 20, true), us = v.getUint32(p + 24, true);
+    const nl = v.getUint16(p + 28, true), el = v.getUint16(p + 30, true), cl = v.getUint16(p + 32, true), off = v.getUint32(p + 42, true);
+    const nome = new TextDecoder().decode(u.subarray(p + 46, p + 46 + nl));
+    if (/\.pdf$/i.test(nome)) itens.push({ nome, met, cs, us, off });
+    p += 46 + nl + el + cl;
+  }
+  const pontos = nm => { const t = nm.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); return /edital/.test(t) ? 0 : /termo.*referencia|\btr\b|projeto basico/.test(t) ? 1 : /minuta|contrato/.test(t) ? 3 : 2; };
+  itens.sort((a, b) => pontos(a.nome) - pontos(b.nome) || a.us - b.us);
+  const saida = [];
+  for (const it of itens) {
+    if (saida.length >= 2 || !it.us || it.us > PNCP_MAX) continue;
+    const nl = v.getUint16(it.off + 26, true), el = v.getUint16(it.off + 28, true), ini = it.off + 30 + nl + el;
+    const dados = u.subarray(ini, ini + it.cs);
+    let pdf;
+    if (it.met === 0) pdf = dados.slice().buffer;
+    else if (it.met === 8) pdf = await new Response(new Blob([dados]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer();
+    else continue;
+    if (new TextDecoder().decode(new Uint8Array(pdf, 0, 4)) === "%PDF") saida.push(pdf);
+  }
+  return saida;
+}
+
+// Baixa o edital no PNCP (PDF direto ou PDF dentro de .zip). O motivo de nao ter achado vai em partes.motivo.
 async function pdfsDoEdital(numero) {
   const m = /^(\d{14})-\d+-(\d+)\/(\d{4})$/.exec(numero || "");
-  if (!m) return [];
+  const vazio = motivo => Object.assign([], { motivo });
+  if (!m) return vazio("o edital não tem número de controle do PNCP");
   let r;
   try { r = await fetch(`https://pncp.gov.br/pncp-api/v1/orgaos/${m[1]}/compras/${m[3]}/${parseInt(m[2], 10)}/arquivos`, { headers: { accept: "application/json" }, signal: AbortSignal.timeout(8000) }); }
   catch { throw new Error("PNCP_FORA"); }
   if (r.status >= 500 || r.status === 429) throw new Error("PNCP_FORA");
-  if (!r.ok) return [];
+  if (!r.ok) return vazio(`o PNCP respondeu ${r.status} ao listar os documentos`);
   const tipo = a => (a.tipoDocumentoNome || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   const arqs = (await r.json() || []).filter(a => a.statusAtivo !== false && ["edital", "termo de referencia", "projeto basico"].includes(tipo(a)))
     .sort((a, b) => (tipo(a) === "edital" ? 0 : 1) - (tipo(b) === "edital" ? 0 : 1));
-  const partes = []; let total = 0;
+  if (!arqs.length) return vazio("o PNCP não lista documento do tipo edital para esta compra");
+  const partes = []; let total = 0, motivo = "";
   for (const a of arqs.slice(0, 2)) {
     const url = a.url || a.uri; if (!url) continue;
     let d;
-    try { d = await fetch(url, { signal: AbortSignal.timeout(20000) }); } catch { throw new Error("PNCP_FORA"); }
+    try { d = await fetch(url, { signal: AbortSignal.timeout(25000) }); } catch { throw new Error("PNCP_FORA"); }
     if (d.status >= 500 || d.status === 429) throw new Error("PNCP_FORA");
-    if (!d.ok) continue;
+    if (!d.ok) { motivo = `o PNCP respondeu ${d.status} ao baixar o arquivo`; continue; }
     const buf = await d.arrayBuffer();
-    if (!buf.byteLength || total + buf.byteLength > PNCP_MAX) continue;
-    const bytes = new Uint8Array(buf.slice(0, 5));
-    if (String.fromCharCode(...bytes).slice(0, 4) !== "%PDF") continue;   // so PDF: o Gemini nao le .docx/.zip aqui
-    total += buf.byteLength;
-    partes.push({ inlineData: { mimeType: "application/pdf", data: b64(buf) } });
+    const cab = new TextDecoder().decode(new Uint8Array(buf.slice(0, 4)));
+    let pdfs = [];
+    if (cab === "%PDF") pdfs = buf.byteLength <= PNCP_MAX ? [buf] : [];
+    else if (cab.startsWith("PK")) pdfs = await pdfsDoZip(buf).catch(() => []);
+    else { motivo = "o arquivo do edital não é PDF nem ZIP com PDF (ex.: Word)"; continue; }
+    if (!pdfs.length) { motivo = motivo || "o arquivo do edital é grande demais ou não contém PDF legível"; continue; }
+    for (const pdf of pdfs) {
+      if (total + pdf.byteLength > PNCP_MAX * 1.5) continue;
+      total += pdf.byteLength;
+      partes.push({ inlineData: { mimeType: "application/pdf", data: b64(pdf) } });
+    }
   }
-  return partes;
+  return partes.length ? partes : vazio(motivo || "não consegui extrair o PDF do edital");
 }
 
 // Recorte inteligente: manda ao Gemini só os trechos do edital que decidem a participação.
@@ -209,7 +248,8 @@ export async function onRequestPost({ request, env }) {
       const [tx] = await get(`edital_textos?oportunidade_id=eq.${id}&select=texto,arquivo`);
       // sem texto salvo: baixa o PDF no PNCP e manda ao Gemini, que le PDF direto
       let pncpFora = false;
-      const pdfs = tx?.texto ? [] : await pdfsDoEdital(op.numero_controle_pncp).catch(e => { if (e.message === "PNCP_FORA") pncpFora = true; return []; });
+      const pdfs = tx?.texto ? [] : await pdfsDoEdital(op.numero_controle_pncp).catch(e => { if (e.message === "PNCP_FORA") pncpFora = true; return Object.assign([], { motivo: "" }); });
+      const motivo = pdfs.motivo || "";
       // leitura pedida pelo botao: com o PNCP fora do ar nao devolve analise "so pelo objeto", avisa
       if (pncpFora && b.exigir_edital) return J({ erro: "PNCP_FORA" }, 503);
       const fonte = tx?.texto || pdfs.length ? "edital" : "objeto";
@@ -244,7 +284,7 @@ ${corpo}`;
         headers: { ...H, "content-type": "application/json", prefer: "resolution=merge-duplicates,return=minimal" },
         body: JSON.stringify([{ oportunidade_id: id, dados: d, risco, resumo: (d.resumo || "").slice(0, 700), fonte }]),
       });
-      return J({ ok: true, dados: d, risco, resumo: d.resumo || "", fonte, pncp_fora: pncpFora });
+      return J({ ok: true, dados: d, risco, resumo: d.resumo || "", fonte, pncp_fora: pncpFora, motivo: fonte === "objeto" ? motivo : "" });
     }
     if (b.acao === "arquivos" || b.acao === "baixar") {
       // Lista os documentos do edital no PNCP; "baixar" entrega o arquivo pelo proprio dominio do painel.
