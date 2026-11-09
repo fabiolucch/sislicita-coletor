@@ -264,3 +264,5 @@ create policy verif_arq_ler on storage.objects for select to authenticated
 -- uma pessoa jurídica/física verificada é única na plataforma (impede duas organizações donas do mesmo CNPJ/CPF)
 create unique index if not exists pj_cnpj_verificado on public.pessoas_juridicas (cnpj) where verificada_em is not null;
 create unique index if not exists pf_cpf_verificado on public.pessoas_fisicas (cpf) where verificada_em is not null;
+
+grant execute on function public.eh_admin_plataforma(), public.org_atual() to authenticated;

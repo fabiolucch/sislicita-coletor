@@ -216,18 +216,18 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .tg-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 4px}
 .tg-i{display:flex;gap:12px;align-items:flex-start;padding:12px 14px}.tg-n{flex:0 0 46px;height:46px;border-radius:12px;background:var(--pri2);color:var(--mut);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:17px}.tg-n.ok{background:#dcfce7;color:#15803d}.tg-n.w{background:#fef3c7;color:#b45309}.tg-c{min-width:0;flex:1}.tg-o{font-weight:600;font-size:14px;line-height:1.4;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:4px}.tg-a{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px}
 @media(max-width:700px){.tg-f{grid-template-columns:repeat(2,minmax(0,1fr))}.tg-f div:first-child{grid-column:span 2}}
+#login .lk{margin:14px 0 0;text-align:center;font-size:13px}#login .lk a{color:var(--pri);cursor:pointer;text-decoration:underline}#login select,#login input[type=text],#login input[type=tel]{width:100%}#login .ok{color:var(--ok,#047857);margin:10px 0 0}#login .ck{display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-size:13px}#login .ck input{width:auto;margin-top:3px}
 </style>
 </head>
 <body>
-<div id="login"><div class="box"><div class="logo"><i id="lg"></i><b>SISLICITA</b></div><p>Radar de licitações públicas</p>
-<label>E-mail</label><input id="em" type="email" autocomplete="username">
-<label>Senha</label><input id="pw" type="password" autocomplete="current-password">
-<p id="err" style="color:var(--bad);margin:10px 0 0"></p><button style="width:100%;margin-top:14px" onclick="entrar()">Entrar</button></div></div>
+<div id="login"><div class="box"><div class="logo"><i id="lg"></i><b>SISLICITA</b></div><p>Radar de licitações públicas</p><div id="lgc"></div></div></div>
 <div id="app"><aside><div class="logo"><i id="lg2"></i><b>SISLICITA</b></div><div id="nav"></div><div class="user" id="usr"></div><button class="sair" onclick="sair()">Sair</button></aside><div id="sbar" onclick="ir('servicos')" title="Ver serviços e métricas" hidden></div><main id="main"></main></div>
 <script>
 // Chave "anon" é pública por desenho; o acesso real é protegido pelo RLS + login.
 const SUPABASE_URL="https://tkbkkqebsxvmxnqiwjfl.supabase.co";
 const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrYmtrcWVic3h2bXhucWl3amZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5MDk1MjIsImV4cCI6MjEwOTQ4NTUyMn0.v--eJcYHEanBh9WG1xgOP-jPGwbR_fikk65AkvMPEaI";
+const RECUP=/type=recovery/.test(location.hash);
+try{const cv=new URLSearchParams(location.search).get("convite");if(cv){localStorage.setItem("sis_convite",cv);history.replaceState(null,"",location.pathname+location.hash);}}catch(e){}
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 const $=s=>document.querySelector(s), main=$('#main');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -291,11 +291,51 @@ async function escolherSel(el,val){
 }
 const P={market:'<path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 5-6"/>',users:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/>',building:'<path d="M3 21h18M5 21V7l7-4 7 4v14M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/>',brief:'<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2M3 13h18"/>',home:'<path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',radar:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 12l6-6"/>',list:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',cal:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',tag:'<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1"/>',funnel:'<path d="M3 4h18l-7 8v7l-4 2v-9z"/>',coin:'<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.2 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2m0 8v2"/>',sliders:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',db:'<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',out:'<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',doc:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8zM14 2v6h6M8 13h8M8 17h8"/>'};
 const svg=k=>`<svg viewBox="0 0 24 24">${P[k]}</svg>`;
-const GRUPOS=[['Visão geral',[['home','Início','home'],['radar','Radar','radar'],['triagem','Triagem','funnel'],['perfis','Perfis de busca','sliders']]],['Oportunidades',[['oportunidades','Pesquisa de editais','list'],['pca','PCA (previsão)','cal'],['precos','Preços','tag'],['mercado','Mercado e fornecedores','market']]],['Negócios',[['processos','Meus processos','brief'],['empresas','Empresas','building'],['funil','Funil','funnel'],['comissoes','Comissões','coin']]],['Sistema',[['servicos','Serviços','sliders'],['coletas','Coletas','db'],['usuarios','Usuários e alertas','users']]]];
+const GRUPOS=[['Visão geral',[['home','Início','home'],['radar','Radar','radar'],['triagem','Triagem','funnel'],['perfis','Perfis de busca','sliders']]],['Oportunidades',[['oportunidades','Pesquisa de editais','list'],['pca','PCA (previsão)','cal'],['precos','Preços','tag'],['mercado','Mercado e fornecedores','market']]],['Negócios',[['processos','Meus processos','brief'],['empresas','Empresas','building'],['funil','Funil','funnel'],['comissoes','Comissões','coin']]],['Conta',[['organizacao','Minha organização','building']]],['Sistema',[['servicos','Serviços','sliders'],['coletas','Coletas','db'],['usuarios','Usuários e alertas','users']]]];
 const TELAS=Object.fromEntries(GRUPOS.flatMap(g=>g[1]).map(x=>[x[0],x[1]]));
 let tela='home';
 
-async function entrar(){const {error}=await sb.auth.signInWithPassword({email:$('#em').value,password:$('#pw').value});if(error)$('#err').textContent='Falha no login: '+error.message;else iniciar();}
+const TERMOS_V='2026-11-v1';
+const traduzErro=m=>/Invalid login/i.test(m)?'E-mail ou senha incorretos.':/not confirmed/i.test(m)?'Confirme seu e-mail pelo link que enviamos antes de entrar.':/already registered|already been registered/i.test(m)?'Este e-mail já tem cadastro. Use "Esqueci a senha" se for o caso.':/rate limit|too many/i.test(m)?'Muitas tentativas. Aguarde alguns minutos.':/at least 6|weak|short/i.test(m)?'Senha fraca: use ao menos 8 caracteres.':m;
+function lgRender(m,msg,ok){
+ const c=$('#lgc'),f=(id,l,t,ac,extra='')=>`<label>${l}</label><input id="${id}" type="${t}" autocomplete="${ac}" ${extra}>`;
+ const er=`<p id="err" style="color:var(--bad);margin:10px 0 0">${msg&&!ok?esc(msg):''}</p>${ok&&msg?`<p class="ok">${esc(msg)}</p>`:''}`;
+ const cv=localStorage.getItem('sis_convite')?'<p class="ok">Você recebeu um convite. Entre ou crie a conta com o e-mail que foi convidado.</p>':'';
+ const bt=(t,fn)=>`<button style="width:100%;margin-top:14px" onclick="${fn}">${t}</button>`;
+ if(m==='entrar')c.innerHTML=cv+f('em','E-mail','email','username')+f('pw','Senha','password','current-password')+er+bt('Entrar','entrar()')+'<p class="lk"><a onclick="lgRender(\'novo\')">Criar conta</a> · <a onclick="lgRender(\'rec\')">Esqueci a senha</a></p>';
+ else if(m==='novo')c.innerHTML=cv+f('em','E-mail','email','username')+f('pw','Senha (mín. 8 caracteres)','password','new-password')+f('pw2','Repita a senha','password','new-password')+er+bt('Criar conta','criarLogin()')+'<p class="lk"><a onclick="lgRender(\'entrar\')">Já tenho conta</a></p>';
+ else if(m==='rec')c.innerHTML=f('em','E-mail da conta','email','username')+er+bt('Enviar link de recuperação','recuperar()')+'<p class="lk"><a onclick="lgRender(\'entrar\')">Voltar</a></p>';
+ else if(m==='nova')c.innerHTML='<p>Defina a nova senha.</p>'+f('pw','Nova senha (mín. 8 caracteres)','password','new-password')+f('pw2','Repita a senha','password','new-password')+er+bt('Salvar senha','novaSenha()');
+ else if(m==='cadastro')c.innerHTML='<p>Falta pouco: conclua o cadastro da conta.</p><label>Tipo de conta</label><select id="ct" onchange="lgTipo()"><option value="pj">Empresa (CNPJ)</option><option value="pf">Pessoa física (CPF)</option></select>'+f('cn','Nome da empresa / seu nome','text','organization')+'<div id="cr">'+f('crz','Razão social (se diferente)','text','off')+'</div>'+f('cd','CNPJ','text','off','inputmode="text"')+f('ctel','Telefone (opcional)','tel','tel')+'<label class="ck"><input id="cte" type="checkbox"><span>Li e aceito os termos de uso e a política de privacidade (LGPD).</span></label>'+er+bt('Concluir cadastro','concluirCadastro()')+'<p class="lk"><a onclick="sair()">Sair</a></p>';
+ $('#login').style.display='flex';$('#app').style.display='none';
+}
+function lgTipo(){const pj=$('#ct').value==='pj';$('#cr').style.display=pj?'':'none';$('#cd').previousElementSibling.textContent=pj?'CNPJ':'CPF';}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&$('#login').style.display==='flex'){const b=$('#lgc button');if(b&&e.target.tagName!=='SELECT')b.click();}});
+async function entrar(){const {error}=await sb.auth.signInWithPassword({email:$('#em').value.trim(),password:$('#pw').value});if(error)$('#err').textContent=traduzErro(error.message);else iniciar();}
+async function criarLogin(){const em=$('#em').value.trim(),pw=$('#pw').value;if(!em||pw.length<8)return $('#err').textContent='Informe o e-mail e uma senha com ao menos 8 caracteres.';if(pw!==$('#pw2').value)return $('#err').textContent='As senhas não conferem.';const {data,error}=await sb.auth.signUp({email:em,password:pw,options:{emailRedirectTo:location.origin+location.pathname}});if(error)return $('#err').textContent=traduzErro(error.message);if(data.session)return iniciar();lgRender('entrar','Enviamos um link de confirmação para '+em+'. Confirme o e-mail e depois entre.',true);}
+async function recuperar(){const em=$('#em').value.trim();if(!em)return $('#err').textContent='Informe o e-mail.';const {error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.origin+location.pathname});if(error)return $('#err').textContent=traduzErro(error.message);lgRender('entrar','Se o e-mail estiver cadastrado, enviamos o link para criar uma nova senha.',true);}
+async function novaSenha(){const pw=$('#pw').value;if(pw.length<8)return $('#err').textContent='Use ao menos 8 caracteres.';if(pw!==$('#pw2').value)return $('#err').textContent='As senhas não conferem.';const {error}=await sb.auth.updateUser({password:pw});if(error)return $('#err').textContent=traduzErro(error.message);history.replaceState(null,'',location.pathname);iniciar();}
+async function concluirCadastro(){if(!$('#cte').checked)return $('#err').textContent='É preciso aceitar os termos.';const pj=$('#ct').value==='pj';const {error}=await sb.rpc('cadastrar_conta',{p_tipo:$('#ct').value,p_nome:$('#cn').value,p_documento:$('#cd').value,p_razao:pj?$('#crz').value||null:null,p_telefone:$('#ctel').value||null,p_termos:TERMOS_V});if(error)return $('#err').textContent=error.message;iniciar();}
+
+async function rpcOk(fn,args,ok){const {error}=await sb.rpc(fn,args);if(error){toast(error.message);return false;}if(ok)toast(ok);ir('organizacao');return true;}
+async function convidar(o){const em=$('#cvem').value.trim();if(!em)return toast('Informe o e-mail.');const {data,error}=await sb.rpc('criar_convite',{p_org:o,p_email:em,p_papel:$('#cvpp').value});if(error)return toast(error.message);const url=location.origin+location.pathname+'?convite='+data;$('#cvlink').innerHTML=`<p class="sub" style="margin-top:10px">Envie este link para <b>${esc(em)}</b> (vale 7 dias e só funciona com esse e-mail):</p><input readonly value="${esc(url)}" onclick="this.select()" style="width:100%"><button class="sec" style="margin-top:6px" onclick="navigator.clipboard.writeText('${esc(url)}').then(()=>toast('Link copiado'))">Copiar link</button>`;}
+const revogarConvite=id=>rpcOk('revogar_convite',{p_id:id},'Convite revogado');
+const mudarPapel=(o,u,p)=>rpcOk('alterar_papel_membro',{p_org:o,p_user:u,p_papel:p},'Papel alterado');
+function tirarMembro(o,u){if(confirm('Remover esta pessoa da organização?'))rpcOk('remover_membro',{p_org:o,p_user:u},'Pessoa removida');}
+function pedirVerif(tipo,id){
+ const d=document.createElement('div');d.id='mverif';d.style.cssText='position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;z-index:99;padding:16px';
+ d.innerHTML=`<div class="card" style="max-width:460px;width:100%"><h3>Solicitar verificação</h3><label>Seu vínculo com este cadastro</label><select id="vvin"><option value="titular">Sou o titular</option><option value="socio_administrador">Sócio-administrador</option><option value="procurador">Procurador</option><option value="contador_assessor">Contador / assessor</option></select><label>Observação</label><textarea id="vobs" rows="3" style="width:100%"></textarea><label>Documento comprobatório (contrato social, procuração, documento com foto…)</label><input id="varq" type="file" accept=".pdf,.png,.jpg,.jpeg"><div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end"><button class="sec" onclick="this.closest('#mverif').remove()">Cancelar</button><button onclick="enviarVerif('${tipo}','${id}')">Enviar</button></div></div>`;
+ document.body.appendChild(d);
+}
+async function enviarVerif(tipo,id){
+ const f=$('#varq').files[0];if(!f)return toast('Anexe o documento comprobatório.');if(f.size>10*1024*1024)return toast('Arquivo acima de 10 MB.');
+ const {data:org}=await sb.rpc('org_atual');const path=`${org}/${Date.now()}-${f.name.replace(/[^\w.\-]/g,'_')}`;
+ const up=await sb.storage.from('verificacoes').upload(path,f,{contentType:f.type});if(up.error)return toast('Envio do arquivo: '+up.error.message);
+ const {error}=await sb.rpc('solicitar_verificacao',{p_tipo:tipo,p_pessoa:id,p_vinculo:$('#vvin').value,p_obs:$('#vobs').value,p_path:path});
+ if(error)return toast(error.message);$('#mverif').remove();toast('Solicitação enviada. A análise é feita pela plataforma.');ir('organizacao');
+}
+async function verDocVerif(path){const {data,error}=await sb.storage.from('verificacoes').createSignedUrl(path,120);if(error)return toast(error.message);window.open(data.signedUrl,'_blank','noopener');}
+function decidirVerif(id,ok){let m=null;if(!ok){m=prompt('Motivo da recusa (o cliente verá):');if(m===null)return;}rpcOk('decidir_verificacao',{p_id:id,p_aprovar:ok,p_motivo:m},ok?'Verificação aprovada':'Verificação recusada');}
 async function sair(){await sb.auth.signOut();location.reload();}
 const FASES={editais:'Editais abertos',pca:'Plano de contratações (PCA)',radar:'Radar',ia:'Classificação por IA',radar_ia:'IA no radar',itens:'Itens dos editais',vigia:'Vigia de editais',docs:'Leitura dos editais',radar_pca_ia:'IA no PCA',interesse:'Cálculo do interesse',briefing:'Resumo do dia',aprender:'Aprendizado',alertas:'Alertas',contratos:'Contratos',resultados:'Resultados de compras',fornecedores:'Fornecedores',catalogo:'Catálogo',historico:'Histórico de editais',cobertura:'Conferência de cobertura'};
 const HIST_DIAS=180;
@@ -332,7 +372,10 @@ async function barraStatus(){
   el.innerHTML=h;el.hidden=false;
  }catch(e){el.hidden=true;}
 }
-async function iniciar(){const {data}=await sb.auth.getSession();if(!data.session){$('#login').style.display='flex';return;}$('#login').style.display='none';$('#usr').textContent=data.session.user.email;$('#app').style.display='block';barraStatus();clearInterval(window.__sb);window.__sb=setInterval(()=>{if(!document.hidden)barraStatus();},60000);ir(location.hash.slice(1)||'home');}
+async function iniciar(){const {data}=await sb.auth.getSession();if(RECUP&&!window.__recOk){window.__recOk=true;return lgRender('nova');}if(!data.session){lgRender('entrar');return;}
+ const cv=localStorage.getItem('sis_convite');if(cv){const {error}=await sb.rpc('aceitar_convite',{p_token:cv});localStorage.removeItem('sis_convite');if(error)toast('Convite: '+error.message);else toast('Convite aceito. Bem-vindo à organização.');}
+ const {data:orgs}=await sb.rpc('minhas_orgs');const {data:adm}=await sb.rpc('eh_admin_plataforma');if(!(orgs&&orgs.length)&&!adm){lgRender('cadastro');lgTipo();return;}
+ $('#login').style.display='none';$('#usr').textContent=data.session.user.email;$('#app').style.display='block';barraStatus();clearInterval(window.__sb);window.__sb=setInterval(()=>{if(!document.hidden)barraStatus();},60000);ir(location.hash.slice(1)||'home');}
 function ir(t,arg){if(!TELAS[t])t='home';tela=t;window.ARG=arg;location.hash=t;scrollTo(0,0);$('#nav').innerHTML=GRUPOS.map(([g,its])=>`<div class="gr">${g}</div>`+its.map(([k,v,i])=>`<a class="${k===t?'on':''}" onclick="ir('${k}')">${svg(i)}${v}</a>`).join('')).join('');main.innerHTML='<div class="vazio">Carregando…</div>';V[t]().catch(e=>main.innerHTML=`<div class="vazio">Erro: ${esc(e.message)}</div>`);}
 const q=async p=>{const {data,error,count}=await p;if(error)throw error;return {data,count};};
 function modoTV(){
@@ -376,6 +419,32 @@ const catnG=c=>({informatica:'Informática',saude:'Saúde',agropecuaria:'Agropec
 const prazo=v=>{const d=dias(v);return d==null?'':`<span class="tag ${d<=5?'w':'ok'}">${d>=0?d+' dias':'encerrado'}</span>`;};
 
 const V={
+ organizacao:async()=>{
+  const [{data:org},{data:adm},{data:minhas}]=await Promise.all([sb.rpc('org_atual'),sb.rpc('eh_admin_plataforma'),sb.from('organizacoes').select('id,nome,tipo')]);
+  const oid=org,o=(minhas||[]).find(x=>x.id===oid);
+  if(!o){main.innerHTML='<div class="vazio">Nenhuma organização ativa.</div>';return;}
+  const {data:membros}=await sb.rpc('listar_membros',{p_org:oid});
+  const {data:meV}=await sb.from('vinculos_org').select('papel').eq('organizacao_id',oid).eq('user_id',(await sb.auth.getSession()).data.session.user.id).maybeSingle();
+  const meu=meV?.papel,gerente=['proprietario','admin'].includes(meu)||adm;
+  const [{data:conv},{data:pjs},{data:pfs},{data:vers}]=await Promise.all([
+   gerente?sb.from('convites').select('id,email,papel,criado_em,expira_em,aceito_em,revogado_em').eq('organizacao_id',oid).is('aceito_em',null).is('revogado_em',null).order('criado_em',{ascending:false}):Promise.resolve({data:[]}),
+   sb.from('pessoas_juridicas').select('id,cnpj,razao_social,propria,verificada_em').eq('organizacao_id',oid),
+   sb.from('pessoas_fisicas').select('id,cpf,nome,verificada_em').eq('organizacao_id',oid),
+   sb.from('verificacoes').select('pessoa_id,situacao,motivo_recusa,criado_em').eq('organizacao_id',oid).order('criado_em',{ascending:false})]);
+  const PAP={proprietario:'Proprietário',admin:'Administrador',editor:'Editor',leitor:'Leitor'};
+  const ult=id=>(vers||[]).find(v=>v.pessoa_id===id);
+  const cad=(tipo,x,nome,doc)=>{const v=ult(x.id);const st=x.verificada_em?'<span class="tag ok">Verificada</span>':v?.situacao==='pendente'?'<span class="tag w">Em análise</span>':v?.situacao==='recusada'?`<span class="tag bad" title="${esc(v.motivo_recusa||'')}">Recusada</span>`:'<span class="tag">Não verificada</span>';
+   return `<tr><td>${esc(nome)}<div class="sub">${esc(doc)}</div></td><td>${st}</td><td>${gerente&&!x.verificada_em&&v?.situacao!=='pendente'?`<button class="sec" onclick="pedirVerif('${tipo}','${x.id}')">Solicitar verificação</button>`:''}</td></tr>`;};
+  let fila='';
+  if(adm){const {data:f}=await sb.rpc('fila_verificacao');fila=`<div class="card"><h3>Fila de verificações (plataforma)</h3>${(f&&f.length)?`<table><tr><th>Organização / cadastro</th><th>Vínculo</th><th>Solicitante</th><th></th></tr>${f.map(v=>`<tr><td>${esc(v.organizacao)}<div class="sub">${esc(v.pessoa)} · ${esc(v.documento)}</div></td><td>${esc(v.vinculo)}<div class="sub">${esc(v.observacao||'')}</div></td><td>${esc(v.solicitante_email||'')}</td><td style="white-space:nowrap">${v.documento_path?`<button class="sec" onclick="verDocVerif('${esc(v.documento_path)}')">Documento</button> `:''}<button onclick="decidirVerif('${v.id}',true)">Aprovar</button> <button class="sec" onclick="decidirVerif('${v.id}',false)">Recusar</button></td></tr>`).join('')}</table>`:'<p class="sub">Nenhuma verificação pendente.</p>'}</div>`;}
+  main.innerHTML=`<div class="top"><div><h2>Minha organização</h2><p class="sub">${esc(o.nome)} · seu papel: ${esc(PAP[meu]||(adm?'Administrador da plataforma':'—'))}</p></div></div>
+  <div class="card"><h3>Cadastros</h3><p class="sub">Para administrar o cadastro de uma empresa ou pessoa, a plataforma precisa confirmar seu vínculo com ela.</p><table><tr><th>Cadastro</th><th>Situação</th><th></th></tr>${(pjs||[]).map(x=>cad('pj',x,x.razao_social,x.cnpj)).join('')}${(pfs||[]).map(x=>cad('pf',x,x.nome,x.cpf)).join('')||''}</table></div>
+  <div class="card"><h3>Membros</h3><table><tr><th>Pessoa</th><th>Papel</th><th></th></tr>${(membros||[]).map(m=>`<tr><td>${esc(m.nome||m.email)}<div class="sub">${esc(m.email)}${m.situacao!=='ativo'?' · '+esc(m.situacao):''}</div></td><td>${gerente?`<select onchange="mudarPapel('${oid}','${m.user_id}',this.value)">${Object.entries(PAP).map(([k,v])=>`<option value="${k}" ${k===m.papel?'selected':''}>${v}</option>`).join('')}</select>`:esc(PAP[m.papel]||m.papel)}</td><td>${gerente?`<button class="sec" onclick="tirarMembro('${oid}','${m.user_id}')">Remover</button>`:''}</td></tr>`).join('')}</table></div>
+  ${gerente?`<div class="card"><h3>Convidar colaborador</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><input id="cvem" type="email" placeholder="e-mail da pessoa" style="flex:1;min-width:200px"><select id="cvpp"><option value="editor">Editor</option><option value="leitor">Leitor</option><option value="admin">Administrador</option></select><button onclick="convidar('${oid}')">Gerar convite</button></div><div id="cvlink"></div>
+  ${(conv&&conv.length)?`<h4 style="margin:16px 0 6px">Convites pendentes</h4><table>${conv.map(c=>`<tr><td>${esc(c.email)}<div class="sub">${esc(PAP[c.papel])} · expira ${dt(c.expira_em)}</div></td><td><button class="sec" onclick="revogarConvite('${c.id}')">Revogar</button></td></tr>`).join('')}</table>`:''}</div>`:''}
+  ${fila}`;
+ },
+
 async home(){
  const agora=new Date().toISOString();
  const [D,cm,top,BR]=await Promise.all([q(sb.rpc('dashboard_resumo')).then(r=>r.data),
