@@ -961,7 +961,10 @@ function pintarArq(box,l){
    const a=document.createElement('a');a.href=u;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);
   }catch(e){alert('Não consegui baixar: '+e.message);}
   bt.disabled=false;bt.innerHTML=t;});}
-const _pintarDet=pintarDet;pintarDet=function(d,a){_pintarDet(d,a);arquivosEdital(d);};
+const _pintarDet=pintarDet;pintarDet=function(d,a){_pintarDet(d,a);arquivosEdital(d);
+ const fim=d.__ctx?.op?.data_fim_proposta;                    // encerrado e ainda sem leitura do edital: botão em destaque
+ if(fim&&new Date(fim)<new Date()&&a&&a.fonte!=='edital'){const f=d.querySelector('.danl .dfoot');
+  if(f)f.innerHTML='<button class="sec sm" onclick="analisarAgora(this.closest(\'.det\'))">'+AI()+'Ler o edital com IA</button> <span class="m">Baixa o PDF no PNCP e analisa; nada é guardado além do resumo.</span>';}};
 
 async function analisarAgora(d){const c=d.__ctx,b=d.querySelector('.danl');
  if(b)b.innerHTML='<div class="m">Lendo o edital com a IA… isso leva alguns segundos.</div>';
