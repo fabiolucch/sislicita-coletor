@@ -250,6 +250,10 @@ export async function onRequestPost({ request, env }) {
   const get = async path => { const r = await fetch(`${SB}/rest/v1/${path}`, { headers: H }); return r.ok ? r.json() : []; };
 
   let b; try { b = await request.json(); } catch { return J({ erro: "JSON inválido" }, 400); }
+  if (!["arquivos", "baixar"].includes(b.acao)) {
+    const ok = await fetch(`${SB}/rest/v1/rpc/tem_recurso`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: JSON.stringify({ p_recurso: "ia" }) }).then(r => r.ok ? r.json() : false).catch(() => false);
+    if (ok !== true) return J({ erro: "A leitura por IA faz parte dos planos Básico e Premium.", plano: true }, 402);
+  }
   const id = parseInt(b.oportunidade_id, 10);
   if (!id) return J({ erro: "informe oportunidade_id" }, 400);
   const [op] = await get(`oportunidades?id=eq.${id}&select=id,objeto,orgao_nome,uf,municipio,modalidade,valor_estimado,valor_sigiloso,data_fim_proposta,ia_resumo,ia_termo,link_pncp,numero_controle_pncp`);

@@ -74,6 +74,8 @@ export async function onRequestPost({ request, env }) {
   if (!u.ok) return J({ erro: "não autenticado" }, 401);
   if (!env.GEMINI_API_KEY) return J({ erro: "GEMINI_API_KEY não configurada" }, 500);
   const b = await request.json().catch(() => ({}));
+  const okPlano = await sb(auth, "rpc/tem_recurso", { method: "POST", body: JSON.stringify({ p_recurso: "perfis" }) }).then(r => r.ok ? r.json() : false).catch(() => false);
+  if (okPlano !== true) return J({ erro: "Perfis de busca fazem parte dos planos Básico e Premium.", plano: true }, 402);
   try {
     if (b.acao === "sugerir") return J({ texto: await sugerir(env, String(b.texto || "").slice(0, 3000)) });
     const id = String(b.perfil || "");
