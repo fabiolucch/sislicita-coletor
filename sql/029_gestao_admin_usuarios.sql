@@ -84,6 +84,19 @@ drop trigger if exists t_org_usuario_ativo on public.organizacoes;
 create trigger t_org_usuario_ativo before insert on public.organizacoes
   for each row execute function public.bloqueados_nao_criam_org();
 
+-- Convites e outros RPCs SECURITY DEFINER também não podem reativar vínculo suspenso.
+create or replace function public.bloqueados_nao_reingressam_org() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.situacao='ativo' and exists(
+    select 1 from public.perfis_usuario p where p.user_id=new.user_id and p.bloqueado
+  ) then raise exception 'esta conta esta suspensa; contate o administrador da plataforma'; end if;
+  return new;
+end $$;
+drop trigger if exists t_vinculo_usuario_ativo on public.vinculos_org;
+create trigger t_vinculo_usuario_ativo before insert or update of situacao,user_id on public.vinculos_org
+  for each row execute function public.bloqueados_nao_reingressam_org();
+
 create or replace function public.admin_listar_usuarios()
 returns table (
   user_id uuid, email text, nome text, criado_em timestamptz,
