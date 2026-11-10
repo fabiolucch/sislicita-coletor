@@ -13,6 +13,8 @@ export async function onRequestGet({ request, env }) {
   const key = env.SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRrYmtrcWVic3h2bXhucWl3amZsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5MDk1MjIsImV4cCI6MjEwOTQ4NTUyMn0.v--eJcYHEanBh9WG1xgOP-jPGwbR_fikk65AkvMPEaI"; // chave anon é pública por desenho
   const u = await fetch(`${SB}/auth/v1/user`, { headers: { authorization: auth, apikey: key } });
   if (!u.ok) return J({ erro: "não autenticado" }, 401);
+  const ativo = await fetch(`${SB}/rest/v1/rpc/usuario_ativo`, { method: "POST", headers: { authorization: auth, apikey: key, "content-type": "application/json" }, body: "{}" }).then(r => r.ok ? r.json() : false).catch(() => false);
+  if (ativo !== true) return J({ erro: "conta suspensa ou sem acesso" }, 403);
 
   const p = new URL(request.url).searchParams;
   const tipo = p.get("tipo") === "S" ? "S" : "M";

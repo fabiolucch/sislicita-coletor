@@ -14,6 +14,11 @@ async function autenticar(request) {
   const u = await fetch(`${SB}/auth/v1/user`, { headers: { authorization: auth, apikey: ANON } });
   return u.ok;
 }
+async function ehAdminAtivo(request) {
+  const auth = request.headers.get("authorization") || "";
+  const r = await fetch(`${SB}/rest/v1/rpc/eh_admin_plataforma`, { method: "POST", headers: { authorization: auth, apikey: ANON, "content-type": "application/json" }, body: "{}" });
+  return r.ok && await r.json().catch(() => false) === true;
+}
 
 const gh = (env, path, init = {}) => fetch(`https://api.github.com/repos/${REPO}/${path}`, {
   ...init,
@@ -62,6 +67,7 @@ async function testarGemini(env) {
 
 export async function onRequest({ request, env }) {
   if (!(await autenticar(request))) return J({ erro: "não autenticado" }, 401);
+  if (!(await ehAdminAtivo(request))) return J({ erro: "somente administradores ativos da plataforma podem usar este serviço" }, 403);
   const url = new URL(request.url);
   try {
     if (request.method === "GET") {
