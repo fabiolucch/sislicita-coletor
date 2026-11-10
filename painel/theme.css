@@ -227,7 +227,7 @@ button.cta:hover { background: #f97316; }
 .toast button { background: #27272a; }
 
 @media (max-width: 860px) {
-  aside { border-right: 0; border-bottom: 1px solid #27272a; background: #09090bf5; }
+  aside { width: 100%; border-right: 0; border-bottom: 1px solid #27272a; background: #09090bf5; }
   aside a.on::before { background: #f97316; }
   main { width: 100%; margin-left: 0; padding: 24px 18px 44px; }
   #sbar { margin-left: 0; }
