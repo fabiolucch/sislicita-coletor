@@ -1,5 +1,6 @@
 -- 025: cálculo de lucro por licitação, assessoria opcional (Básico e Premium) e cobranças:
--- taxa fixa se o certame for perdido + comissão sobre cada empenho de contrato assinado.
+-- taxa fixa se o certame for perdido e/ou taxa fixa se for vencido (ambas configuráveis e desligáveis)
+-- + comissão sobre cada empenho de contrato assinado. Desistência não gera cobrança.
 -- Percentuais e taxas são definidos pela plataforma por licitação; o sistema sugere a comissão a partir do lucro estimado.
 
 -- A. parâmetros (só a plataforma altera) ----------------------------------------------------------
@@ -9,6 +10,9 @@ create table if not exists public.assessoria_parametros (
   comissao_padrao_premium numeric(6,3),    -- % sobre empenho, referência para Premium
   taxa_perda_basico numeric(12,2),         -- R$ cobrado se o certame for perdido
   taxa_perda_premium numeric(12,2),
+  taxa_exito_basico numeric(12,2),         -- R$ cobrado se o certame for vencido (além da comissão)
+  taxa_exito_premium numeric(12,2),
+  taxas_fixas_ativas boolean not null default true,
   participacao_lucro_pct numeric(6,3),     -- sugestão: comissão = participação × margem estimada
   comissao_min_pct numeric(6,3),
   comissao_max_pct numeric(6,3),
@@ -18,7 +22,7 @@ create table if not exists public.assessoria_parametros (
 );
 insert into public.assessoria_parametros (id, participacao_lucro_pct, comissao_min_pct, comissao_max_pct, texto_aceite)
 values (1, 20, 1, 10,
- 'Contrato a ser revisado por advogado antes do uso com clientes. Ao aceitar, a empresa contrata a assessoria do SISLICITA para esta licitação, nas condições acima: (1) se o certame for perdido, é devida a taxa fixa indicada; (2) se for vencido, é devida a comissão indicada sobre o valor de cada empenho emitido no contrato assinado com o órgão, à medida que os empenhos forem registrados.')
+ 'Contrato a ser revisado por advogado antes do uso com clientes. Ao aceitar, a empresa contrata a assessoria do SISLICITA para esta licitação, nas condições acima: (1) se o certame for perdido, é devida a taxa fixa indicada; (2) se for vencido, é devida a taxa fixa de êxito indicada, se houver, e a comissão indicada sobre o valor de cada empenho emitido no contrato assinado com o órgão, à medida que os empenhos forem registrados; (3) a desistência da participação não gera cobrança.')
 on conflict (id) do nothing;
 alter table public.assessoria_parametros enable row level security;
 drop policy if exists assess_par_ler on public.assessoria_parametros;
@@ -35,6 +39,9 @@ begin
     comissao_padrao_premium = nullif(p->>'comissao_padrao_premium','')::numeric,
     taxa_perda_basico = nullif(p->>'taxa_perda_basico','')::numeric,
     taxa_perda_premium = nullif(p->>'taxa_perda_premium','')::numeric,
+    taxa_exito_basico = nullif(p->>'taxa_exito_basico','')::numeric,
+    taxa_exito_premium = nullif(p->>'taxa_exito_premium','')::numeric,
+    taxas_fixas_ativas = coalesce((p->>'taxas_fixas_ativas')::boolean, taxas_fixas_ativas),
     participacao_lucro_pct = nullif(p->>'participacao_lucro_pct','')::numeric,
     comissao_min_pct = nullif(p->>'comissao_min_pct','')::numeric,
     comissao_max_pct = nullif(p->>'comissao_max_pct','')::numeric,
@@ -70,6 +77,7 @@ create table if not exists public.assessorias (
   comissao_sugerida_pct numeric(6,3),
   comissao_pct numeric(6,3),
   taxa_perda numeric(12,2),
+  taxa_exito numeric(12,2),
   solicitado_por uuid references auth.users(id) on delete set null,
   solicitado_em timestamptz not null default now(),
   proposta_por uuid references auth.users(id) on delete set null,
@@ -101,7 +109,7 @@ create table if not exists public.assessoria_cobrancas (
   id bigserial primary key,
   organizacao_id uuid not null references public.organizacoes(id) on delete cascade,
   assessoria_id bigint not null references public.assessorias(id) on delete cascade,
-  tipo text not null check (tipo in ('taxa_perda','comissao_empenho')),
+  tipo text not null check (tipo in ('taxa_perda','taxa_exito','comissao_empenho')),
   empenho_id bigint references public.processo_empenhos(id) on delete set null,
   base_valor numeric(14,2), pct numeric(6,3),
   valor numeric(14,2) not null,
@@ -110,7 +118,7 @@ create table if not exists public.assessoria_cobrancas (
   pago_em date, observacao text
 );
 create unique index if not exists cobr_empenho_unico on public.assessoria_cobrancas (empenho_id) where empenho_id is not null and situacao <> 'cancelada';
-create unique index if not exists cobr_taxa_unica on public.assessoria_cobrancas (assessoria_id) where tipo = 'taxa_perda' and situacao <> 'cancelada';
+create unique index if not exists cobr_taxa_unica on public.assessoria_cobrancas (assessoria_id, tipo) where tipo in ('taxa_perda','taxa_exito') and situacao <> 'cancelada';
 
 -- RLS: cliente lê o que é da sua organização; a plataforma lê tudo; escrita sensível só por funções
 alter table public.parametros_custo enable row level security;
@@ -181,12 +189,16 @@ begin
   return a;
 end $$;
 
-create or replace function public.propor_assessoria(p_id bigint, p_comissao numeric, p_taxa numeric, p_obs text default null) returns void
+drop function if exists public.propor_assessoria(bigint, numeric, numeric, text);
+drop function if exists public.propor_assessoria(bigint, numeric, numeric, text, numeric);
+create or replace function public.propor_assessoria(p_id bigint, p_comissao numeric, p_taxa numeric, p_obs text default null, p_taxa_exito numeric default 0) returns void
 language plpgsql security definer set search_path = public as $$
+declare ativas boolean := coalesce((select taxas_fixas_ativas from assessoria_parametros where id = 1), true);
 begin
   if not public.eh_admin_plataforma() then raise exception 'apenas a plataforma define as condicoes'; end if;
   if p_comissao is null or p_comissao < 0 or p_comissao > 100 then raise exception 'comissao invalida'; end if;
-  update assessorias set situacao = 'proposta', comissao_pct = p_comissao, taxa_perda = coalesce(p_taxa, 0),
+  update assessorias set situacao = 'proposta', comissao_pct = p_comissao,
+    taxa_perda = case when ativas then coalesce(p_taxa, 0) else 0 end, taxa_exito = case when ativas then coalesce(p_taxa_exito, 0) else 0 end,
     comissao_sugerida_pct = public.sugerir_comissao(processo_id), proposta_por = auth.uid(), proposta_em = now(),
     observacao_plataforma = left(p_obs, 1000)
   where id = p_id and situacao in ('solicitada','proposta');
@@ -203,8 +215,8 @@ begin
   select * into par from assessoria_parametros where id = 1;
   if p_aceitar then
     update assessorias set situacao = 'aceita', aceito_por = auth.uid(), aceito_em = now(), aceite_versao = par.versao_aceite,
-      aceite_texto = format('Comissão de %s%% sobre cada empenho do contrato assinado; taxa de R$ %s se o certame for perdido. %s',
-        a.comissao_pct, coalesce(a.taxa_perda, 0), par.texto_aceite)
+      aceite_texto = format('Comissão de %s%% sobre cada empenho do contrato assinado; taxa fixa de R$ %s se o certame for perdido; taxa fixa de R$ %s se for vencido; desistência sem cobrança. %s',
+        a.comissao_pct, coalesce(a.taxa_perda, 0), coalesce(a.taxa_exito, 0), par.texto_aceite)
     where id = p_id;
     perform public._gerar_cobrancas(a.processo_id);
   else
@@ -227,14 +239,19 @@ end $$;
 -- F. cobranças: taxa se perdido; comissão por empenho quando o contrato está assinado ----------------
 create or replace function public._gerar_cobrancas(p_processo bigint) returns void
 language plpgsql security definer set search_path = public as $$
-declare a assessorias; p processos;
+declare a assessorias; p processos; ativas boolean := coalesce((select taxas_fixas_ativas from assessoria_parametros where id = 1), true);
 begin
   select * into a from assessorias where processo_id = p_processo and situacao = 'aceita';
   if not found then return; end if;
   select * into p from processos where id = p_processo;
-  if p.status = 'perdido' and coalesce(a.taxa_perda, 0) > 0 then
+  if p.status = 'perdido' and coalesce(a.taxa_perda, 0) > 0 and ativas then
     insert into assessoria_cobrancas (organizacao_id, assessoria_id, tipo, valor, observacao)
     values (a.organizacao_id, a.id, 'taxa_perda', a.taxa_perda, 'Certame perdido')
+    on conflict do nothing;
+  end if;
+  if p.status = 'ganho' and coalesce(a.taxa_exito, 0) > 0 and ativas then
+    insert into assessoria_cobrancas (organizacao_id, assessoria_id, tipo, valor, observacao)
+    values (a.organizacao_id, a.id, 'taxa_exito', a.taxa_exito, 'Certame vencido')
     on conflict do nothing;
   end if;
   if p.contrato_assinado_em is not null and coalesce(a.comissao_pct, 0) > 0 then
@@ -283,11 +300,12 @@ begin
 end $$;
 
 -- visão da plataforma
+drop function if exists public.listar_assessorias();
 create or replace function public.listar_assessorias() returns table (id bigint, organizacao text, processo_id bigint, titulo text, orgao text, status_processo text,
-  plano text, situacao text, comissao_sugerida_pct numeric, comissao_pct numeric, taxa_perda numeric, margem_pct numeric, receita numeric,
+  plano text, situacao text, comissao_sugerida_pct numeric, comissao_pct numeric, taxa_perda numeric, taxa_exito numeric, margem_pct numeric, receita numeric,
   solicitado_em timestamptz, aceito_em timestamptz, cobrado numeric, recebido numeric)
 language sql stable security definer set search_path = public as $$
-  select a.id, o.nome, a.processo_id, p.titulo, p.orgao, p.status, a.plano, a.situacao, public.sugerir_comissao(a.processo_id), a.comissao_pct, a.taxa_perda,
+  select a.id, o.nome, a.processo_id, p.titulo, p.orgao, p.status, a.plano, a.situacao, public.sugerir_comissao(a.processo_id), a.comissao_pct, a.taxa_perda, a.taxa_exito,
     nullif(v.totais->>'margem_pct','')::numeric, nullif(v.totais->>'receita','')::numeric, a.solicitado_em, a.aceito_em,
     (select coalesce(sum(valor),0) from assessoria_cobrancas c where c.assessoria_id = a.id and c.situacao <> 'cancelada'),
     (select coalesce(sum(valor),0) from assessoria_cobrancas c where c.assessoria_id = a.id and c.situacao = 'paga')
@@ -297,10 +315,10 @@ language sql stable security definer set search_path = public as $$
 $$;
 
 revoke execute on function public.salvar_parametros_assessoria(jsonb), public.sugerir_comissao(bigint), public.solicitar_assessoria(bigint, text),
-  public.propor_assessoria(bigint, numeric, numeric, text), public.responder_assessoria(bigint, boolean), public.cancelar_assessoria(bigint),
+  public.propor_assessoria(bigint, numeric, numeric, text, numeric), public.responder_assessoria(bigint, boolean), public.cancelar_assessoria(bigint),
   public.atualizar_cobranca(bigint, text, date, text), public.listar_assessorias() from public, anon;
 grant execute on function public.salvar_parametros_assessoria(jsonb), public.sugerir_comissao(bigint), public.solicitar_assessoria(bigint, text),
-  public.propor_assessoria(bigint, numeric, numeric, text), public.responder_assessoria(bigint, boolean), public.cancelar_assessoria(bigint),
+  public.propor_assessoria(bigint, numeric, numeric, text, numeric), public.responder_assessoria(bigint, boolean), public.cancelar_assessoria(bigint),
   public.atualizar_cobranca(bigint, text, date, text), public.listar_assessorias() to authenticated;
 
 -- G. textos dos planos: assessoria é opcional nos dois planos pagos (Premium com condições melhores)
