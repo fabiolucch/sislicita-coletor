@@ -1214,7 +1214,6 @@ async function novaCom(){if(!$('#cn').value)return alert('Informe a empresa');co
  const {error}=await sb.from('contratos_comissao').insert({empresa_nome:$('#cn').value,empresa_cnpj:$('#cc').value||null,base_tipo:$('#cb').value,base_valor:bv,percentual:p,valor_estimado_comissao:bv==null?null:bv*p/100});if(error)alert(error.message);else ir('comissoes');}
 async function novoPerfil(){const n=prompt('Nome do novo perfil:');if(!n)return;const {error}=await sb.from('perfis_busca').insert({nome:n});if(error)alert(error.message);else ir('perfis');}
 $('#lg').innerHTML=$('#lg2').innerHTML=svg('doc');$('#lg').firstChild.style.cssText=$('#lg2').firstChild.style.cssText='width:22px;height:22px;stroke:#fff;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round';
-$('#pw').onkeydown=e=>{if(e.key==='Enter')entrar();};
 iniciar();
 </script>
 </body>
