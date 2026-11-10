@@ -1,4 +1,4 @@
-"""SISLICITA - coletor do PNCP para o Supabase.
+"""EditalVector - coletor do PNCP para o Supabase.
 
 Uso: python coletor.py [editais|pca|radar|tudo]
 Variaveis: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (obrigatorias).
@@ -1677,14 +1677,14 @@ def h(s):
     return (str(s or "")).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-TG_DESC = ("Radar de licitações públicas do SISLICITA. Avisa sobre oportunidades com score alto no radar, "
+TG_DESC = ("Radar de licitações públicas do EditalVector. Avisa sobre oportunidades com score alto no radar, "
            "briefing diário por IA, documentos novos (retificações) nos editais acompanhados, sessões próximas "
            "dos seus processos e documentos de empresas vencendo. Envie /start para vincular este chat e /status "
            "para ver se o sistema está operando.")
 TG_CMDS = [{"command": "start", "description": "Vincular este chat e ver o que o bot faz"},
            {"command": "status", "description": "Situação do sistema agora"},
            {"command": "ajuda", "description": "O que este bot avisa"}]
-TG_CFG_VERSAO = "2"
+TG_CFG_VERSAO = "3"
 
 
 def tg_api(metodo, **dados):
@@ -1725,7 +1725,7 @@ def tg_configurar():
     if estado("telegram_cfg") != TG_CFG_VERSAO:
         tg_api("setMyDescription", description=TG_DESC[:512], language_code="pt")
         tg_api("setMyDescription", description=TG_DESC[:512])
-        tg_api("setMyShortDescription", short_description="Alertas de licitações do SISLICITA: oportunidades, briefing, retificações e prazos.")
+        tg_api("setMyShortDescription", short_description="Alertas de licitações do EditalVector: oportunidades, briefing, retificações e prazos.")
         tg_api("setMyCommands", commands=TG_CMDS)
         estado("telegram_cfg", TG_CFG_VERSAO)
 
@@ -1774,7 +1774,7 @@ def alertas():
         requests.patch(f"{SB}/radar", params={"notificado_em": "is.null"}, headers=HDR, timeout=120, data=json.dumps({"notificado_em": agora.isoformat()}))
         requests.patch(f"{SB}/alertas", params={"enviado_em": "is.null"}, headers=HDR, timeout=60, data=json.dumps({"enviado_em": agora.isoformat()}))
         requests.patch(f"{SB}/briefings", params={"enviado_em": "is.null"}, headers=HDR, timeout=60, data=json.dumps({"enviado_em": agora.isoformat()}))
-        tg(chat, f"✅ <b>SISLICITA conectado</b>\nVocê vai receber aqui: oportunidades com interesse ≥ {ALERTA_SCORE}, briefing diário, documentos novos em editais do radar, sessões próximas e documentos vencendo.\n{PAINEL}")
+        tg(chat, f"✅ <b>EditalVector conectado</b>\nVocê vai receber aqui: oportunidades com interesse ≥ {ALERTA_SCORE}, briefing diário, documentos novos em editais do radar, sessões próximas e documentos vencendo.\n{PAINEL}")
         estado("telegram_inicio", agora.isoformat())
         return 1
     # 1) briefings novos

@@ -10,7 +10,7 @@ const quando = iso => iso ? new Date(iso).toLocaleString("pt-BR", { timeZone: "A
 const h = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const responder = (chat, text) => new Response(JSON.stringify({ method: "sendMessage", chat_id: chat, text, parse_mode: "HTML", disable_web_page_preview: true }), { headers: { "content-type": "application/json" } });
 
-const SOBRE = `🛰️ <b>SISLICITA · Radar de licitações públicas</b>
+const SOBRE = `🛰️ <b>EditalVector · Radar de licitações públicas</b>
 
 Este bot avisa você sobre:
 🎯 <b>Oportunidades</b> novas no radar com score ≥ 80 (editais e itens do PCA)
@@ -66,4 +66,4 @@ export async function onRequestPost({ request }) {
   return responder(chat, SOBRE);
 }
 
-export const onRequestGet = () => new Response("SISLICITA bot: webhook ativo", { headers: { "content-type": "text/plain; charset=utf-8" } });
+export const onRequestGet = () => new Response("EditalVector bot: webhook ativo", { headers: { "content-type": "text/plain; charset=utf-8" } });
