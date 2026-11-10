@@ -136,7 +136,33 @@ async function pdfsDoZip(buf) {
   return saida;
 }
 
-// Baixa o edital no PNCP (PDF direto ou PDF dentro de .zip). O motivo de nao ter achado vai em partes.motivo.
+// Extrai texto simples de DOCX (OOXML dentro de ZIP); sem bibliotecas externas.
+async function textoDocxDoZip(buf) {
+  const v = new DataView(buf), u = new Uint8Array(buf);
+  let e = -1;
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65600); i--) if (v.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) return "";
+  const n = v.getUint16(e + 10, true); let p = v.getUint32(e + 16, true), item = null;
+  for (let k = 0; k < n && v.getUint32(p, true) === 0x02014b50; k++) {
+    const met = v.getUint16(p + 10, true), cs = v.getUint32(p + 20, true), us = v.getUint32(p + 24, true);
+    const nl = v.getUint16(p + 28, true), el = v.getUint16(p + 30, true), cl = v.getUint16(p + 32, true), off = v.getUint32(p + 42, true);
+    const nome = new TextDecoder().decode(u.subarray(p + 46, p + 46 + nl));
+    if (nome === "word/document.xml" && us <= 12 * 1024 * 1024) { item = { met, cs, us, off }; break; }
+    p += 46 + nl + el + cl;
+  }
+  if (!item) return "";
+  const nl = v.getUint16(item.off + 26, true), el = v.getUint16(item.off + 28, true), ini = item.off + 30 + nl + el;
+  const dados = u.subarray(ini, ini + item.cs);
+  let xml;
+  if (item.met === 0) xml = new TextDecoder().decode(dados);
+  else if (item.met === 8) xml = await new Response(new Blob([dados]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).text();
+  else return "";
+  const decode = s => s.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&").replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n))).replace(/&#x([\da-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)));
+  const texto = xml.replace(/<w:tab\b[^>]*\/>/g, "\t").replace(/<w:br\b[^>]*\/>/g, "\n").replace(/<\/w:p>/g, "\n").replace(/<[^>]+>/g, "");
+  return decode(texto).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 120000);
+}
+
+// Baixa o edital no PNCP (PDF direto, PDF em ZIP ou texto DOCX). O motivo vai em partes.motivo.
 async function pdfsDoEdital(numero, env) {
   const m = /^(\d{14})-\d+-(\d+)\/(\d{4})$/.exec(numero || "");
   const vazio = motivo => Object.assign([], { motivo });
@@ -161,8 +187,15 @@ async function pdfsDoEdital(numero, env) {
     const cab = new TextDecoder().decode(new Uint8Array(buf.slice(0, 4)));
     let pdfs = [];
     if (cab === "%PDF") pdfs = buf.byteLength <= MAX_PDF ? [buf] : [];
-    else if (cab.startsWith("PK")) pdfs = await pdfsDoZip(buf).catch(() => []);
-    else { motivo = "o arquivo do edital não é PDF nem ZIP com PDF (ex.: Word)"; continue; }
+    else if (cab.startsWith("PK")) {
+      pdfs = await pdfsDoZip(buf).catch(() => []);
+      if (!pdfs.length) {
+        const texto = await textoDocxDoZip(buf).catch(() => "");
+        if (texto) { partes.texto = `${partes.texto ? `${partes.texto}\n\n` : ""}${texto}`.slice(0, 120000); continue; }
+        motivo = "o arquivo compactado não contém um PDF legível nem texto DOCX extraível";
+      }
+    }
+    else { motivo = "o arquivo do edital não está em formato PDF ou DOCX legível"; continue; }
     if (!pdfs.length) { motivo = motivo || "o arquivo do edital é grande demais ou não contém PDF legível"; continue; }
     for (const pdf of pdfs) {
       if (total + pdf.byteLength > MAX_PDF) continue;
@@ -170,7 +203,7 @@ async function pdfsDoEdital(numero, env) {
       partes.push(pdf.byteLength > PNCP_MAX ? await gemArquivo(env, pdf) : { inlineData: { mimeType: "application/pdf", data: b64(pdf) } });
     }
   }
-  return partes.length ? partes : vazio(motivo || "não consegui extrair o PDF do edital");
+  return (partes.length || partes.texto) ? partes : vazio(motivo || "não consegui extrair texto legível do edital");
 }
 
 // Recorte inteligente: manda ao Gemini só os trechos do edital que decidem a participação.
@@ -274,11 +307,12 @@ export async function onRequestPost({ request, env }) {
       const motivo = pdfs.motivo || "";
       // leitura pedida pelo botao: com o PNCP fora do ar nao devolve analise "so pelo objeto", avisa
       if (pncpFora && b.exigir_edital) return J({ erro: "PNCP_FORA" }, 503);
-      const fonte = tx?.texto || pdfs.length ? "edital" : "objeto";
+      const textoEdital = tx?.texto || pdfs.texto || "";
+      const fonte = textoEdital || pdfs.length ? "edital" : "objeto";
       const corpo = pdfs.length
         ? `O EDITAL COMPLETO VAI ANEXADO EM PDF. OBJETO: ${(op.objeto || "").slice(0, 1200)}`
-        : tx?.texto
-        ? `TEXTO DO EDITAL (${tx.arquivo || ""}):\n${recortar(tx.texto)}`
+        : textoEdital
+        ? `TEXTO DO EDITAL (${tx?.arquivo || "arquivo PNCP"}):\n${recortar(textoEdital)}`
         : `SÓ O OBJETO (o edital ainda não foi baixado):\n${(op.objeto || "").slice(0, 4000)}\nÓRGÃO: ${op.orgao_nome} (${op.municipio || ""}/${op.uf})\nMODALIDADE: ${op.modalidade || ""}\nVALOR ESTIMADO: ${op.valor_sigiloso ? "sigiloso" : op.valor_estimado}\nPRAZO PARA PROPOSTAS: ${op.data_fim_proposta || ""}`;
       const prompt = `Você analisa editais de licitação pública brasileira para uma consultoria que ajuda empresas fornecedoras a participar.
 Responda SOMENTE um objeto JSON com estes campos (use null ou lista vazia quando não constar; NÃO invente):
@@ -337,10 +371,11 @@ ${corpo}`;
       // Le o edital (texto salvo ou PDF do PNCP) e procura clausulas restritivas.
       const [tx] = await get(`edital_textos?oportunidade_id=eq.${id}&select=texto,arquivo`);
       const pdfs = tx?.texto ? [] : await pdfsDoEdital(op.numero_controle_pncp, env).catch(() => []);
-      const fonte = tx?.texto || pdfs.length ? "edital" : "objeto";
+      const textoEdital = tx?.texto || pdfs.texto || "";
+      const fonte = textoEdital || pdfs.length ? "edital" : "objeto";
       const corpo = pdfs.length
         ? `O EDITAL COMPLETO VAI ANEXADO EM PDF. OBJETO: ${(op.objeto || "").slice(0, 1200)}`
-        : tx?.texto ? `TEXTO DO EDITAL (${tx.arquivo || ""}):\n${recortar(tx.texto)}`
+        : textoEdital ? `TEXTO DO EDITAL (${tx?.arquivo || "arquivo PNCP"}):\n${recortar(textoEdital)}`
         : `SÓ O OBJETO (o edital não foi baixado):\n${ctx}\nANÁLISE JÁ FEITA: ${resumoEdital.slice(0, 2500)}`;
 
       if (b.acao === "direcionamento" && fonte === "objeto") {
@@ -433,7 +468,8 @@ ${corpo}`;
       let pdfs;
       try { pdfs = await pdfsDoEdital(op.numero_controle_pncp, env); }
       catch (e) { return J({ erro: e.message === "PNCP_FORA" ? "PNCP_FORA" : String(e.message || e) }, e.message === "PNCP_FORA" ? 503 : 502); }
-      if (!pdfs.length) return J({ erro: `Não consegui ler o PDF do edital: ${pdfs.motivo || "sem arquivo"}.` }, 422);
+      if (!pdfs.length && !pdfs.texto) return J({ erro: `Não consegui ler o arquivo do edital: ${pdfs.motivo || "sem arquivo"}.` }, 422);
+      if (pdfs.texto) return J({ ok: true, ...(await gemini(env, cab + `EDITAL (texto extraído de DOCX):\n${pdfs.texto}`, true)) });
       const res = await geminiPartes(env, [{ text: cab + "O EDITAL VAI ANEXADO EM PDF." }, ...pdfs]);
       return J({ ok: true, ...(Array.isArray(res) ? res[0] || {} : res || {}) });
     }

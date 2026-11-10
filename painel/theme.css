@@ -261,6 +261,13 @@ html[data-theme="light"] {
   --bad: #be123c;
   --sh: 0 1px 3px #18181b0c, 0 4px 16px #18181b08;
 }
+
+/* Avisos de leitura continuam legíveis nos dois temas. */
+.dwarn { color: #fde68a; background: #2a2111; border-color: #854d0e; line-height: 1.55; }
+.dwarn a { color: #fdba74; font-weight: 600; }
+html[data-theme="light"] .dwarn { color: #78350f; background: #fffbeb; border-color: #fde68a; }
+html[data-theme="light"] .dwarn a { color: #c2410c; }
+
 html[data-theme="light"] body {
   color: #27272a;
   background: radial-gradient(900px 520px at 86% -16%, #f973160c, transparent 72%), #f4f4f5;
