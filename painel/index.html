@@ -3,6 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark light">
+<script>
+(()=>{let tema='dark';try{tema=localStorage.getItem('editalvector.theme')==='light'?'light':'dark'}catch{}document.documentElement.dataset.theme=tema;const icones={light:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 15.3A8.5 8.5 0 0 1 8.7 3.7 8.5 8.5 0 1 0 20.3 15.3Z"/></svg>',dark:'<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42"/></svg>'};const atualizar=()=>{const atual=document.documentElement.dataset.theme||'dark';document.querySelectorAll('.theme-toggle').forEach(b=>{b.innerHTML=icones[atual]+'<span>Modo '+(atual==='dark'?'claro':'escuro')+'</span>';b.setAttribute('aria-label',atual==='dark'?'Tema escuro. Ative para usar o modo claro.':'Tema claro. Ative para usar o modo escuro.');b.title=atual==='dark'?'Ativar modo claro':'Ativar modo escuro';b.setAttribute('aria-pressed',String(atual==='light'))})};window.alternarTema=()=>{const proximo=document.documentElement.dataset.theme==='dark'?'light':'dark';document.documentElement.dataset.theme=proximo;try{localStorage.setItem('editalvector.theme',proximo)}catch{}atualizar()};document.addEventListener('DOMContentLoaded',atualizar)})();
+</script>
 <title>EditalVector · Radar de Licitações</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- Tailwind CDN: utilitários usados progressivamente no redesign do painel. -->
@@ -13,8 +17,8 @@
 <link rel="stylesheet" href="./theme.css">
 </head>
 <body>
-<div id="login"><div class="box"><div class="logo"><i id="lg"></i><b>Edital<span class="wordmark-accent">Vector</span></b></div><p>Radar de licitações públicas</p><div id="lgc"></div></div></div>
-<div id="app"><aside><div class="logo"><i id="lg2"></i><b>Edital<span class="wordmark-accent">Vector</span></b></div><div id="nav"></div><div class="user" id="usr"></div><button class="sair" onclick="sair()">Sair</button></aside><div id="sbar" onclick="ir('servicos')" title="Ver serviços e métricas" hidden></div><main id="main"></main></div>
+<div id="login"><div class="box"><div class="logo"><i id="lg"></i><b>Edital<span class="wordmark-accent">Vector</span></b></div><p>Radar de licitações públicas</p><button class="theme-toggle login-theme-toggle" type="button" onclick="alternarTema()" aria-label="Ativar modo claro" title="Ativar modo claro"></button><div id="lgc"></div></div></div>
+<div id="app"><aside><div class="logo"><i id="lg2"></i><b>Edital<span class="wordmark-accent">Vector</span></b></div><div id="nav"></div><div class="user" id="usr"></div><button class="theme-toggle" type="button" onclick="alternarTema()" aria-label="Ativar modo claro" title="Ativar modo claro"></button><button class="sair" onclick="sair()">Sair</button></aside><div id="sbar" onclick="ir('servicos')" title="Ver serviços e métricas" hidden></div><main id="main"></main></div>
 <script>
 // Chave "anon" é pública por desenho; o acesso real é protegido pelo RLS + login.
 const SUPABASE_URL="https://tkbkkqebsxvmxnqiwjfl.supabase.co";
