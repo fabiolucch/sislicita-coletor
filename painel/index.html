@@ -355,6 +355,7 @@ function agendaSB(){const q=proxExec(),c=proxExec('completa');if(!q)return'';
  return `<span class="sg sn" title="${esc(dica)}"><i class="sd nx"></i>Próxima coleta <b>${quandoSB(q)}</b> ${faltaSB(q)}${q.getTime()===c.getTime()?'':`<s>·</s>completa <b>${quandoSB(c)}</b>`}</span>`;}
 async function barraStatus(){
  const el=document.getElementById('sbar');if(!el)return;
+ if(!window.__ADM){el.hidden=true;return;}
  try{
   const [lg,es]=await Promise.all([q(sb.from('coletas_log').select('fonte,iniciado_em,finalizado_em,registros,status,erro').order('id',{ascending:false}).limit(40)),q(sb.from('coleta_estado').select('chave,valor').eq('chave','historico_min'))]);
   const L=lg.data||[],agora=Date.now();
@@ -378,8 +379,8 @@ async function barraStatus(){
 async function iniciar(){const {data}=await sb.auth.getSession();if(RECUP&&!window.__recOk){window.__recOk=true;return lgRender('nova');}if(!data.session){lgRender('entrar');return;}
  const cv=localStorage.getItem('sis_convite');if(cv){const {error}=await sb.rpc('aceitar_convite',{p_token:cv});localStorage.removeItem('sis_convite');if(error)toast('Convite: '+error.message);else toast('Convite aceito. Bem-vindo à organização.');}
  const {data:orgs}=await sb.rpc('minhas_orgs');const {data:adm}=await sb.rpc('eh_admin_plataforma');if(!(orgs&&orgs.length)&&!adm){lgRender('cadastro');lgTipo();return;}
- $('#login').style.display='none';$('#usr').textContent=data.session.user.email;$('#app').style.display='block';barraStatus();clearInterval(window.__sb);window.__sb=setInterval(()=>{if(!document.hidden)barraStatus();},60000);ir(location.hash.slice(1)||'home');}
-function ir(t,arg){if(!TELAS[t])t='home';tela=t;window.ARG=arg;location.hash=t;scrollTo(0,0);$('#nav').innerHTML=GRUPOS.map(([g,its])=>`<div class="gr">${g}</div>`+its.map(([k,v,i])=>`<a class="${k===t?'on':''}" onclick="ir('${k}')">${svg(i)}${v}</a>`).join('')).join('');main.innerHTML='<div class="vazio">Carregando…</div>';V[t]().catch(e=>main.innerHTML=`<div class="vazio">Erro: ${esc(e.message)}</div>`);}
+ window.__ADM=!!adm;$('#login').style.display='none';$('#usr').textContent=data.session.user.email;$('#app').style.display='block';barraStatus();clearInterval(window.__sb);window.__sb=setInterval(()=>{if(!document.hidden)barraStatus();},60000);ir(location.hash.slice(1)||'home');}
+function ir(t,arg){if(!TELAS[t]||(!window.__ADM&&['servicos','coletas','usuarios'].includes(t)))t='home';tela=t;window.ARG=arg;location.hash=t;scrollTo(0,0);$('#nav').innerHTML=GRUPOS.filter(g=>g[0]!=='Sistema'||window.__ADM).map(([g,its])=>`<div class="gr">${g}</div>`+its.map(([k,v,i])=>`<a class="${k===t?'on':''}" onclick="ir('${k}')">${svg(i)}${v}</a>`).join('')).join('');main.innerHTML='<div class="vazio">Carregando…</div>';V[t]().catch(e=>main.innerHTML=`<div class="vazio">Erro: ${esc(e.message)}</div>`);}
 const q=async p=>{const {data,error,count}=await p;if(error)throw error;return {data,count};};
 function modoTV(){
  if(document.getElementById('tv'))return sairTV();
