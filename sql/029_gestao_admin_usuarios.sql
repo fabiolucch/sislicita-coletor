@@ -1,5 +1,5 @@
 -- 029: painel administrativo multiusuário, suspensão reversível e auditoria de permissões.
--- Não apaga auth.users nem dados do cliente. A desativação pode ser revertida pelo administrador da plataforma.
+-- Não exclui usuários durante a migração. Suspensão é reversível; exclusão exige confirmação e salvaguardas.
 
 alter table public.perfis_usuario
   add column if not exists bloqueado boolean not null default false,
