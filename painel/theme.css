@@ -244,3 +244,250 @@ button.cta:hover { background: #f97316; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+/* Light theme. Dark remains the default and keeps the executive palette above. */
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f4f5;
+  --card: #ffffff;
+  --bd: #e4e4e7;
+  --tx: #27272a;
+  --mut: #71717a;
+  --pri: #ea580c;
+  --pri2: #fff7ed;
+  --pri3: #c2410c;
+  --ok: #15803d;
+  --warn: #a16207;
+  --bad: #be123c;
+  --sh: 0 1px 3px #18181b0c, 0 4px 16px #18181b08;
+}
+html[data-theme="light"] body {
+  color: #27272a;
+  background: radial-gradient(900px 520px at 86% -16%, #f973160c, transparent 72%), #f4f4f5;
+}
+html[data-theme="light"] ::-webkit-scrollbar-thumb { background: #d4d4d8; border-color: #f4f4f5; }
+html[data-theme="light"] aside {
+  color: #52525b;
+  background: linear-gradient(180deg, #fff, #fafafa 78%);
+  border-right-color: #e4e4e7;
+  box-shadow: 8px 0 32px #18181b08;
+}
+html[data-theme="light"] aside .logo b {
+  color: #18181b;
+  background: none;
+  -webkit-text-fill-color: currentColor;
+}
+html[data-theme="light"] aside .gr { color: #a1a1aa; }
+html[data-theme="light"] aside .gr::after { background: linear-gradient(90deg, #e4e4e7, transparent); }
+html[data-theme="light"] aside a { color: #52525b; }
+html[data-theme="light"] aside a:hover { color: #18181b; background: #18181b08; }
+html[data-theme="light"] aside a.on { color: #c2410c; background: #fff7ed; }
+html[data-theme="light"] aside a.on::before { background: #f97316; box-shadow: 0 0 12px #f9731640; }
+html[data-theme="light"] aside .user { color: #71717a; }
+html[data-theme="light"] aside .sair { color: #52525b; background: #f4f4f5; border-color: #e4e4e7; }
+html[data-theme="light"] aside .sair:hover { color: #18181b; background: #e4e4e7; }
+html[data-theme="light"] #sbar { color: #52525b; background: #fffffff2; border-color: #e4e4e7; }
+html[data-theme="light"] #sbar b { color: #27272a; }
+html[data-theme="light"] #sbar .sbt { background: #e4e4e7; }
+html[data-theme="light"] #sbar .sn { color: #71717a; }
+html[data-theme="light"] h1,
+html[data-theme="light"] h2,
+html[data-theme="light"] h3,
+html[data-theme="light"] h4,
+html[data-theme="light"] h5 { color: #18181b; }
+html[data-theme="light"] .sub,
+html[data-theme="light"] .m,
+html[data-theme="light"] label,
+html[data-theme="light"] th { color: #71717a; }
+html[data-theme="light"] .card,
+html[data-theme="light"] .bar,
+html[data-theme="light"] .pln,
+html[data-theme="light"] .fin-row,
+html[data-theme="light"] .fin-step,
+html[data-theme="light"] .fin-kpi,
+html[data-theme="light"] .hab-kpi,
+html[data-theme="light"] .pzc,
+html[data-theme="light"] .legc,
+html[data-theme="light"] .dextra,
+html[data-theme="light"] .dextra > summary,
+html[data-theme="light"] .det > .danl,
+html[data-theme="light"] .iaout,
+html[data-theme="light"] .md,
+html[data-theme="light"] .stmenu,
+html[data-theme="light"] .res button,
+html[data-theme="light"] .hab-group {
+  color: #27272a;
+  background-color: #fff;
+  border-color: #e4e4e7;
+  box-shadow: var(--sh);
+}
+html[data-theme="light"] .card:hover { border-color: #d4d4d8; }
+html[data-theme="light"] table td,
+html[data-theme="light"] table th { border-bottom-color: #e4e4e7; }
+html[data-theme="light"] tr:hover td { background: #fafafa; }
+html[data-theme="light"] .vazio,
+html[data-theme="light"] .oc .meta,
+html[data-theme="light"] .oc .just { color: #71717a; }
+html[data-theme="light"] a.l,
+html[data-theme="light"] .fin-settings summary,
+html[data-theme="light"] .leg summary,
+html[data-theme="light"] .dac summary { color: #c2410c; }
+html[data-theme="light"] input,
+html[data-theme="light"] select,
+html[data-theme="light"] textarea,
+html[data-theme="light"] .stbtn {
+  color-scheme: light;
+  color: #27272a;
+  background-color: #fff;
+  border-color: #d4d4d8;
+}
+html[data-theme="light"] input::placeholder,
+html[data-theme="light"] textarea::placeholder { color: #a1a1aa; }
+html[data-theme="light"] button.sec,
+html[data-theme="light"] .gh,
+html[data-theme="light"] .darq-b,
+html[data-theme="light"] .dtw .dtb {
+  color: #3f3f46;
+  background: #f4f4f5;
+  border-color: #e4e4e7;
+}
+html[data-theme="light"] button.sec:hover,
+html[data-theme="light"] .gh:hover,
+html[data-theme="light"] .darq-b:hover,
+html[data-theme="light"] .dtw .dtb:hover { color: #18181b; background: #e4e4e7; }
+html[data-theme="light"] button.bad { color: #be123c; background: #fff1f2; }
+html[data-theme="light"] .tag { color: #52525b; background: #f4f4f5; border-color: #e4e4e7; }
+html[data-theme="light"] .tag.ok { color: #166534; background: #f0fdf4; border-color: #bbf7d0; }
+html[data-theme="light"] .tag.w { color: #854d0e; background: #fefce8; border-color: #fde68a; }
+html[data-theme="light"] .tag.b { color: #9f1239; background: #fff1f2; border-color: #fecdd3; }
+html[data-theme="light"] .kp,
+html[data-theme="light"] .kp:hover,
+html[data-theme="light"] .sv-k,
+html[data-theme="light"] .fin-kpi,
+html[data-theme="light"] .oc,
+html[data-theme="light"] .grid .card,
+html[data-theme="light"] .pbox .card { color: #27272a; background: #fff; border-color: #e4e4e7; }
+html[data-theme="light"] .kp .n,
+html[data-theme="light"] .pbox .big,
+html[data-theme="light"] .fin-kpi b,
+html[data-theme="light"] .pzc b,
+html[data-theme="light"] .dres,
+html[data-theme="light"] .dkv b,
+html[data-theme="light"] .dr b,
+html[data-theme="light"] .dr span,
+html[data-theme="light"] .ds b,
+html[data-theme="light"] .hab-kpi b { color: #18181b; }
+html[data-theme="light"] .kp.w .n { color: #a16207; }
+html[data-theme="light"] .kp.ok .n,
+html[data-theme="light"] .kp.g .n { color: #15803d; }
+html[data-theme="light"] .oc .h { color: #18181b; }
+html[data-theme="light"] .oc .ia { color: #3f3f46; background: #fff7ed; border-left-color: #ea580c; }
+html[data-theme="light"] .oc .ia b { color: #c2410c; }
+html[data-theme="light"] .oc .acts { background: #fafafa; border-top-color: #e4e4e7; }
+html[data-theme="light"] .oc .acts select { color: #c2410c; background-color: #fff; border-color: #d4d4d8; }
+html[data-theme="light"] .scr b { color: #27272a; background: #fff; }
+html[data-theme="light"] .det { color: #3f3f46; border-top-color: #e4e4e7; }
+html[data-theme="light"] .det h4,
+html[data-theme="light"] .det h5,
+html[data-theme="light"] .det .dkv span { color: #71717a; }
+html[data-theme="light"] .det .danl,
+html[data-theme="light"] .dsum,
+html[data-theme="light"] .dkv > div,
+html[data-theme="light"] .dr,
+html[data-theme="light"] .dextra,
+html[data-theme="light"] .dextra > summary,
+html[data-theme="light"] .ds div,
+html[data-theme="light"] .pzc,
+html[data-theme="light"] .hab-kpi { color: #3f3f46; background-color: #fafafa; border-color: #e4e4e7; }
+html[data-theme="light"] .dscore { color: #166534; background: #f0fdf4; }
+html[data-theme="light"] .dscore.medio { color: #854d0e; background: #fefce8; }
+html[data-theme="light"] .dscore.alto { color: #9f1239; background: #fff1f2; }
+html[data-theme="light"] .dr.alto { border-left-color: #e11d48; background: #fff1f2; }
+html[data-theme="light"] .dr.medio { border-left-color: #eab308; background: #fefce8; }
+html[data-theme="light"] .dr.baixo { border-left-color: #22c55e; background: #f0fdf4; }
+html[data-theme="light"] .iaout textarea,
+html[data-theme="light"] .md { color: #3f3f46; }
+html[data-theme="light"] .sug { color: #7c2d12; background: #fff7ed; border-color: #fed7aa; }
+html[data-theme="light"] .stit:hover { background: #f4f4f5; }
+html[data-theme="light"] .stit.on { background: #fff7ed; }
+html[data-theme="light"] .stit b { color: #27272a; }
+html[data-theme="light"] .stit span { color: #71717a; }
+html[data-theme="light"] .ic { color: #c2410c; background: #fff7ed; }
+html[data-theme="light"] .hab-group > summary { color: #27272a; }
+html[data-theme="light"] .hab-group > summary strong { color: #c2410c; }
+html[data-theme="light"] .hab-noresult,
+html[data-theme="light"] .fin-empty { color: #71717a; background: #fafafa; border-color: #e4e4e7; }
+html[data-theme="light"] .hbar,
+html[data-theme="light"] .tg-bar { background: #e4e4e7; }
+html[data-theme="light"] .ascta { border-color: #ea580c; background: #fff7ed; }
+html[data-theme="light"] .fin-step i { color: #c2410c; background: #fff7ed; }
+html[data-theme="light"] .pban { color: #7c2d12; background: #fff7ed; border-color: #fed7aa; }
+html[data-theme="light"] .pban a { color: #c2410c; }
+html[data-theme="light"] .pln.on { border-color: #f97316; box-shadow: 0 0 0 1px #f9731640; }
+html[data-theme="light"] .pln .pr { color: #c2410c; }
+html[data-theme="light"] .tg-f div { color: #3f3f46; background: #fafafa; border-color: #e4e4e7; }
+html[data-theme="light"] .tg-n { color: #c2410c; background: #fff7ed; }
+html[data-theme="light"] .tg-n.ok { color: #166534; background: #f0fdf4; }
+html[data-theme="light"] .tg-n.w { color: #854d0e; background: #fefce8; }
+html[data-theme="light"] .hero { color: #27272a; background: linear-gradient(120deg, #fff, #fff7ed); border-color: #e4e4e7; }
+html[data-theme="light"] .hero .hk { color: #18181b; }
+html[data-theme="light"] .hero .hs,
+html[data-theme="light"] .hero .dtx { color: #71717a; }
+html[data-theme="light"] .hero .hr b { color: #c2410c; }
+html[data-theme="light"] .hero .tvb { color: #3f3f46; background: #f4f4f5; border-color: #e4e4e7; }
+html[data-theme="light"] #login { background: radial-gradient(800px 500px at 50% 0%, #f9731610, transparent 72%), #f4f4f5; }
+html[data-theme="light"] #login .box { color: #27272a; background: #fff; border-color: #e4e4e7; box-shadow: 0 24px 80px #18181b12; }
+html[data-theme="light"] #login .logo b { color: #18181b; -webkit-text-fill-color: currentColor; }
+html[data-theme="light"] #login p,
+html[data-theme="light"] #login label { color: #71717a; }
+html[data-theme="light"] #login input { color-scheme: light; color: #27272a; background: #fff; border-color: #d4d4d8; }
+html[data-theme="light"] .toast { color: #27272a; background: #fff; border-color: #e4e4e7; }
+html[data-theme="light"] .toast button { color: #3f3f46; background: #f4f4f5; }
+
+.theme-toggle {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  margin: 8px 0 6px;
+  padding: 9px 12px;
+  color: #a1a1aa;
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 9px;
+  box-shadow: none;
+  font-size: 12px;
+}
+.theme-toggle svg { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.theme-toggle:hover { color: #fdba74; background: #27272a; }
+#login .box { position: relative; }
+#login .theme-toggle { width: auto; margin: 0 0 18px; }
+html[data-theme="light"] .theme-toggle { color: #52525b; background: #fff; border-color: #e4e4e7; }
+html[data-theme="light"] .theme-toggle:hover { color: #c2410c !important; background: #fff7ed !important; border-color: #fed7aa; }
+@media (max-width: 860px) {
+  aside .theme-toggle { width: auto; min-width: max-content; margin: 0; white-space: nowrap; }
+  aside .theme-toggle span { display: none; }
+  aside .sair { width: auto; white-space: nowrap; }
+  #login .theme-toggle { margin-bottom: 18px; }
+  html[data-theme="light"] aside { background: #fffffff5; }
+}
+
+/* The Triagem markup uses important Tailwind utilities. Keep those readable in light mode. */
+html[data-theme="light"] .tg-i { color: #27272a !important; background: #fff !important; border-color: #e4e4e7 !important; }
+html[data-theme="light"] .tg-i:hover { border-color: #d4d4d8 !important; }
+html[data-theme="light"] .tg-i .tg-o { color: #18181b !important; }
+html[data-theme="light"] .tg-i [class*="text-zinc-100"],
+html[data-theme="light"] .tg-i [class*="text-zinc-200"],
+html[data-theme="light"] .tg-i [class*="text-zinc-300"] { color: #3f3f46 !important; }
+html[data-theme="light"] .tg-i [class*="text-zinc-400"],
+html[data-theme="light"] .tg-i [class*="text-zinc-500"] { color: #71717a !important; }
+html[data-theme="light"] .tg-i [class*="bg-zinc-900"],
+html[data-theme="light"] .tg-i [class*="bg-zinc-800"] { background-color: #f4f4f5 !important; }
+html[data-theme="light"] .tg-i [class*="border-zinc-800"],
+html[data-theme="light"] .tg-i [class*="border-zinc-700"] { border-color: #e4e4e7 !important; }
+html[data-theme="light"] .tg-i [class*="text-orange-400"] { color: #c2410c !important; }
+html[data-theme="light"] .tg-i .tg-a button,
+html[data-theme="light"] .tg-i .tg-a a { color: #3f3f46 !important; background: #f4f4f5 !important; border-color: #e4e4e7 !important; }
+html[data-theme="light"] .tg-i .tg-a button:hover,
+html[data-theme="light"] .tg-i .tg-a a:hover { background: #e4e4e7 !important; }
