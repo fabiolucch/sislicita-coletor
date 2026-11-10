@@ -345,6 +345,12 @@ async function enviarVerif(tipo,id){
 }
 async function verDocVerif(path){const {data,error}=await sb.storage.from('verificacoes').createSignedUrl(path,120);if(error)return toast(error.message);window.open(data.signedUrl,'_blank','noopener');}
 function decidirVerif(id,ok){let m=null;if(!ok){m=prompt('Motivo da recusa (o cliente verá):');if(m===null)return;}rpcOk('decidir_verificacao',{p_id:id,p_aprovar:ok,p_motivo:m},ok?'Verificação aprovada':'Verificação recusada');}
+const UFS_HAB=['AC','AL','AM','AP','BA','CE','DF','ES','GO','MA','MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN','RO','RR','RS','SC','SE','SP','TO'];
+function ufPicker(cod,tipo,uf){const u=UFS_HAB.includes((uf||'').toUpperCase())?uf.toUpperCase():'SP';return `<select id="uf_${cod}" style="width:auto;padding:5px 6px" onchange="ufInfo('${cod}','${tipo}')">${UFS_HAB.map(x=>`<option ${x===u?'selected':''}>${x}</option>`).join('')}</select><button class="sec" onclick="abrirUF('${cod}','${tipo}')">Emitir ↗</button><span id="ufo_${cod}" class="sub" style="flex-basis:100%;text-align:right">${ufObs(tipo,u)}</span>`;}
+function ufLinks(tipo,u){return (window.__HAB.lufs||[]).filter(x=>x.uf===u&&(x.tipo===tipo||(tipo==='estadual'&&x.tipo==='estadual_divida_ativa')));}
+function ufObs(tipo,u){return ufLinks(tipo,u).map(x=>x.observacao?esc(x.observacao)+(x.tipo==='estadual_divida_ativa'?` <a href="${x.url}" target="_blank" rel="noopener">Emitir na PGE ↗</a>`:''):'').filter(Boolean).join(' ');}
+function ufInfo(cod,tipo){$('#ufo_'+cod).innerHTML=ufObs(tipo,$('#uf_'+cod).value);}
+function abrirUF(cod,tipo){const l=ufLinks(tipo,$('#uf_'+cod).value).find(x=>x.tipo===tipo);if(!l)return toast('Link não cadastrado para este estado.');window.open(l.url,'_blank','noopener');}
 async function salvarHab(campos){const {pj,H}=window.__HAB;const row={pessoa_juridica_id:pj.id,natureza:H.natureza,uf:H.uf,municipio:H.municipio,etapas:H.etapas||{},...campos,atualizado_em:new Date().toISOString()};const {error}=await sb.from('hab_empresas').upsert(row);if(error)return toast(error.message);ir('habilitacao');}
 function marcarEtapa(k,v){const et={...(window.__HAB.H.etapas||{})};et[k]=v;salvarHab({etapas:et});}
 function novoDocHab(cod){const c=window.__HAB.cat.find(x=>x.codigo===cod);const hoje=new Date().toISOString().slice(0,10);
@@ -465,8 +471,8 @@ const V={
   const topo=`<div class="top"><div><h2>Habilitação</h2><p class="sub">Cadastro no SICAF e certidões exigidas pela Lei 14.133 (arts. 62 a 70), com alerta de vencimento.</p></div></div>`;
   if(!pjs||!pjs.length){main.innerHTML=topo+'<div class="card vazio">Nenhuma empresa (CNPJ) cadastrada nesta organização. A empresa informada no cadastro da conta aparece aqui.</div>';return;}
   const pid=(window.ARG&&window.ARG.pj)||window.__HABPJ||pjs[0].id;const pj=pjs.find(x=>x.id===pid)||pjs[0];window.__HABPJ=pj.id;
-  const [{data:cat},{data:he},{data:docs}]=await Promise.all([sb.from('hab_catalogo').select('*').order('ordem'),sb.from('hab_empresas').select('*').eq('pessoa_juridica_id',pj.id).maybeSingle(),sb.from('hab_documentos').select('*').eq('pessoa_juridica_id',pj.id).order('criado_em',{ascending:false})]);
-  const H=he||{natureza:null,uf:pj.uf||'',municipio:pj.municipio||'',etapas:{}};window.__HAB={pj,H,cat:cat||[]};
+  const [{data:cat},{data:he},{data:docs},{data:lufs}]=await Promise.all([sb.from('hab_catalogo').select('*').order('ordem'),sb.from('hab_empresas').select('*').eq('pessoa_juridica_id',pj.id).maybeSingle(),sb.from('hab_documentos').select('*').eq('pessoa_juridica_id',pj.id).order('criado_em',{ascending:false}),sb.from('hab_links_uf').select('*')]);
+  const H=he||{natureza:null,uf:pj.uf||'',municipio:pj.municipio||'',etapas:{}};window.__HAB={pj,H,cat:cat||[],lufs:lufs||[]};
   const NAT={mei:'MEI',ei:'Empresário individual',ltda:'Sociedade limitada (inclui unipessoal e antiga EIRELI)',sa:'Sociedade anônima',coop:'Cooperativa',ss:'Sociedade simples',assoc:'Associação ou fundação'};
   const ult={};(docs||[]).forEach(d=>{if(!ult[d.codigo])ult[d.codigo]=d;});
   const itens=(cat||[]).filter(c=>H.natureza?c.naturezas.includes(H.natureza):c.naturezas.includes('ltda'));
@@ -474,7 +480,7 @@ const V={
   const st=c=>{const d=ult[c.codigo];if(!d)return c.obrigatorio?{k:'bad',t:'Falta',ok:false}:{k:'',t:'Opcional',ok:true,op:true};if(!d.valido_ate)return {k:'ok',t:'Enviado',ok:true};const n=dias(d.valido_ate);if(n<0)return {k:'bad',t:`Vencido há ${-n} dia(s)`,ok:false};if(n<=15)return {k:'w',t:`Vence em ${n} dia(s)`,ok:true};return {k:'ok',t:`Válido até ${dt(d.valido_ate)}`,ok:true};};
   const obr=itens.filter(c=>c.obrigatorio),okN=obr.filter(c=>st(c).ok).length,pct=obr.length?Math.round(okN/obr.length*100):0;
   const venc=itens.filter(c=>ult[c.codigo]&&st(c).k!=='ok'&&st(c).k!=='').length;
-  const lk=c=>c.link?c.link.replace('{UF}',encodeURIComponent(H.uf||'')).replace('{MUNICIPIO}',encodeURIComponent(H.municipio||'')):null;
+  const lk=c=>c.link&&!c.link.startsWith('uf:')?c.link.replace('{UF}',encodeURIComponent(H.uf||'')).replace('{MUNICIPIO}',encodeURIComponent(H.municipio||'')):null;
   const GR=[['credenciamento','Identificação (SICAF Nível I)'],['juridica','Habilitação jurídica (Nível II · art. 66)'],['fiscal','Regularidade fiscal, social e trabalhista (Níveis III e IV · art. 68)'],['tecnica','Qualificação técnica (Nível V · art. 67)'],['economica','Qualificação econômico-financeira (Nível VI · art. 69)'],['declaracoes','Declarações (arts. 63 e 68)'],['impedimentos','Impedimentos e sanções'],['sicaf','SICAF']];
   const SICAF='https://www3.comprasnet.gov.br/sicaf-web/index.jsf';
   const ET=[['govbr','Conta gov.br prata ou ouro do responsável','O SICAF exige a conta gov.br com selo de confiabilidade (prata ou ouro) de um sócio ou responsável.','https://www.gov.br/governodigital/pt-br/conta-gov-br'],
@@ -493,7 +499,7 @@ const V={
   <div class="card"><h3>Passo a passo do SICAF</h3>${ET.map(e=>`<div class="etp ${H.etapas&&H.etapas[e[0]]?'ok':''}"><input type="checkbox" ${H.etapas&&H.etapas[e[0]]?'checked':''} onchange="marcarEtapa('${e[0]}',this.checked)"><div><b>${e[1]}</b><div class="sub">${e[2]}${e[3]?` <a href="${e[3]}" target="_blank" rel="noopener">Abrir ↗</a>`:''}</div></div></div>`).join('')}
    <p class="sub" style="margin-top:10px">Guias oficiais: <a href="https://www.gov.br/pt-br/servicos/cadastrar-se-como-fornecedor-da-administracao-publica" target="_blank" rel="noopener">serviço "Cadastrar-se como fornecedor"</a> · <a href="https://tutoriais.comprasgovernamentais.gov.br/sicaf/html/" target="_blank" rel="noopener">tutoriais do SICAF</a>. O cadastro no SICAF é gratuito. Estados e municípios podem ter cadastro próprio de fornecedores; vale sempre o que o edital pedir.</p></div>
   ${GR.map(([g,tt])=>{const its=itens.filter(c=>c.grupo===g);if(!its.length)return '';return `<div class="card"><h3>${tt}</h3><div class="hgrid">${its.map(c=>{const s=st(c),d=ult[c.codigo],l=lk(c);return `<div class="hrow"><div><div class="nm">${esc(c.nome)} ${c.obrigatorio?'':'<span class="tag">conforme o edital</span>'}</div><div class="sub">${esc(c.base_legal||'')}${c.nivel_sicaf?` · SICAF nível ${c.nivel_sicaf}`:''}${c.validade_dias?` · validade usual ${c.validade_dias} dias`:''}${c.sicaf_automatico?' · o SICAF consulta sozinho':''}</div><div class="sub">${esc(c.como_obter||'')}</div>${d&&d.observacao?`<div class="sub">Obs.: ${esc(d.observacao)}</div>`:''}</div>
-   <div class="ac"><span class="tag ${s.k}">${s.t}</span>${l?`<a href="${l}" target="_blank" rel="noopener"><button class="sec">Emitir ↗</button></a>`:''}${d&&d.arquivo_path?`<button class="sec" onclick="verDocHab('${esc(d.arquivo_path)}')">Ver</button>`:''}<button onclick="novoDocHab('${c.codigo}')">${d?'Atualizar':'Enviar'}</button></div></div>`;}).join('')}</div></div>`;}).join('')}`;
+   <div class="ac"><span class="tag ${s.k}">${s.t}</span>${l?`<a href="${l}" target="_blank" rel="noopener"><button class="sec">Emitir ↗</button></a>`:''}${c.link&&c.link.startsWith('uf:')?ufPicker(c.codigo,c.link.slice(3),H.uf):''}${d&&d.arquivo_path?`<button class="sec" onclick="verDocHab('${esc(d.arquivo_path)}')">Ver</button>`:''}<button onclick="novoDocHab('${c.codigo}')">${d?'Atualizar':'Enviar'}</button></div></div>`;}).join('')}</div></div>`;}).join('')}`;
  },
 
  organizacao:async()=>{

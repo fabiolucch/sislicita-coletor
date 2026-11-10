@@ -219,7 +219,7 @@ insert into public.hab_catalogo (codigo, nome, grupo, nivel_sicaf, base_legal, n
  ('cndt', 'Certidão Negativa de Débitos Trabalhistas (CNDT)', 'fiscal', 3, 'Lei 14.133, art. 68, V', '{mei,ei,ltda,sa,coop,ss,assoc,pf}', true, 180,
   'https://cndt-certidao.tst.jus.br/inicio.faces', 'Emitida pelo TST informando o CNPJ (ou CPF).', true, 52),
  ('cnd_estadual', 'Certidão de regularidade fiscal estadual (sede)', 'fiscal', 4, 'Lei 14.133, art. 68, III', '{mei,ei,ltda,sa,coop,ss,assoc,pf}', true, null,
-  'https://www.google.com/search?q=certid%C3%A3o+negativa+de+d%C3%A9bitos+estaduais+SEFAZ+{UF}', 'Emitida no site da Secretaria da Fazenda do estado da sede. A validade varia por estado: informe a data que consta na certidão.', false, 53),
+  'uf:estadual', 'Escolha o estado da sede e emita no site oficial da Secretaria da Fazenda. A validade varia por estado: informe a data que consta na certidão.', false, 53),
  ('cnd_municipal', 'Certidão de regularidade fiscal municipal (sede)', 'fiscal', 4, 'Lei 14.133, art. 68, III', '{mei,ei,ltda,sa,coop,ss,assoc,pf}', true, null,
   'https://www.google.com/search?q=certid%C3%A3o+negativa+de+d%C3%A9bitos+municipais+prefeitura+{MUNICIPIO}+{UF}', 'Emitida no site da prefeitura da sede. A validade varia por município: informe a data que consta na certidão.', false, 54),
  ('registro_conselho', 'Registro no conselho profissional (CREA, CRA, CRQ, CRF etc.), quando o objeto exigir', 'tecnica', 5, 'Lei 14.133, art. 67, V', '{mei,ei,ltda,sa,coop,ss,assoc,pf}', false, null,
@@ -229,7 +229,7 @@ insert into public.hab_catalogo (codigo, nome, grupo, nivel_sicaf, base_legal, n
  ('balanco', 'Balanço patrimonial, DRE e demonstrações contábeis dos 2 últimos exercícios', 'economica', 6, 'Lei 14.133, art. 69, I e § 6º', '{ei,ltda,sa,coop,ss,assoc}', true, null,
   null, 'Fornecido pelo contador. Empresa com menos de 2 anos apresenta só o último exercício. MEI é dispensado. Informe até quando vale (normalmente até o encerramento do exercício seguinte).', false, 70),
  ('falencia', 'Certidão negativa de falência (distribuidor da sede)', 'economica', 6, 'Lei 14.133, art. 69, II', '{ei,ltda,sa,coop,ss,assoc,mei}', true, 90,
-  'https://www.google.com/search?q=certid%C3%A3o+negativa+de+fal%C3%AAncia+tribunal+de+justi%C3%A7a+{UF}', 'Emitida no site do Tribunal de Justiça do estado da sede. A validade costuma vir na própria certidão.', false, 71),
+  'uf:falencia', 'Escolha o estado da sede e emita no site oficial do Tribunal de Justiça. A validade costuma vir na própria certidão.', false, 71),
  ('decl_menor', 'Declaração de não emprego de menor (art. 7º, XXXIII, da Constituição)', 'declaracoes', null, 'Lei 14.133, art. 68, VI', '{mei,ei,ltda,sa,coop,ss,assoc}', true, null,
   null, 'Declaração assinada pelo representante legal. Em licitações eletrônicas costuma ser marcada no próprio sistema.', false, 80),
  ('decl_reserva_cargos', 'Declaração de cumprimento da reserva de cargos (PcD e reabilitados)', 'declaracoes', null, 'Lei 14.133, art. 63, IV', '{mei,ei,ltda,sa,coop,ss,assoc}', true, null,
@@ -241,6 +241,76 @@ insert into public.hab_catalogo (codigo, nome, grupo, nivel_sicaf, base_legal, n
 on conflict (codigo) do update set nome = excluded.nome, grupo = excluded.grupo, nivel_sicaf = excluded.nivel_sicaf, base_legal = excluded.base_legal,
   naturezas = excluded.naturezas, obrigatorio = excluded.obrigatorio, validade_dias = excluded.validade_dias, link = excluded.link,
   como_obter = excluded.como_obter, sicaf_automatico = excluded.sicaf_automatico, ordem = excluded.ordem;
+
+
+-- links oficiais por UF (certidão estadual e de falência); editáveis sem publicar o site
+create table if not exists public.hab_links_uf (
+  uf text not null, tipo text not null check (tipo in ('estadual','estadual_divida_ativa','falencia')),
+  url text not null, observacao text,
+  primary key (uf, tipo)
+);
+alter table public.hab_links_uf enable row level security;
+drop policy if exists hab_links_ler on public.hab_links_uf;
+create policy hab_links_ler on public.hab_links_uf for select to authenticated using (true);
+revoke insert, update, delete on public.hab_links_uf from authenticated, anon;
+grant select on public.hab_links_uf to authenticated;
+insert into public.hab_links_uf (uf, tipo, url, observacao) values
+ ('AC','estadual','http://sefazonline.ac.gov.br/sefazonline/app.cndprincipal',null),
+ ('AC','falencia','https://www.tjac.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('AL','estadual','https://contribuinte.sefaz.al.gov.br/certidao/#/emitir-certidao',null),
+ ('AL','falencia','https://www.tjal.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('AM','estadual','http://sistemas.sefaz.am.gov.br/GAE/mnt/dividaAtiva/certidaoNegativa/emitirCertidaoNegativaNaoContPortal.do',null),
+ ('AM','falencia','https://www.tjam.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('AP','estadual','https://www.sefaz.ap.gov.br/sate/seg/SEGf_AcessarFuncao.jsp?cdFuncao=DIA_060',null),
+ ('AP','falencia','https://www.tjap.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('BA','estadual','https://servicos.sefaz.ba.gov.br/sistemas/DSCRE/Modulos/Publico/EmissaoCertidao.aspx',null),
+ ('BA','falencia','https://portalcertidoes.tjba.jus.br/#/primeirograu',null),
+ ('CE','estadual','https://consultapublica.sefaz.ce.gov.br/certidaonegativa/preparar-consultar',null),
+ ('CE','falencia','https://www.tjce.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('DF','estadual','https://ww1.receita.fazenda.df.gov.br/cidadao/certidoes/Certidao',null),
+ ('DF','falencia','https://www.tjdft.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('ES','estadual','https://s2-internet.sefaz.es.gov.br/certidao/cnd',null),
+ ('ES','falencia','https://www.tjes.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('GO','estadual','http://www.sefaz.go.gov.br/Certidao/Emissao/',null),
+ ('GO','falencia','https://www.tjgo.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('MA','estadual','https://sistemas1.sefaz.ma.gov.br/certidoes/jsp/emissaoCertidaoNegativa/emissaoCertidaoNegativa.jsf',null),
+ ('MA','falencia','https://www.tjma.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('MG','estadual','https://cdt.fazenda.mg.gov.br/',null),
+ ('MG','falencia','https://www.tjmg.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('MS','estadual','https://servicos.efazenda.ms.gov.br/pndfis/Home/Emissao',null),
+ ('MS','falencia','https://esaj.tjms.jus.br/sco/abrirCadastro.do',null),
+ ('MT','estadual','https://www.sefaz.mt.gov.br/cnd/certidao/servlet/ServletRotdAberto?origem=60',null),
+ ('MT','falencia','https://sec.tjmt.jus.br/',null),
+ ('PA','estadual','https://app.sefa.pa.gov.br/emissao-certidao/template.action',null),
+ ('PA','falencia','https://www.tjpa.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('PB','estadual','https://www.sefaz.pb.gov.br/servirtual/certidoes/emissao-de-certidao-de-debitos-cidadao',null),
+ ('PB','falencia','https://www.tjpb.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('PE','estadual','https://efisco.sefaz.pe.gov.br/sfi_trb_gpf/PREmitirCertidaoNegativaNarrativaDebitoFiscal',null),
+ ('PE','falencia','https://www.tjpe.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('PI','estadual','https://siatweb.sefaz.pi.gov.br/portal-publico/',null),
+ ('PI','falencia','https://www.tjpi.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('PR','estadual','https://cdwfazenda.paas.pr.gov.br/cdwportal/certidao/automatica',null),
+ ('PR','falencia','https://www.tjpr.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('RJ','estadual','https://crf-unificada-web.fazenda.rj.gov.br/crf-unificada-web/#/',null),
+ ('RJ','falencia','https://www.tjrj.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('RN','estadual','https://uvt2.set.rn.gov.br/#/services/certidao-negativa/emitir',null),
+ ('RN','falencia','https://www.tjrn.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('RO','estadual','https://portalcontribuinte.sefin.ro.gov.br/Publico/certidaoNegativa.jsp',null),
+ ('RO','falencia','https://www.tjro.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('RR','estadual','https://www.sefaz.rr.gov.br/empresa/certidao-negativa-de-debitos',null),
+ ('RR','falencia','https://www.tjrr.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('RS','estadual','https://www.sefaz.rs.gov.br/sat/CertidaoSitFiscalSolic.aspx',null),
+ ('RS','falencia','https://www.tjrs.jus.br/novo/processos-e-servicos/servicos-processuais/emissao-de-antecedentes-e-certidoes/','No RS a certidão sai como "Certidão Judicial Cível" (inclui falência e recuperação).'),
+ ('SC','estadual','https://tributario.sef.sc.gov.br/tax.NET/Sat.CtaCte.Web/SolicitacaoCnd.aspx',null),
+ ('SC','falencia','https://www.tjsc.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('SE','estadual','https://www.sefaz.se.gov.br/SitePages/emissao_certidao_negativa.aspx',null),
+ ('SE','falencia','https://www.tjse.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('SP','estadual','https://www4.fazenda.sp.gov.br/SIDEB/CertidaoNegativaDebitos/EmitirECND',null),
+ ('SP','falencia','https://esaj.tjsp.jus.br/sco/abrirCadastro.do','Escolha o modelo "Certidão Estadual de Falências, Concordatas e Recuperações Judiciais". Desde 2026 o TJSP orienta consultar também o eproc.'),
+ ('TO','estadual','https://www.to.gov.br/sefaz/cnd-certidao-negativa-de-debitos/7h3xx8lr88vg',null),
+ ('TO','falencia','https://www.tjto.jus.br/','Site oficial do Tribunal de Justiça: procure o menu Certidões e escolha a certidão de falência e recuperação judicial.'),
+ ('SP','estadual_divida_ativa','https://www.dividaativa.pge.sp.gov.br/','Em SP a certidão de débitos inscritos em dívida ativa é emitida à parte, pela Procuradoria Geral do Estado.')
+on conflict (uf, tipo) do update set url = excluded.url, observacao = excluded.observacao;
 
 -- D. habilitação por empresa ---------------------------------------------------------------------
 create table if not exists public.hab_empresas (
