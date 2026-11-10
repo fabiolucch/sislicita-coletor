@@ -433,6 +433,7 @@ html[data-theme="light"] .hero { color: #27272a; background: linear-gradient(120
 html[data-theme="light"] .hero .hk { color: #18181b; }
 html[data-theme="light"] .hero .hs,
 html[data-theme="light"] .hero .dtx { color: #71717a; }
+html[data-theme="light"] .hero .clk { color: #18181b; }
 html[data-theme="light"] .hero .hr b { color: #c2410c; }
 html[data-theme="light"] .hero .tvb { color: #3f3f46; background: #f4f4f5; border-color: #e4e4e7; }
 html[data-theme="light"] #login { background: radial-gradient(800px 500px at 50% 0%, #f9731610, transparent 72%), #f4f4f5; }
