@@ -1,6 +1,6 @@
-# SISLICITA - coletor do PNCP
+# EditalVector - radar e coletor do PNCP
 
-Coleta editais abertos e itens do PCA no PNCP e grava no Supabase (projeto SISLICITA).
+Coleta editais abertos e itens do PCA no PNCP e grava no Supabase (projeto EditalVector).
 
 - `coletor.py editais`: editais com propostas abertas (modalidades 4,5,6,7,8,12) por UF.
 - `coletor.py pca`: planos do PCA (2026 e 2027) e itens que casam com os perfis de busca ativos.
