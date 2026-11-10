@@ -72,6 +72,8 @@ export async function onRequestPost({ request, env }) {
   const auth = request.headers.get("authorization") || "";
   const u = await fetch(`${SB}/auth/v1/user`, { headers: { authorization: auth, apikey: ANON } });
   if (!u.ok) return J({ erro: "não autenticado" }, 401);
+  const ativo = await sb(auth, "rpc/usuario_ativo", { method: "POST", body: "{}" }).then(r => r.ok ? r.json() : false).catch(() => false);
+  if (ativo !== true) return J({ erro: "conta suspensa ou sem acesso" }, 403);
   if (!env.GEMINI_API_KEY) return J({ erro: "GEMINI_API_KEY não configurada" }, 500);
   const b = await request.json().catch(() => ({}));
   const okPlano = await sb(auth, "rpc/tem_recurso", { method: "POST", body: JSON.stringify({ p_recurso: "perfis" }) }).then(r => r.ok ? r.json() : false).catch(() => false);

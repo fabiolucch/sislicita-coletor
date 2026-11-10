@@ -247,6 +247,8 @@ export async function onRequestPost({ request, env }) {
   const u = await fetch(`${SB}/auth/v1/user`, { headers: { authorization: auth, apikey: ANON } });
   if (!u.ok) return J({ erro: "não autenticado" }, 401);
   const H = { authorization: auth, apikey: ANON };
+  const ativo = await fetch(`${SB}/rest/v1/rpc/usuario_ativo`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: "{}" }).then(r => r.ok ? r.json() : false).catch(() => false);
+  if (ativo !== true) return J({ erro: "conta suspensa ou sem acesso" }, 403);
   const get = async path => { const r = await fetch(`${SB}/rest/v1/${path}`, { headers: H }); return r.ok ? r.json() : []; };
 
   let b; try { b = await request.json(); } catch { return J({ erro: "JSON inválido" }, 400); }
