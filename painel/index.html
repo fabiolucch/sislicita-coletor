@@ -15,8 +15,8 @@
 .logo b{font-size:21px;color:var(--pri);letter-spacing:.3px}#login p{margin:0 0 20px;color:var(--mut)}
 input,select,textarea,button{font:inherit}input,select,textarea{width:100%;padding:9px 11px;border:1px solid var(--bd);border-radius:8px;background:#fff;color:var(--tx)}
 input:focus,select:focus,textarea:focus{outline:3px solid #24436f22;border-color:var(--pri)}
-button{cursor:pointer;border:0;border-radius:8px;padding:9px 16px;background:var(--pri);color:#fff;font-weight:500;transition:.15s}button:hover{background:var(--pri3)}button:disabled{opacity:.45;cursor:default}
-button.sec{background:var(--pri2);color:var(--pri)}button.sec:hover{background:#d8e3f3}button.bad{background:#fee2e2;color:var(--bad)}button.sm{padding:5px 11px;font-size:12.5px}
+button{cursor:pointer;border:0;border-radius:8px;padding:9px 16px;background:var(--pri);color:#fff;font-weight:500;transition:.15s}button:not(.sec):not(.bad):not(.cta):not(.stbtn):not(.gh):hover{background:var(--pri3);color:#fff}button.bad:hover{background:#fecaca;color:var(--bad)}button:disabled{opacity:.45;cursor:default}
+button.sec{background:var(--pri2);color:var(--pri)}button.sec:hover{background:#d8e3f3;color:var(--pri)}button.bad{background:#fee2e2;color:var(--bad)}button.sm{padding:5px 11px;font-size:12.5px}
 #app{display:none;min-height:100vh}
 html{scrollbar-color:#c3cfe0 transparent;scrollbar-width:thin}::-webkit-scrollbar{width:9px;height:9px}::-webkit-scrollbar-thumb{background:#c3cfe0;border-radius:9px;border:2px solid var(--bg)}::-webkit-scrollbar-track{background:transparent}
 aside{scrollbar-width:thin;scrollbar-color:#ffffff24 transparent}aside::-webkit-scrollbar{width:6px}aside::-webkit-scrollbar-thumb{background:#ffffff24;border:0;border-radius:6px}aside::-webkit-scrollbar-thumb:hover{background:#ffffff40}aside::-webkit-scrollbar-track{background:transparent}
@@ -225,6 +225,7 @@ label{display:block;font-size:12px;font-weight:500;color:var(--mut);margin:9px 0
 .etp{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line,#e2e8f0)}.etp:first-child{border-top:0}.etp input{width:auto;margin-top:4px}.etp b{font-size:14px}.etp.ok b{text-decoration:line-through;color:#64748b}
 .cta{background:#16a34a;color:#fff;border:0;font-weight:600;padding:10px 16px;border-radius:10px;font-size:14px;cursor:pointer}.cta:hover{background:#15803d}
 .ascta{border:2px solid #16a34a;background:#f0fdf4}
+.dtw{display:flex;gap:6px;align-items:center;position:relative}.dtw .dtt{flex:1;min-width:0}.dtw .dtb{min-height:0;padding:8px 10px;background:var(--pri2);color:var(--pri);border-radius:8px;flex:none}.dtw .dtb:hover{background:#d8e3f3;color:var(--pri)}.dtw .dto{position:absolute;right:0;bottom:0;width:40px;height:100%;opacity:0;pointer-events:none}
 </style>
 </head>
 <body>
@@ -237,6 +238,29 @@ const SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 const RECUP=/type=recovery/.test(location.hash);
 try{const cv=new URLSearchParams(location.search).get("convite");if(cv){localStorage.setItem("sis_convite",cv);history.replaceState(null,"",location.pathname+location.hash);}}catch(e){}
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+(function(){
+ const VD=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+ const isoToBr=(v,dt)=>{if(!v)return '';const m=v.match(/^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}))?/);if(!m)return '';return `${m[3]}/${m[2]}/${m[1]}`+(dt?` ${m[4]||'00'}:${m[5]||'00'}`:'');};
+ const brToIso=(t,dt)=>{const m=t.match(/^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{2}):(\d{2}))?$/);if(!m)return null;const d=+m[1],mo=+m[2],y=+m[3];const x=new Date(y,mo-1,d);if(x.getFullYear()!==y||x.getMonth()!==mo-1||x.getDate()!==d||y<1900||y>2100)return null;if(dt){const h=+(m[4]??0),mi=+(m[5]??0);if(h>23||mi>59)return null;return `${m[3]}-${m[2]}-${m[1]}T${String(h).padStart(2,'0')}:${String(mi).padStart(2,'0')}`;}return `${m[3]}-${m[2]}-${m[1]}`;};
+ const mask=(t,dt)=>{const d=t.replace(/\D/g,'').slice(0,dt?12:8);let r=d.slice(0,2);if(d.length>2)r+='/'+d.slice(2,4);if(d.length>4)r+='/'+d.slice(4,8);if(dt&&d.length>8)r+=' '+d.slice(8,10);if(dt&&d.length>10)r+=':'+d.slice(10,12);return r;};
+ function prep(o){if(o.dataset.dtm)return;o.dataset.dtm=1;const dt=o.type==='datetime-local';
+  const w=document.createElement('div');w.className='dtw';o.parentNode.insertBefore(w,o);
+  const t=document.createElement('input');t.type='text';t.className='dtt';t.inputMode='numeric';t.placeholder=dt?'dd/mm/aaaa hh:mm':'dd/mm/aaaa';t.autocomplete='off';
+  const b=document.createElement('button');b.type='button';b.className='dtb';b.title='Abrir calendário';b.textContent='📅';
+  w.appendChild(t);w.appendChild(b);w.appendChild(o);o.classList.add('dto');o.tabIndex=-1;
+  t.value=isoToBr(VD.get.call(o),dt);
+  Object.defineProperty(o,'value',{configurable:true,get(){return VD.get.call(o);},set(v){VD.set.call(o,v);t.value=isoToBr(v,dt);t.style.borderColor='';}});
+  const fire=()=>{o.dispatchEvent(new Event('input',{bubbles:true}));o.dispatchEvent(new Event('change',{bubbles:true}));};
+  t.addEventListener('input',()=>{const p=t.selectionStart===t.value.length;t.value=mask(t.value,dt);if(p)t.setSelectionRange(t.value.length,t.value.length);
+   if(!t.value){VD.set.call(o,'');t.style.borderColor='';fire();return;}
+   const iso=brToIso(t.value,dt);if(iso){VD.set.call(o,iso);t.style.borderColor='';fire();}else VD.set.call(o,'');});
+  t.addEventListener('blur',()=>{if(t.value&&!brToIso(t.value,dt))t.style.borderColor='var(--bad)';});
+  o.addEventListener('change',e=>{if(e.isTrusted)t.value=isoToBr(VD.get.call(o),dt);});
+  b.onclick=()=>{try{o.showPicker();}catch(e){o.style.pointerEvents='auto';o.focus();o.click();}};}
+ const run=root=>root.querySelectorAll&&root.querySelectorAll('input[type=date],input[type=datetime-local]').forEach(prep);
+ new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1){if(n.matches&&n.matches('input[type=date],input[type=datetime-local]'))prep(n);else run(n);}}))).observe(document.documentElement,{childList:true,subtree:true});
+ document.addEventListener('DOMContentLoaded',()=>run(document));
+})();
 const $=s=>document.querySelector(s), main=$('#main');
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const brl=v=>v==null?'—':Number(v).toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0});
