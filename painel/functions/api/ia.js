@@ -398,6 +398,39 @@ ${corpo}`;
       const d = Array.isArray(res) ? (res[0] || {}) : (res || {});
       return J({ ok: true, fonte, prazo, ...d });
     }
+    if (b.acao === "disputa") {
+      // Regras operacionais da disputa, lidas no edital: modo, intervalo mínimo entre lances, portal e prazos.
+      const [tx] = await get(`edital_textos?oportunidade_id=eq.${id}&select=texto,arquivo`);
+      let pncpFora = false;
+      const pdfs = tx?.texto ? [] : await pdfsDoEdital(op.numero_controle_pncp, env).catch(e => { if (e.message === "PNCP_FORA") pncpFora = true; return Object.assign([], { motivo: "" }); });
+      if (pncpFora && !tx?.texto) return J({ erro: "PNCP_FORA" }, 503);
+      const fonte = tx?.texto || pdfs.length ? "edital" : "objeto";
+      const corpo = pdfs.length ? `O EDITAL COMPLETO VAI ANEXADO EM PDF.` : tx?.texto ? `TEXTO DO EDITAL (${tx.arquivo || ""}):\n${recortar(tx.texto)}` : "";
+      const prompt = `Você prepara a DISPUTA (fase de lances) de uma licitação pública brasileira para uma empresa fornecedora.
+${ctx}
+${corpo}
+Responda SOMENTE um objeto JSON, sem texto fora dele. Use null quando o edital não disser; NÃO invente:
+{
+ "portal": "comprasnet" ou "licitacoes-e" ou "bll" ou "bnc" ou "portal-compras-publicas" ou "outro",
+ "uasg": "código da UASG/unidade compradora, só dígitos",
+ "numero_portal": "número do pregão/dispensa no portal (ex.: 90012/2026)",
+ "modo_disputa": "aberto" ou "aberto_fechado" ou "fechado_aberto" ou "dispensa" ou "nao_identificado",
+ "intervalo_tipo": "valor" ou "percentual",
+ "intervalo_minimo": número do intervalo mínimo de diferença entre lances (R$ ou %), ou null,
+ "julgamento_por": "item" ou "lote" ou "global",
+ "srp": true ou false,
+ "exclusivo_me_epp": true ou false,
+ "limite_envio_proposta": "data e hora limite para cadastrar a proposta, como está no edital",
+ "abertura_sessao": "data e hora da sessão de disputa, como está no edital",
+ "lance_intermediario_permitido": true ou false,
+ "regras_lance": ["frases curtas: regras que afetam o envio de lances (prorrogação automática, tempo aleatório, empate ficto ME/EPP, desempate)"],
+ "atencao": ["até 4 frases curtas: o que pode desclassificar na disputa (planilha, marca, amostra, negociação final)"],
+ "passos_portal": ["passo a passo curto do que o fornecedor faz no portal até a disputa começar"]
+}
+O intervalo mínimo costuma aparecer como "intervalo mínimo de diferença de valores/percentuais entre os lances".`;
+      const r = await gemini(env, prompt, true);
+      return J({ ok: true, fonte, ...r });
+    }
     if (b.acao === "checklist") {
       const eid = parseInt(b.empresa_id, 10);
       if (!eid) return J({ erro: "informe empresa_id" }, 400);
