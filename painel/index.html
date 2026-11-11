@@ -290,7 +290,7 @@ function bannerPlano(){const P=window.__PL;if(!P||window.__ADM||P.plano==='plata
  if(P.situacao==='teste'&&P.teste_ate){const dias=Math.ceil((new Date(P.teste_ate)-Date.now())/864e5),pl=P.plano_apos_teste||P.solicitado;return `<div class="pban">${dias>0?`Teste grátis: <b>${dias} dia(s) restantes</b>. Acesso completo ativo.`:'Seu teste grátis terminou.'} ${pl?`Plano escolhido para continuar: <b>${esc(pl==='premium'?'Premium':'Básico')}</b>.`:'Escolha Básico ou Premium em Planos.'}<a onclick="ir('planos')">Ver planos</a></div>`;}
  if(P.plano==='gratuito')return `<div class="pban">Seu acesso inclui <b>pesquisa de editais e PCA</b>. Para Radar, IA, acompanhamento e habilitação, conheça o <b>Premium</b>.<a onclick="ir('planos')">Ver planos</a></div>`;return '';}
 function telaBloqueada(t){const r=REQ[t];main.innerHTML=`${bannerPlano()}<div class="upgrade-page"><div class="upgrade-lock">✳</div><span>RECURSO PREMIUM</span><h2>${esc(TELAS[t])}</h2><p>${esc(RECN[r]||TELAS[t])} está incluído no Plano Premium. Acesse o Radar com IA, acompanhe processos licitatórios e organize a habilitação SICAF de empresas e pessoas.</p><div class="upgrade-actions"><button onclick="ir('planos')">Conhecer o Premium <b>↗</b></button>${window.__PL?.solicitado?`<span class="tag w">Interesse no ${esc(window.__PL.solicitado)} registrado</span>`:`<button class="sec" onclick="solicitarPlano('premium')">Tenho interesse no Premium</button>`}</div><small>Seu acesso atual a pesquisas de editais e ao PCA continua disponível.</small></div>`;return Promise.resolve();}
-async function solicitarPlano(c){if(window.__PL?.situacao==='teste'){const {error}=await sb.rpc('escolher_plano_apos_teste',{p_plano:c});if(error)return toast(error.message);await carregarPlano();toast(`Plano ${c==='premium'?'Premium':'Básico'} salvo para depois do teste.`);return ir('planos');}const {error}=await sb.rpc('solicitar_plano',{p_plano:c,p_obs:'Interesse registrado pelo sistema de planos.'});if(error)return toast(error.message);await carregarPlano();toast('Solicitação registrada. O checkout será disponibilizado quando o pagamento estiver integrado.');ir('planos');}
+async function solicitarPlano(c){const P=window.__PL||{},emTeste=P.situacao==='teste'&&P.teste_ate&&new Date(P.teste_ate)>new Date();if(emTeste){const {error}=await sb.rpc('escolher_plano_apos_teste',{p_plano:c});if(error)return toast(error.message);await carregarPlano();toast(`Plano ${c==='premium'?'Premium':'Básico'} salvo para depois do teste.`);return ir('planos');}const {error}=await sb.rpc('solicitar_plano',{p_plano:c,p_obs:'Interesse registrado pelo sistema de planos.'});if(error)return toast(error.message);await carregarPlano();toast('Solicitação registrada. O checkout será disponibilizado quando o pagamento estiver integrado.');ir('planos');}
 async function cancelarPlanoAposTeste(){if(!confirm('Cancelar a continuidade após o período gratuito? O acesso completo segue até a data final do teste.'))return;const {error}=await sb.rpc('cancelar_plano_apos_teste');if(error)return toast(error.message);await carregarPlano();toast('Continuidade após o teste cancelada.');ir('planos');}
 async function definirPlano(o,voltar='organizacao',uid=null){const sufixo=uid?uid+'_':'';const pl=$('#pl_'+sufixo+o).value,st=$('#st_'+sufixo+o).value;const teste=st==='teste'?new Date(Date.now()+7*864e5).toISOString():null;const {error}=await sb.rpc('definir_plano',{p_org:o,p_plano:pl,p_situacao:st,p_teste_ate:teste,p_periodo_fim:null});if(error)return toast(error.message);toast('Plano atualizado');ir(voltar);}
 function ir(t,arg){if(!TELAS[t]||(!window.__ADM&&SO_ADM.includes(t)))t='home';tela=t;window.ARG=arg;location.hash=t;scrollTo(0,0);$('#nav').innerHTML=renderNav(t);main.innerHTML='<div class="vazio">Carregando…</div>';(REQ[t]&&!pode(REQ[t])?telaBloqueada(t):V[t]()).catch(e=>main.innerHTML=`<div class="vazio">Erro: ${esc(e.message)}</div>`);}
@@ -1044,12 +1044,12 @@ function pintarDetBasico(d){const c=d.__ctx,o=c.op||{},its=c.its||[],fim=o.data_
 // Documentos do edital no PNCP, com link direto para baixar (o painel nao guarda os arquivos).
 async function arquivosEdital(d){
  const box=d.querySelector('.darq');if(!box)return;
- if(d.__arq){pintarArq(box,d.__arq);return;}
+ if(d.__arq){pintarArq(box,d.__arq,d.__ctx.id);return;}
  box.innerHTML='<div class="m">Buscando os documentos do edital…</div>';
  try{const j=await iaApi('arquivos',d.__ctx.id);d.__arq=j.arquivos||[];}catch(e){box.innerHTML=`<div class="m">Não consegui listar os documentos agora (${esc(e.message)}). Use o botão PNCP.</div>`;return;}
- pintarArq(box,d.__arq);}
+ pintarArq(box,d.__arq,d.__ctx.id);}
 IC.dl='<path d="M12 3v12m0 0l-4-4m4 4l4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>';
-function pintarArq(box,l){
+function pintarArq(box,l,opId){
  if(!l.length){box.innerHTML='<h4>Documentos do edital</h4><div class="m">O PNCP não lista documentos para este edital. Use o botão PNCP.</div>';return;}
  const cont={},tot={};l.forEach(a=>{const k=a.tipo||'Anexo';tot[k]=(tot[k]||0)+1;});
  box.innerHTML='<h4>Documentos do edital</h4><div class="darq-l">'+l.map(a=>{const k=a.tipo||'Anexo';cont[k]=(cont[k]||0)+1;const nome=tot[k]>1?`${k} ${cont[k]}`:k;
@@ -1057,7 +1057,7 @@ function pintarArq(box,l){
  box.querySelectorAll('button[data-n]').forEach(bt=>bt.onclick=async()=>{
   const t=bt.innerHTML;bt.disabled=true;bt.textContent='Baixando…';
   try{const {data:{session}}=await sb.auth.getSession();
-   const r=await fetch('/api/ia',{method:'POST',headers:{authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:JSON.stringify({acao:'baixar',oportunidade_id:box.parentElement.__ctx.id,n:+bt.dataset.n})});
+   const r=await fetch('/api/ia',{method:'POST',headers:{authorization:'Bearer '+session.access_token,'content-type':'application/json'},body:JSON.stringify({acao:'baixar',oportunidade_id:opId,n:+bt.dataset.n})});
    if(!r.ok){const j=await r.json().catch(()=>({}));throw new Error(j.erro||('erro '+r.status));}
    const nome=decodeURIComponent(r.headers.get('x-nome')||'edital.pdf');const u=URL.createObjectURL(await r.blob());
    const a=document.createElement('a');a.href=u;a.download=nome;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);
