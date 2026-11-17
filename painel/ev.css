@@ -362,3 +362,4 @@ table td{color:var(--tx);border-color:var(--line)}
 .lf-chave{display:block;margin-top:3px;font-size:12px;line-height:1.45;color:var(--tx2)}.lf-chave b{color:var(--tx)}
 .card>.ev-kpis{margin-top:12px}
 .ev-det{margin:6px 0 10px;font-size:13px}.ev-det summary{cursor:pointer;color:var(--tx2)}.ev-det ul{margin:6px 0 0 18px;padding:0}.ev-det li{margin:3px 0}
+.lf-trilha{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 10px}.lf-voltar{margin-right:8px}

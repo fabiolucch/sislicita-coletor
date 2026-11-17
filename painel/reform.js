@@ -91,7 +91,7 @@ V.empresa=async()=>{
  </div>
  <div class="ev-pane" data-g="emp" data-t="dados" ${aba==='dados'?'':'hidden'}>${empForm(pj)}</div>
  </div>`;
- empAuto(false);lfCnae();
+ empAuto(false);lfCnae();lfRestaurar();
 };
 function lfLinha(l){
  const s=SIT_LF[l.situacao]||SIT_LF.ativo;
@@ -135,7 +135,7 @@ async function lfBuscar(){
 }
 // navegação por níveis (servidor devolve só os filhos do nível aberto)
 async function lfNav(tipo,nivel,codigo,rotulo){
- const box=$('#lfnav');if(!box)return;window.__LFNAV=window.__LFNAV&&window.__LFNAV.tipo===tipo&&nivel?window.__LFNAV:{tipo,trilha:[]};
+ const box=$('#lfnav');if(!box)return;window.__LFNAV=window.__LFNAV&&window.__LFNAV.tipo===tipo&&nivel?window.__LFNAV:{tipo,trilha:[],origem:null};
  const N=window.__LFNAV;if(nivel){const i=N.trilha.findIndex(x=>x.nivel===nivel&&x.codigo===codigo);if(i>=0)N.trilha=N.trilha.slice(0,i+1);else N.trilha.push({nivel,codigo,rotulo});}
  box.innerHTML='<div class="vazio">Carregando…</div>';
  try{
@@ -144,8 +144,34 @@ async function lfNav(tipo,nivel,codigo,rotulo){
   box.innerHTML=lfTrilha()+(r&&r.length?r.map(x=>lfResRow(x)).join(''):'<div class="vazio">Sem subdivisões neste nível.</div>');
  }catch(e){box.innerHTML=`<div class="vazio">Erro: ${esc(e.message)}</div>`;}
 }
-function lfTrilha(){const N=window.__LFNAV;return `<div class="lf-trilha"><a onclick="window.__LFNAV=null;lfNav('${N.tipo}')">${N.tipo==='M'?'Materiais':'Serviços'}</a>${N.trilha.map(x=>` › <a onclick="lfNav('${N.tipo}','${x.nivel}','${esc(x.codigo)}')">${esc(x.codigo)} ${esc((x.rotulo||'').slice(0,40))}</a>`).join('')}</div>`;}
-function lfAbrir(k){const r=window.__LFR[k];const sel=$('#lfnt');document.querySelector('[data-g="lfadd"][data-t="nav"]').click();if(sel)sel.value=r.tipo;window.__LFNAV={tipo:r.tipo,trilha:[]};lfNav(r.tipo,r.nivel,r.codigo,r.nome);}
+function lfTrilha(){
+ const N=window.__LFNAV,t=N.trilha,ant=t.length>1?t[t.length-2]:null;
+ const alvo=t.length>1?`${esc(ant.codigo)} ${esc((ant.rotulo||'').slice(0,40))}`:N.origem==='busca'?'resultados da pesquisa':N.tipo==='M'?'Materiais':'Serviços';
+ return `<div class="lf-trilha">${t.length||N.origem==='busca'?`<button type="button" class="sec sm lf-voltar" onclick="lfVoltar()">← Voltar para ${alvo}</button>`:''}<a onclick="window.__LFNAV=null;lfNav('${N.tipo}')">${N.tipo==='M'?'Materiais':'Serviços'}</a>${t.map(x=>` › <a onclick="lfNav('${N.tipo}','${x.nivel}','${esc(x.codigo)}')">${esc(x.codigo)} ${esc((x.rotulo||'').slice(0,40))}</a>`).join('')}</div>`;
+}
+// volta um nível; no primeiro nível aberto a partir de uma pesquisa, volta aos resultados da pesquisa (que continuam na tela)
+// depois de incluir/excluir, a tela é refeita: guarda e devolve a pesquisa ou o nível aberto e a rolagem
+function lfAba(t){const b=document.querySelector('.ev-tabs[data-g="lfadd"] button[data-t="'+t+'"]');if(b)abaSel(b);}
+function lfGuardar(){
+ const nav=document.querySelector('.ev-pane[data-g="lfadd"][data-t="nav"]:not([hidden])'),q=$('#lfq');
+ window.__LFREST={nav:!!nav,q:q?q.value:'',t:$('#lft')?$('#lft').value:'',y:window.scrollY||document.documentElement.scrollTop||0,N:window.__LFNAV?JSON.parse(JSON.stringify(window.__LFNAV)):null};
+}
+async function lfRestaurar(){
+ const R=window.__LFREST;if(!R)return;window.__LFREST=null;
+ try{
+  if(R.nav&&R.N){lfAba('nav');window.__LFNAV=R.N;const ult=R.N.trilha[R.N.trilha.length-1];
+   if(ult)await lfNav(R.N.tipo,ult.nivel,ult.codigo,ult.rotulo);else await lfNav(R.N.tipo);}
+  else if(R.q){$('#lfq').value=R.q;if($('#lft'))$('#lft').value=R.t;await lfBuscar();}
+ }catch(e){}
+ window.scrollTo(0,R.y);
+}
+function lfVoltar(){
+ const N=window.__LFNAV;if(!N)return;
+ if(N.trilha.length>1){const ant=N.trilha[N.trilha.length-2];return lfNav(N.tipo,ant.nivel,ant.codigo,ant.rotulo);}
+ if(N.origem==='busca'){window.__LFNAV=null;lfAba('busca');return;}
+ window.__LFNAV=null;lfNav(N.tipo);
+}
+function lfAbrir(k){const r=window.__LFR[k];const sel=$('#lfnt');const veioDaBusca=!!document.querySelector('.ev-pane[data-g="lfadd"][data-t="busca"]:not([hidden])');lfAba('nav');if(sel)sel.value=r.tipo;window.__LFNAV={tipo:r.tipo,trilha:[],origem:veioDaBusca?'busca':null};lfNav(r.tipo,r.nivel,r.codigo,r.nome);}
 // itens de material de um PDM: vêm da API oficial sob demanda (o catálogo de itens não é carregado inteiro)
 async function lfItensPdm(pdm,pag){
  const box=$('#lfnav');
@@ -160,7 +186,7 @@ async function lfAdd(k,modo){
  const r=window.__LFR[k];if(!r)return;
  const esp=modo==='excluir'?(prompt('Motivo da exclusão (opcional):','')||null):null;
  try{await rpc('salvar_linha',{p_tipo:r.tipo,p_nivel:r.nivel,p_codigo:String(r.codigo),p_modo:modo,p_especialidade:esp,p_origem:r.origem||'manual',p_ia_motivo:r.motivo||null,p_nome:r.nome||null,p_caminho:r.caminho||null});
-  toast(modo==='excluir'?'Exclusão registrada':'Incluída na linha de fornecimento');lfMudou();V.empresa();}
+  toast(modo==='excluir'?'Exclusão registrada':'Incluída na linha de fornecimento');lfMudou();lfGuardar();V.empresa();}
  catch(e){toast(e.message);}
 }
 async function lfEditar(id){
