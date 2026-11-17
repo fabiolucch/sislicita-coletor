@@ -2,18 +2,6 @@
    Um só padrão para cards de licitação, abas, formulários, menu e habilitação,
    apoiado nas variáveis de tema já existentes (--bg, --card, --bd, --tx, --mut, --pri). */
 
-:root,html[data-theme]{
-  /* Tema único: cinza intermediário com superfícies alternadas (fundo < seção/card < elevado; campos mais escuros).
-     Contraste AA conferido para texto principal, secundário, acentos e placeholders. */
-  color-scheme:dark;
-  --bg:#3a3e45; --side:#33373d; --card:#454a52; --raise:#4f545c; --campo:#30343a;
-  --bd:#626871; --line:#5a6068; --campo-bd:#7c828b;
-  --tx:#f3f4f6; --tx2:#e5e7eb; --mut:#cfd3d9; --ph:#aeb4bc;
-  --pri:#f97316; --pri2:#f9731622; --pri3:#fdba74; --pri-tx:#18181b;
-  --ok:#86efac; --warn:#fcd34d; --bad:#fdb8c2;
-  --c-blue:#a9cdfc; --c-violet:#cdc1fd; --c-green:#86efac; --c-amber:#fcd34d; --c-red:#fdb8c2; --c-orange:#fdba74; --c-mut:#cfd3d9;
-  --sf:var(--raise); --sf2:#555a63; --r:14px; --sh:0 6px 18px #1c1f2426;
-}
 
 /* ───────── Chips: uma cor por tipo de informação ───────── */
 .chip{display:inline-flex;align-items:center;gap:5px;min-height:24px;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600;line-height:1.2;white-space:nowrap;
@@ -40,7 +28,7 @@
 .lc-ring small{display:block;margin-top:5px;font-size:9.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
 .lc-ring.hi{--rc:var(--c-green)}.lc-ring.md{--rc:var(--c-amber)}.lc-ring.lo{--rc:var(--c-red)}
 
-.lc-fav .gh{min-width:38px;min-height:38px;padding:8px;justify-content:center}
+.lc-fav .gh{min-width:38px;justify-content:center}
 .lc-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;margin:0;background:var(--line);border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
 .lc-facts>div{display:grid;gap:3px;padding:11px 20px;background:var(--sf)}
 .lc-facts span{font-size:10.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
@@ -63,10 +51,10 @@
 .lc-acts{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:13px 20px 16px}
 .lc-acts .lc-l,.lc-acts .lc-r{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
 .lc-acts .lc-r{margin-left:auto}
-.lc-acts button,.lc-acts a.gh{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:38px;padding:8px 13px;border-radius:10px;font-size:12.5px;font-weight:600;text-decoration:none;white-space:nowrap}
+.lc-acts button,.lc-acts a.gh{display:inline-flex;align-items:center;justify-content:center;gap:6px;font-weight:600;text-decoration:none;white-space:nowrap}
 .lc-acts svg{width:15px;height:15px}
-.lc-acts .lc-go{padding:9px 16px;background:var(--pri);color:#18181b;border:1px solid var(--pri);font-weight:700;letter-spacing:.02em}
-.lc-acts .lc-go:hover:not(:disabled){background:var(--pri3);color:#18181b}
+.lc-acts .lc-go{font-weight:700;letter-spacing:.02em}
+.lc-acts .lc-go:hover:not(:disabled){background:var(--pri3)}
 .lc-acts .mk-on-pos{color:var(--c-green)!important;border-color:color-mix(in srgb,var(--c-green) 45%,transparent)!important;background:color-mix(in srgb,var(--c-green) 12%,transparent)!important}
 .lc-acts .mk-on-neg{color:var(--c-red)!important;border-color:color-mix(in srgb,var(--c-red) 45%,transparent)!important;background:color-mix(in srgb,var(--c-red) 12%,transparent)!important}
 .lc>.det{margin:0;padding:0 20px 20px;border-top:1px solid var(--line);background:var(--sf)}
@@ -117,7 +105,6 @@ main .bar>*{width:100%;min-width:0}
 main .bar input[type=search]{grid-column:1/-1}
 main .card>h3{margin:0 0 6px;font-size:16px;font-weight:650;letter-spacing:-.01em}
 main .card{border-radius:16px}
-main button{min-height:40px}
 main button.sm{min-height:34px}
 .ev-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:2px 18px}
 .ev-form label:first-child{margin-top:4px}
@@ -160,7 +147,7 @@ main button.sm{min-height:34px}
   .lc-acts{padding:12px 15px 15px}
   .lc-acts .lc-l,.lc-acts .lc-r{width:100%;margin:0}
   .lc-acts .lc-r>*{flex:1 1 auto}
-  .lc-acts .lc-go{flex:1 1 100%;min-height:46px;font-size:13.5px}
+  .lc-acts .lc-go{flex:1 1 100%}
   .lc>.det{padding:0 15px 16px}
   .lc-ring{width:50px}.lc-ring i{width:46px;height:46px}.lc-ring i::before{width:36px;height:36px}.lc-ring b{height:46px;font-size:14px}
   main .top{flex-direction:column;align-items:stretch;gap:10px}
@@ -190,7 +177,7 @@ main button.sm{min-height:34px}
 .hdoc details p{margin:6px 0 0;line-height:1.6}
 .hdoc-ac{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:8px;max-width:420px}
 .hdoc-ac a{text-decoration:none}
-.hdoc-ac .anexar{background:var(--pri);color:#18181b;font-weight:700;border:1px solid var(--pri)}
+.hdoc-ac .anexar{font-weight:700}
 .hab-todo{display:grid;gap:8px;margin-top:6px}
 .hab-todo>div{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:11px;background:var(--sf)}
 .hab-todo>div span{flex:1;min-width:0;font-size:13px;color:var(--tx2)}
@@ -253,7 +240,7 @@ input::placeholder,textarea::placeholder{color:var(--ph)!important;opacity:1}
 input:disabled,select:disabled,textarea:disabled{opacity:.75;cursor:not-allowed}
 input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible,summary:focus-visible{outline:2px solid var(--pri3)!important;outline-offset:2px}
 option{background:var(--campo);color:var(--tx)}
-button{background:var(--pri);color:var(--pri-tx);border-color:transparent}
+button{border-color:transparent}
 button:hover{filter:brightness(1.06)}
 button.sec,.gh,a.gh{background:var(--raise);color:var(--tx);border:1px solid var(--bd)}
 button.sec:hover,.gh:hover{background:#5a6069}
@@ -267,7 +254,6 @@ table td{color:var(--tx);border-color:var(--line)}
 .nav-link{color:var(--tx2)!important}
 .nav-link:hover{background:#ffffff12!important;color:var(--tx)!important}
 .nav-link.on{background:var(--pri2)!important;color:var(--pri3)!important}
-.lc-acts .lc-go,.hdoc-ac .anexar{background:var(--pri);color:var(--pri-tx)}
 #login,#login .landing-page{background:var(--bg)!important;color:var(--tx)}
 .landing-auth .box{background:var(--card)!important;border-color:var(--bd)!important}
 
@@ -353,11 +339,6 @@ table td{color:var(--tx);border-color:var(--line)}
   .hab-cat>summary{grid-template-columns:30px minmax(0,1fr)}.hab-cat>summary .chip,.hab-cat>summary .hab-n{grid-column:2;justify-self:start}
   .an-sens>div{grid-template-columns:1fr auto}.an-sens i{grid-column:1/-1}
 }
-/* contraste dos contadores e selos pequenos */
-.ev-tabs .n,.ev-sub .n,.ev-tabs>button .n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:5px;font-size:11px;font-weight:700;background:#e4e6ea;color:#383c43}
-.ev-tabs>button.on .n{background:#ffedd5;color:#c2410c}
-.aib-t{display:inline-block!important;width:auto!important;color:#6d28d9!important;background:#ede9fe!important;border:1px solid #c4b5fd}
-.ev-steps li.ok .n{background:#dcfce7;color:#166534}
 /* arte da página inicial no tema cinza */
 .lv-art{--k0:#4f545c;--k1:#30343a;--k2:#5c626b;--k3:#6b717a;--k4:#9aa0a8;--k5:#e5e7eb;--a:#f97316;--a2:#fdba74;--a3:#86efac}
 .lf-chave{display:block;margin-top:3px;font-size:12px;line-height:1.45;color:var(--tx2)}.lf-chave b{color:var(--tx)}
@@ -365,117 +346,3 @@ table td{color:var(--tx);border-color:var(--line)}
 .ev-det{margin:6px 0 10px;font-size:13px}.ev-det summary{cursor:pointer;color:var(--tx2)}.ev-det ul{margin:6px 0 0 18px;padding:0}.ev-det li{margin:3px 0}
 .lf-trilha{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 10px}.lf-voltar{margin-right:8px}
 
-/* ═════════ Tema v3 — conteúdo claro, menu escuro, botões flat (mesma paleta cinza + laranja) ═════════ */
-:root,html[data-theme]{
-  color-scheme:light;
-  --bg:#f1f2f4; --side:#2b2e34; --card:#ffffff; --raise:#f4f5f7; --campo:#ffffff;
-  --bd:#d5d8dd; --line:#e3e5e9; --campo-bd:#b9bec6;
-  --tx:#23262b; --tx2:#383c43; --mut:#5d646e; --ph:#8a919b;
-  --pri:#f97316; --pri2:#f9731620; --pri3:#c2410c; --pri-tx:#ffffff;
-  --ok:#15803d; --warn:#b45309; --bad:#b91c1c;
-  --c-blue:#1d4ed8; --c-violet:#6d28d9; --c-green:#15803d; --c-amber:#b45309; --c-red:#b91c1c; --c-orange:#c2410c; --c-mut:#5d646e;
-  --sf:var(--raise); --sf2:#e9ebee; --r:8px; --sh:0 1px 2px #1f23290d,0 2px 8px #1f232910;
-}
-html{color-scheme:light;background:var(--bg)}
-body{background:var(--bg)!important;color:var(--tx)}
-::selection{background:#f9731633;color:#23262b}
-::-webkit-scrollbar-thumb{background:#c3c7cd;border-color:var(--bg)}
-
-/* menu lateral escuro: variáveis próprias só dentro dele */
-#app>aside,aside{--tx:#f3f4f6;--tx2:#e5e7eb;--mut:#b4bac3;--bd:#454a52;--line:#3d424a;--raise:#3a3f46;--pri3:#fdba74;
-  background:#2b2e34!important;border-color:#1f2227!important;color:#d5d9df;box-shadow:none}
-aside a{color:#c9ced6}
-aside a:hover{background:#ffffff12;color:#fff}
-aside a.on,aside .nav-link.on{background:#3a3f46!important;color:#fb923c!important;box-shadow:none!important}
-aside .gr{color:#8f96a0}aside .user{color:#98a0ab}aside .logo b{color:#fff}
-aside .sair,aside .theme-toggle{background:#3a3f46!important;color:#e5e7eb!important;border:1px solid #4a5058!important}
-
-/* botões: planos, cantos pequenos, tamanho uniforme */
-button,.gh,a.gh{border-radius:6px!important;box-shadow:none!important;font-weight:600;letter-spacing:0;text-transform:none}
-main button{min-height:38px;padding:8px 16px}
-main button.sm,.lc-acts button.sm{min-height:32px;padding:6px 12px;font-size:12.5px}
-.lc-acts button,.lc-acts a.gh{border-radius:6px;min-height:36px}
-button{background:var(--pri);color:#fff;border:1px solid var(--pri)}
-button:hover:not(:disabled){background:#ea6a0c;filter:none}
-button.sec,.gh,a.gh{background:#fff;color:var(--tx);border:1px solid var(--campo-bd)}
-button.sec:hover:not(:disabled),.gh:hover{background:var(--raise);border-color:#9aa0a9}
-button.danger,button.perigo{background:#fff;color:var(--bad);border:1px solid #e3b4b4}
-.ev-tabs{background:transparent}
-.ev-tabs>button,.ev-sub button,.an-tabs button{border-radius:6px!important;background:transparent!important;border:0!important;color:var(--mut)}
-.ev-tabs>button.on,.ev-tabs>button.on:hover,.ev-sub button.on{background:#fff!important;color:var(--tx)!important;box-shadow:inset 0 -2px 0 var(--pri)!important}
-
-/* campos, cartões e superfícies */
-input,select,textarea{background:#fff!important;color:var(--tx)!important;border:1px solid var(--campo-bd)!important;border-radius:6px!important}
-input::placeholder,textarea::placeholder{color:var(--ph)}
-input:disabled,select:disabled{background:#eef0f2!important;color:var(--mut)!important}
-.card,.lc,.det .dkv>div,.det .dex>div{background:var(--card);border-color:var(--bd);border-radius:10px;color:var(--tx)}
-.lc{border-radius:10px}
-.lc-ring i::before{background:var(--card)}
-.chip{border-radius:5px}
-.ev-sub{background:var(--sf2);border-color:var(--line);border-radius:8px}
-.ev-tabs{background:var(--sf2);border:1px solid var(--line);border-radius:8px}
-main .bar,.bar{background:#fff;border-radius:10px}
-main .card,.kp,.legc{border-radius:10px}
-#mtop,#mtop.on{background:#2b2e34!important;border-color:#1f2227!important}
-#mtop .mbrand,#mtop .mtit{color:#e5e7eb!important}
-#mtop .mbtn{background:#3a3f46!important;border:1px solid #4a5058!important;color:#fff!important;border-radius:6px!important}
-button.sec.on,.stbtn{border-radius:6px}
-/* botão principal: laranja padrão, texto branco; secundário: branco com borda.
-   "html body" sobe a especificidade para vencer o reset de botões do Tailwind (que deixa o fundo transparente). */
-html body button,html body .lf-ac button,html body .res button.sm,html body .hdoc-ac .anexar,html body .lc-acts .lc-go{background-color:#ea580c;background-image:none;color:#fff;border:1px solid #ea580c}
-html body button:hover:not(:disabled),html body .lc-acts .lc-go:hover:not(:disabled){background-color:#c2410c;border-color:#c2410c;color:#fff}
-html body button.sec,html body .gh,html body a.gh,html body .lf-ac button.sec,html body .res button.sec{background-color:#fff;color:var(--tx);border:1px solid var(--campo-bd)}
-html body button.sec:hover:not(:disabled),html body .gh:hover,html body .lf-ac button.sec:hover{background-color:#f1f2f4;color:var(--tx);border-color:#9aa0a9}
-html body .res>button:not(.sm){background-color:#fff;color:var(--tx);border:1px solid var(--bd);border-radius:8px}
-html body .res>button:not(.sm):hover{border-color:var(--pri);background-color:#fff7ed}
-button.bad,button.danger,button.perigo{background:#fff;color:var(--bad)!important;border:1px solid #e3b4b4}
-aside .sair,aside .theme-toggle,#mtop .mbtn{color:#e5e7eb!important}
-button:disabled{opacity:.5}
-.ev-tabs>button,.ev-sub button,.an-tabs button,.ev-tabs.sm button{background:transparent!important;color:var(--mut)!important;border:0!important}
-.ev-tabs>button:hover:not(:disabled),.ev-sub button:hover:not(:disabled){background:#0000000a!important;color:var(--tx)!important}
-.ev-tabs>button.on,.ev-tabs>button.on:hover,.ev-sub button.on{background:#fff!important;color:var(--tx)!important}
-
-/* ═════════ Responsivo: nada passa da tela; tudo quebra linha ou rola dentro do próprio bloco ═════════ */
-html,body{max-width:100%;overflow-x:clip}
-main,main>*{min-width:0;max-width:100%}
-main :where(h1,h2,h3,h4,p,li,span,small,b,a,label,td,th,div,summary,legend,dd,dt){overflow-wrap:break-word;word-break:normal}
-main :where(img,svg,video,canvas,iframe){max-width:100%}
-main :where(input,select,textarea){max-width:100%;min-width:0}
-main button,main .gh,main a.gh{max-width:100%;white-space:normal;text-align:center;line-height:1.25}
-main pre,main code{white-space:pre-wrap;overflow-wrap:anywhere}
-main table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.chip{white-space:normal;max-width:100%}
-.ev-tabs,.ev-sub,.an-tabs{max-width:100%}
-.ev-tabs>button,.ev-sub button,.an-tabs button{white-space:nowrap}
-.card,.lc,.bar,.det{min-width:0;max-width:100%}
-.ev-form,.ev-kpis,.lc-facts,.hab-nums,.dkv{min-width:0}
-.ev-form>*,.bar>*,.lc-acts>*{min-width:0}
-@media(max-width:900px){
-  main{padding-left:14px!important;padding-right:14px!important}
-  .ev-form{grid-template-columns:1fr!important}
-  .hab-head{grid-template-columns:1fr!important}
-  .lc-acts{flex-wrap:wrap}.lc-acts button,.lc-acts a.gh{flex:1 1 auto}
-  .lc-facts{grid-template-columns:1fr 1fr!important}
-  .bar{grid-template-columns:1fr 1fr!important}
-}
-@media(max-width:560px){
-  .bar,.lc-facts{grid-template-columns:1fr!important}
-  .ev-kpis{grid-template-columns:1fr 1fr!important}
-  h1{font-size:22px!important}
-  .lc-acts button,.lc-acts a.gh{flex:1 1 100%}
-}
-.hab-prog .pc{display:flex!important;align-items:baseline;gap:10px;flex-wrap:wrap}
-.hab-prog .pc b{white-space:nowrap}
-.landing-login,.landing-nav button:not(.cta){background:#fff!important;color:var(--tx)!important;border:1px solid var(--campo-bd)!important}
-.landing-lead{text-align:center}
-
-/* botões que só mudam de estado (filtros/seleção) mantêm fundo claro e texto escuro legível */
-html body button.on:not(.sec),html body .fx button,html body button.chipbtn{color:var(--tx)}
-
-/* rótulos curtos dos filtros não quebram letra a letra */
-.bar label,.bar>span,.ev-filtros label{white-space:nowrap;word-break:keep-all;overflow-wrap:normal}
-/* etiquetas e chips com contraste em fundo claro */
-.tag{background:#f1f2f4;color:var(--tx);border:1px solid var(--bd)}
-.tag.ok{background:#dcfce7;color:#166534;border-color:#86efac}
-.tag.w{background:#fef3c7;color:#92400e;border-color:#f6c560}
-.tag.b{background:#fee2e2;color:#991b1b;border-color:#f5a3a3}

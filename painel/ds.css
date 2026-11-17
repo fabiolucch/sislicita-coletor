@@ -1,0 +1,196 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   EditalVector — DESIGN SYSTEM (fonte única de verdade)
+   Carregado por último. Define tokens e componentes compartilhados; as páginas
+   não definem cores, alturas, raios nem tipografia próprios.
+   Documentação: docs/design-system.md
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ───────── 1. TOKENS ───────── */
+:root,html[data-theme]{
+  color-scheme:light;
+  /* cores — superfícies */
+  --bg:#f1f2f4; --card:#ffffff; --raise:#f4f5f7; --sf:var(--raise); --sf2:#e9ebee; --campo:#ffffff; --side:#2b2e34;
+  /* cores — bordas */
+  --bd:#d5d8dd; --line:#e3e5e9; --campo-bd:#b9bec6;
+  /* cores — texto (contraste AA sobre --card e --bg) */
+  --tx:#23262b; --tx2:#383c43; --mut:#5d646e; --ph:#7d848e;
+  /* marca: laranja */
+  --pri:#f97316; --pri2:#f9731620; --pri3:#c2410c; --pri-tx:#ffffff;
+  --primary:#ea580c; --primary-hover:#c2410c; --primary-soft:#fff7ed;
+  --focus:#2563eb;
+  /* semânticas (texto/ícone sobre fundo claro) */
+  --ok:#15803d; --warn:#b45309; --bad:#b91c1c; --info:#1d4ed8;
+  --c-blue:#1d4ed8; --c-violet:#6d28d9; --c-green:#15803d; --c-amber:#b45309; --c-red:#b91c1c; --c-orange:#c2410c; --c-mut:#5d646e;
+  --disabled-bg:#eceef1; --disabled-tx:#8a919b;
+  /* menu lateral */
+  --nav-bg:#2b2e34; --nav-hover:#ffffff12; --nav-active:#3a3f46; --nav-tx:#c9ced6; --nav-mut:#8f96a0; --nav-bd:#454a52;
+  /* espaçamento (múltiplos de 4) */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-8:32px; --sp-12:48px;
+  /* raios */
+  --r-sm:6px; --r-md:8px; --r-lg:12px; --r-pill:999px; --r:var(--r-lg);
+  /* alturas de controles */
+  --h-sm:32px; --h-md:40px; --h-lg:44px; --h-touch:44px;
+  /* tipografia */
+  --font:Inter,ui-sans-serif,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+  --fs-title:26px; --fs-section:18px; --fs-sub:16px; --fs-body:14px; --fs-sec:13px; --fs-cap:12px; --fs-kpi:24px;
+  /* sombras */
+  --sh-1:0 1px 2px #1f23290d; --sh-2:0 2px 8px #1f232914; --sh:var(--sh-1),var(--sh-2);
+}
+
+/* ───────── 2. BASE ───────── */
+html{color-scheme:light;background:var(--bg);max-width:100%;overflow-x:clip}
+body{background:var(--bg);color:var(--tx);font-family:var(--font);font-size:var(--fs-body);line-height:1.5;max-width:100%;overflow-x:clip}
+::selection{background:#f9731633;color:var(--tx)}
+::-webkit-scrollbar-thumb{background:#c3c7cd;border-color:var(--bg)}
+main h1,main .top h2,main>h2{font-size:var(--fs-title);line-height:1.2;letter-spacing:-.01em}
+main h3{font-size:var(--fs-sub);line-height:1.3}
+main .sub,main .m{font-size:var(--fs-sec);color:var(--mut)}
+main .ev-hint,main small{font-size:var(--fs-cap)}
+:where(a){color:var(--pri3)}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+
+/* ───────── 3. BOTÕES — Button (padrão 40px) + variantes ─────────
+   "html body" vence o reset de botões do Tailwind (fundo transparente) sem precisar de !important.
+   Tamanhos: .sm 32 · padrão 40 · .lg/.cta 44.  Variantes: primário (padrão), .sec (outline), .ghost, .bad (destrutivo), .lnk. */
+html body button,html body .gh,html body a.gh{
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--sp-2);
+  min-height:var(--h-md);padding:0 var(--sp-4);border-radius:var(--r-sm);
+  font:600 var(--fs-body)/1.2 var(--font);letter-spacing:0;text-transform:none;text-decoration:none;
+  background-color:var(--primary);background-image:none;color:#fff;border:1px solid var(--primary);box-shadow:none;
+  cursor:pointer;max-width:100%;white-space:normal;text-align:center;transition:background-color .12s,border-color .12s}
+html body button svg,html body .gh svg{width:16px;height:16px;flex:none}
+html body button:hover:not(:disabled){background-color:var(--primary-hover);border-color:var(--primary-hover);color:#fff;filter:none}
+html body button:active:not(:disabled){background-color:#9a3412;border-color:#9a3412}
+html body button.sm,html body .gh.sm{min-height:var(--h-sm);padding:0 var(--sp-3);font-size:var(--fs-sec)}
+html body button.lg,html body button.cta{min-height:var(--h-lg);padding:0 var(--sp-5)}
+html body button.sec,html body .gh,html body a.gh{background-color:#fff;color:var(--tx);border:1px solid var(--campo-bd)}
+html body button.sec:hover:not(:disabled),html body .gh:hover{background-color:var(--raise);border-color:#9aa0a9;color:var(--tx)}
+html body button.ghost{background-color:transparent;color:var(--tx2);border-color:transparent}
+html body button.ghost:hover:not(:disabled){background-color:#0000000a;color:var(--tx);border-color:transparent}
+html body button.bad,html body button.danger,html body button.perigo{background-color:#fff;color:var(--bad);border:1px solid #e3b4b4}
+html body button.bad:hover:not(:disabled){background-color:#fef2f2;color:var(--bad);border-color:#d99}
+html body button.lnk{background:none;border:0;color:var(--pri3);min-height:0;padding:0;text-decoration:underline}
+html body button:disabled{background-color:var(--disabled-bg);border-color:var(--line);color:var(--disabled-tx);cursor:not-allowed;opacity:1}
+html body button[aria-busy=true]{opacity:.75;cursor:progress}
+/* botão só-ícone: quadrado */
+html body button.icon,html body .icon-btn{min-width:var(--h-md);padding:0}
+html body button.icon.sm{min-width:var(--h-sm)}
+
+/* ───────── 4. CAMPOS — Input / Select / Textarea / Checkbox (40px) ───────── */
+main input:not([type=checkbox]):not([type=radio]):not([type=range]),main select,main textarea,#login input,#login select{
+  min-height:var(--h-md);padding:0 var(--sp-3);border:1px solid var(--campo-bd);border-radius:var(--r-sm);
+  background-color:#fff;color:var(--tx);font:400 var(--fs-body)/1.3 var(--font);max-width:100%;min-width:0;box-shadow:none}
+main textarea{padding:var(--sp-2) var(--sp-3);min-height:88px;line-height:1.5}
+main input::placeholder,main textarea::placeholder{color:var(--ph)}
+main input:hover:not(:disabled),main select:hover:not(:disabled),main textarea:hover:not(:disabled){border-color:#8f959e}
+main input:focus,main select:focus,main textarea:focus{border-color:var(--focus);outline:2px solid #2563eb33;outline-offset:0}
+main input:disabled,main select:disabled,main textarea:disabled{background:var(--disabled-bg);color:var(--disabled-tx)}
+main input[type=checkbox],main input[type=radio]{width:18px;height:18px;min-height:0;padding:0;accent-color:var(--primary)}
+main label{display:block;margin:0 0 var(--sp-1);font-size:var(--fs-sec);font-weight:600;color:var(--tx2)}
+main label.ck,main label:has(>input[type=checkbox]),main label:has(>input[type=radio]){display:flex;align-items:center;gap:var(--sp-2);font-weight:500}
+main .ev-form,main .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--sp-3) var(--sp-4)}
+.bar>*,.ev-actions>*{min-width:0}
+/* alinhamento campo + botão na mesma linha */
+main .bar,main .ev-actions{align-items:center}
+
+/* ───────── 5. CARD / SUPERFÍCIES ───────── */
+main .card,.kp,.legc,.bar{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-lg);box-shadow:var(--sh);color:var(--tx);min-width:0;max-width:100%}
+main .card{padding:var(--sp-4) var(--sp-5);margin-bottom:var(--sp-3)}
+main .card>h3:first-child{margin-top:0}
+main .bar{padding:var(--sp-3);gap:var(--sp-2) var(--sp-3);margin-bottom:var(--sp-3)}
+main .ev-kpis{gap:var(--sp-3)}
+/* indicadores numéricos */
+main .kp .n,main .ev-kpis b{font-size:var(--fs-kpi);line-height:1.2}
+
+/* ───────── 6. BADGE / CHIP / TAG (24px) ───────── */
+.chip,.tag{display:inline-flex;align-items:center;gap:var(--sp-1);min-height:24px;padding:2px var(--sp-2);border-radius:var(--r-sm);font-size:var(--fs-cap);font-weight:600;line-height:1.2;max-width:100%;white-space:normal}
+.tag{background:#f1f2f4;color:var(--tx);border:1px solid var(--bd);margin:0}
+.tag.ok{background:#dcfce7;color:#166534;border-color:#86efac}
+.tag.w{background:#fef3c7;color:#92400e;border-color:#f6c560}
+.tag.b{background:#fee2e2;color:#991b1b;border-color:#f5a3a3}
+.aib-t{display:inline-block;padding:1px 6px;margin-left:var(--sp-1);border-radius:var(--r-sm);font:600 10px/1.4 var(--mono);color:#6d28d9;background:#ede9fe;border:1px solid #c4b5fd;vertical-align:middle}
+.aib{color:#6d28d9}
+
+/* ───────── 7. ABAS — Tabs ───────── */
+main .ev-tabs,main .ev-sub{display:flex;gap:var(--sp-1);padding:var(--sp-1);margin:0 0 var(--sp-3);background:var(--sf2);border:1px solid var(--line);border-radius:var(--r-md);overflow-x:auto;scrollbar-width:none;max-width:100%}
+html body .ev-tabs>button,html body .ev-sub button,html body .an-tabs button,html body .ev-tabs.sm button{
+  flex:none;min-height:var(--h-md);padding:0 var(--sp-4);background-color:transparent;color:var(--mut);border:0;border-radius:var(--r-sm);font-size:var(--fs-sec);font-weight:600;white-space:nowrap}
+html body .ev-tabs.sm button{min-height:var(--h-sm);padding:0 var(--sp-3)}
+html body .ev-tabs>button:hover:not(:disabled),html body .ev-sub button:hover:not(:disabled){background-color:#0000000a;color:var(--tx)}
+html body .ev-tabs>button.on,html body .ev-sub button.on,html body .an-tabs button.on{background-color:#fff;color:var(--tx);box-shadow:inset 0 -2px 0 var(--primary)}
+.ev-tabs .n,.ev-sub .n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-left:6px;border-radius:var(--r-sm);font-size:11px;font-weight:700;background:#e4e6ea;color:var(--tx2)}
+.ev-tabs>button.on .n{background:#ffedd5;color:var(--pri3)}
+.ev-steps li.ok .n{background:#dcfce7;color:#166534}
+
+/* ───────── 8. MENU LATERAL (escuro) e barra superior mobile ───────── */
+#app>aside,aside{--tx:#f3f4f6;--tx2:#e5e7eb;--mut:#b4bac3;--bd:var(--nav-bd);--line:#3d424a;--raise:#3a3f46;--pri3:#fdba74;
+  background:var(--nav-bg)!important;border-color:#1f2227!important;color:var(--nav-tx);box-shadow:none}
+aside a{color:var(--nav-tx);border-radius:var(--r-sm)}
+aside a:hover{background:var(--nav-hover);color:#fff}
+aside a.on,aside .nav-link.on{background:var(--nav-active)!important;color:#fb923c!important;box-shadow:none!important}
+aside .gr{color:var(--nav-mut)}aside .user{color:#98a0ab}aside .logo b{color:#fff}
+html body aside .sair,html body aside .theme-toggle{background-color:var(--nav-active);color:#e5e7eb;border:1px solid #4a5058}
+html body aside .sair:hover{background-color:#454a52;border-color:#5a6068}
+#mtop{background:var(--nav-bg)!important;border-color:#1f2227!important}
+#mtop .mbrand,#mtop .mtit{color:#e5e7eb!important}
+html body #mtop .mbtn{background-color:var(--nav-active);border:1px solid #4a5058;color:#fff;border-radius:var(--r-sm);min-height:0}
+
+/* ───────── 9. TABELAS / LISTAS ───────── */
+main table{width:100%;border-collapse:collapse;font-size:var(--fs-sec);display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+main th{padding:var(--sp-2) var(--sp-3);text-align:left;font-size:var(--fs-cap);font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;background:var(--raise);border-bottom:1px solid var(--bd);white-space:nowrap}
+main td{padding:var(--sp-2) var(--sp-3);border-bottom:1px solid var(--line);vertical-align:top}
+main tr:hover td{background:#fafafb}
+
+/* ───────── 10. CARD DE LICITAÇÃO (.lc) — cores preservadas; só densidade e alinhamento ───────── */
+.lc{border-radius:var(--r-lg);margin-bottom:var(--sp-3)}
+.lc-facts>div{padding:var(--sp-2) var(--sp-4);gap:2px}
+.lc-acts{gap:var(--sp-2);padding:var(--sp-3) var(--sp-4)}
+html body .lc-acts button,html body .lc-acts a.gh,html body .lc-acts .gh{min-height:var(--h-sm);padding:0 var(--sp-3);font-size:var(--fs-sec)}   /* todos os botões da linha: mesma altura */
+
+/* ───────── 11. TOAST / DIÁLOGO ───────── */
+.toast{background:#2b2e34;color:#f3f4f6;border:1px solid #454a52;border-radius:var(--r-md);box-shadow:var(--sh-2)}
+.toast button{min-height:var(--h-sm)}
+
+/* ───────── 12. RESPONSIVIDADE ─────────
+   Nada passa da largura da tela: texto quebra, tabelas rolam por dentro, grades se empilham. */
+main,main>*{min-width:0;max-width:100%}
+main :where(h1,h2,h3,h4,p,li,span,small,b,a,td,th,div,summary,legend,dd,dt){overflow-wrap:break-word}
+main :where(img,svg,video,canvas,iframe){max-width:100%}
+main pre,main code{white-space:pre-wrap;overflow-wrap:anywhere}
+.bar label,.ev-filtros label{white-space:nowrap;overflow-wrap:normal}
+.card,.lc,.bar,.det,.ev-form>*,.bar>*,.lc-acts>*{min-width:0}
+@media(max-width:1024px){
+  main{padding-left:var(--sp-4)!important;padding-right:var(--sp-4)!important}
+}
+@media(max-width:900px){
+  .hab-head{grid-template-columns:1fr!important}
+  .lc-facts{grid-template-columns:1fr 1fr!important}
+  .bar{grid-template-columns:1fr 1fr!important}
+}
+@media(max-width:640px){
+  :root,html[data-theme]{--h-sm:36px;--h-md:44px;--h-lg:48px;--fs-title:22px}   /* áreas de toque (WCAG 2.2 AA: ≥ 24px; adotamos 44px) */
+  main{padding-left:var(--sp-3)!important;padding-right:var(--sp-3)!important}
+  .bar,.lc-facts{grid-template-columns:1fr!important}
+  .ev-kpis{grid-template-columns:1fr 1fr!important}
+  .lc-acts button,.lc-acts a.gh{flex:1 1 100%}
+  main .card{padding:var(--sp-3) var(--sp-4)}
+}
+@media(min-width:1600px){main{max-width:1480px}}
+
+/* ───────── 13. PÁGINA INICIAL / LANDING ───────── */
+.landing-login,.landing-nav button:not(.cta){background:#fff!important;color:var(--tx)!important;border:1px solid var(--campo-bd)!important}
+.landing-lead{text-align:center}
+.hab-prog .pc{display:flex;align-items:baseline;gap:var(--sp-3);flex-wrap:wrap}.hab-prog .pc b{white-space:nowrap}
+
+/* filtros: principais sempre à vista; avançados em área expansível */
+main .bar>.bar-av{grid-column:1/-1;flex:1 1 100%;border-top:1px solid var(--line);padding-top:var(--sp-2)}
+.bar-av>summary{cursor:pointer;font-size:var(--fs-sec);font-weight:600;color:var(--tx2);list-style:none;display:flex;align-items:center;gap:var(--sp-2);min-height:var(--h-sm)}
+.bar-av>summary::before{content:"▸";color:var(--mut);transition:transform .12s}.bar-av[open]>summary::before{transform:rotate(90deg)}
+.bar-av>summary::-webkit-details-marker{display:none}.bar-av>summary small{font-weight:400;color:var(--mut)}
+.bar-av-g{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:var(--sp-2) var(--sp-3);padding-top:var(--sp-2);align-items:center}
+.bar-av-g label.m{display:flex;gap:var(--sp-2);align-items:center;margin:0;font-weight:500;white-space:nowrap}
+html body button.dtb{min-height:var(--h-md);min-width:var(--h-md);padding:0;background-color:#fff;color:var(--tx);border:1px solid var(--campo-bd);font-size:var(--fs-body)}
+html body button.dtb:hover:not(:disabled){background-color:var(--raise);color:var(--tx)}
+@media(max-width:640px){.bar-av>summary small{display:none}}
+main .top{margin-bottom:var(--sp-4)}main .top h2{margin:0 0 var(--sp-1)}main .top .sub{margin:0}

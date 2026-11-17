@@ -13,7 +13,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./app.css">
 <link rel="stylesheet" href="./theme.css">
-<link rel="stylesheet" href="./ev.css">
+<link rel="stylesheet" href="./ev.css"><link rel="stylesheet" href="./ds.css">
 </head>
 <body>
 <div id="login">
@@ -542,11 +542,11 @@ async oportunidades(){
  <div class="bar"><input id="fq" class="grow" type="search" placeholder="Buscar no objeto (ex.: carne bovina)…"><select id="fu"><option value="">UF</option>${opts(UFS)}</select>
  <select id="fm"><option value="">Modalidade</option>${MODS.map((m,i)=>`<option value="${i}">${m[0]}</option>`).join('')}</select>
  <select id="fs"><option value="a">Abertos agora</option><option value="e">Encerrados</option><option value="t">Abertos e encerrados</option></select>
- <label class="m" style="display:flex;gap:6px;align-items:center;margin:0">Publicados de <input id="d1" type="date"></label><label class="m" style="display:flex;gap:6px;align-items:center;margin:0">até <input id="d2" type="date"></label>
+ <button onclick="pg=0;go()">Buscar</button><details class="bar-av"><summary>Mais filtros <small>período, valor, preço referencial, registro de preços e ordem</small></summary><div class="bar-av-g"><label class="m" style="display:flex;gap:6px;align-items:center;margin:0">Publicados de <input id="d1" type="date"></label><label class="m" style="display:flex;gap:6px;align-items:center;margin:0">até <input id="d2" type="date"></label>
  <input id="vmin" type="number" placeholder="Valor mín."><input id="vmax" type="number" placeholder="Valor máx.">
  <select id="fsg"><option value="">Preço referencial: todos</option><option value="s">Só sigiloso</option><option value="n">Só com valor informado</option></select>
  <select id="frp"><option value="">Registro de preços: todos</option><option value="s">Só registro de preços</option><option value="n">Sem registro de preços</option></select>
- <select id="fo2"><option value="enc">Ordenar: encerramento</option><option value="pub">Ordenar: publicação (recentes)</option><option value="val">Ordenar: maior valor</option></select><button onclick="pg=0;go()">Buscar</button></div><div id="aviso"></div><div id="lista"></div><div class="pg" id="pg"></div>`;
+ <select id="fo2"><option value="enc">Ordenar: encerramento</option><option value="pub">Ordenar: publicação (recentes)</option><option value="val">Ordenar: maior valor</option></select></div></details></div><div id="aviso"></div><div id="lista"></div><div class="pg" id="pg"></div>`;
  const iso8=v=>v&&String(v).length===8?`${v.slice(6,8)}/${v.slice(4,6)}/${v.slice(0,4)}`:null;
  let HM=null;
  (async()=>{try{const e=(await q(sb.from('coleta_estado').select('chave,valor').eq('chave','historico_min'))).data||[];HM=e[0]?.valor||null;
