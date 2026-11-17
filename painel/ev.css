@@ -359,3 +359,5 @@ table td{color:var(--tx);border-color:var(--line)}
 .ev-steps li.ok .n{background:#2f4a3c}
 /* arte da página inicial no tema cinza */
 .lv-art{--k0:#4f545c;--k1:#30343a;--k2:#5c626b;--k3:#6b717a;--k4:#9aa0a8;--k5:#e5e7eb;--a:#f97316;--a2:#fdba74;--a3:#86efac}
+.lf-chave{display:block;margin-top:3px;font-size:12px;line-height:1.45;color:var(--tx2)}.lf-chave b{color:var(--tx)}
+.card>.ev-kpis{margin-top:12px}

@@ -5,7 +5,7 @@
 'use strict';
 const NIVEL={grupo:'Grupo',classe:'Classe',pdm:'PDM (padrão descritivo)',item:'Item',secao:'Seção',divisao:'Divisão',subclasse:'Subclasse',servico:'Serviço'};
 const TIPO_CAT={M:'Material',S:'Serviço'};
-const ORIGEM_LF={manual:'Declarada por você',ia:'Sugerida pela IA e confirmada por você',sicaf_declarado:'Copiada do SICAF por você — não verificada pelo sistema'};
+const ORIGEM_LF={manual:'Declarada por você',ia:'Sugerida pela IA e confirmada por você',sicaf_declarado:'Copiada do SICAF por você — não verificada pelo sistema',historico_pncp:'Encontrada automaticamente no histórico público do CNPJ (atas de registro de preços) — não é validação do SICAF'};
 const SIT_LF={ativo:['c-green','✓','Ativa no catálogo'],inativo:['c-amber','!','Inativa no catálogo oficial'],a_conferir:['c-amber','?','Item ainda não conferido no catálogo'],nao_encontrado:['c-red','!','Não encontrada no catálogo oficial']};
 window.ST_INT={a_analisar:'A analisar',em_analise:'Em análise',viavel:'Viável',inviavel:'Inviável',arquivada:'Arquivada'};
 const ST_INT_COR={a_analisar:'c-mut',em_analise:'c-blue',viavel:'c-green',inviavel:'c-red',arquivada:'c-mut'};
@@ -23,32 +23,29 @@ async function analisarViab(opId,btn){
 }
 async function marcarInteresse(opId){try{await rpc('marcar_interesse',{p_oportunidade:Number(opId)});toast('Salva em Licitações de interesse','Abrir',()=>ir('interesses'));}catch(e){toast(e.message);}}
 
-// ------------------------------------------------------------------ início: próxima ação clara
+// ------------------------------------------------------------------ início
+// A empresa é opcional: perfis de busca funcionam sozinhos; com empresa e linha de fornecimento a busca automática por classe/grupo se soma a eles.
 V.home=async()=>{
- const [R,pjR,intR]=await Promise.all([rpc('resumo_linha').catch(()=>null),
-  sb.from('pessoas_juridicas').select('id,cnpj,razao_social,uf,municipio,descricao_atividades').order('propria',{ascending:false}).limit(1),
-  sb.rpc('listar_interesses',{p_status:null})]);
- const pj=(pjR.data||[])[0],ints=intR.data||[],r=R||{};
- const hab=pj?await habResumo(pj.id).catch(()=>null):null;
- const cadOk=!!(pj&&pj.cnpj&&pj.razao_social&&pj.uf);
- const linhaOk=(r.linhas_incluir||0)>0;
- const habOk=hab&&hab.obrig>0&&hab.ok===hab.obrig;
- const passos=[
-  ['Cadastro da empresa',cadOk?'Dados principais preenchidos.':'Confirme CNPJ, razão social e UF.',cadOk,"ir('empresa')",'Completar cadastro'],
-  ['Linha de fornecimento',linhaOk?`${r.linhas_incluir} classificação(ões) do que você fornece${r.linhas_excluir?` e ${r.linhas_excluir} exclusão(ões)`:''}.`:'Informe o que sua empresa fornece para encontrar licitações e compras planejadas compatíveis.',linhaOk,"ir('empresa',{aba:'linha'})",'Cadastrar linha'],
-  ['Habilitação',hab?(habOk?'Documentos obrigatórios anexados e válidos no cadastro.':`${hab.ok} de ${hab.obrig} documentos obrigatórios anexados e válidos.`):'Organize os documentos da empresa.',habOk,"ir('habilitacao')",'Organizar documentos'],
-  ['Oportunidades e PCA',linhaOk?`${fmtN(r.lic_confirmadas)} licitação(ões) na sua linha e ${fmtN(r.lic_revisar)} para revisar · ${fmtN(r.pca_confirmadas)} compra(s) planejada(s).`:'Aparecem depois que a linha de fornecimento for cadastrada.',linhaOk&&(r.lic_confirmadas+r.lic_revisar+r.pca_confirmadas)>0,"ir('oport')",'Ver licitações'],
-  ['Análise de viabilidade',ints.length?`${ints.length} licitação(ões) de interesse; ${ints.filter(x=>x.status==='em_analise').length} em análise.`:'Escolha uma licitação e toque em “Analisar viabilidade”.',ints.some(x=>['viavel','inviavel'].includes(x.status)),"ir('interesses')",'Abrir interesses']];
- const prox=passos.find(p=>!p[2]);
- main.innerHTML=`<div class="top"><div><h2>${pj?esc(pj.razao_social):'Bem-vindo'}</h2><p class="sub">Linha de fornecimento confiável → oportunidades e PCA relevantes → análise de viabilidade clara.</p></div></div>
- ${prox?`<div class="card ev-next"><span class="ev-next-k">Próxima ação</span><h3>${prox[0]}</h3><p>${prox[1]}</p><button onclick="${prox[3]}">${prox[4]}</button></div>`:''}
- <div class="card"><h3>Seu caminho</h3><ol class="ev-steps">${passos.map((p,i)=>`<li class="${p[2]?'ok':p===prox?'now':''}"><span class="n">${p[2]?'✓':i+1}</span><div><b>${p[0]}</b><small>${p[1]}</small></div><button class="sec sm" onclick="${p[3]}">${p[2]?'Abrir':p[4]}</button></li>`).join('')}</ol></div>
- ${linhaOk?`<div class="ev-kpis">
-   <button class="ev-kpi" onclick="ir('oport',{conf:'confirmada'})"><b>${fmtN(r.lic_confirmadas)}</b><span>Licitações abertas na sua linha</span><small>código ou classificação confirmados</small></button>
-   <button class="ev-kpi" onclick="ir('oport',{conf:'revisar'})"><b>${fmtN(r.lic_revisar)}</b><span>Possíveis, para revisar</span><small>pela descrição; sem código que confirme</small></button>
-   <button class="ev-kpi" onclick="ir('pca')"><b>${fmtN(r.pca_confirmadas)}</b><span>Compras planejadas (PCA)</span><small>planejamento, não é licitação aberta</small></button>
-   <button class="ev-kpi" onclick="ir('interesses')"><b>${fmtN(ints.length)}</b><span>Licitações de interesse</span><small>${ints.filter(x=>x.mudancas&&x.mudancas.length).length} com dados oficiais alterados</small></button></div>
-  <p class="ev-hint">Cobertura atual: itens lidos em ${fmtN(r.abertas_com_itens)} de ${fmtN(r.abertas)} licitações abertas no PNCP; a leitura avança a cada coleta. Última coleta: ${r.ultima_coleta?dt(r.ultima_coleta)+' '+new Date(r.ultima_coleta).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'—'}.</p>`:''}`;
+ const q=x=>Promise.resolve(x).catch(()=>({data:null}));
+ const [R,pjR,intR,D,temPerfil,BRr,topR]=await Promise.all([rpc('resumo_linha').catch(()=>null),
+  q(sb.from('pessoas_juridicas').select('id,cnpj,razao_social,uf').order('propria',{ascending:false}).limit(1)),
+  q(sb.rpc('listar_interesses',{p_status:null})),q(sb.rpc('dashboard_resumo')).then(r=>r.data||{}),temPerfilBusca(),
+  q(sb.from('briefings').select('*,perfis_busca(nome,ativo)').order('gerado_em',{ascending:false}).limit(60)),
+  q(sb.from('radar').select('id,score,status,justificativa,perfis_busca(nome),oportunidades!inner(id,objeto,orgao_nome,municipio,uf,modalidade,srp,valor_estimado,valor_sigiloso,data_fim_proposta,link_pncp,ia_resumo,ia_categoria,ia_atencao,ia_tipo,ia_termo,ia_catalogo_codigo,ia_catalogo_nome)').gte('oportunidades.data_fim_proposta',new Date().toISOString()).neq('status','descartado').order('score',{ascending:false}).limit(5))]);
+ const pj=(pjR.data||[])[0],ints=intR.data||[],r=R||{},linhaOk=(r.linhas_incluir||0)>0;
+ const vb=new Set(),brs=(BRr.data||[]).filter(b=>b.perfis_busca&&b.perfis_busca.ativo&&!vb.has(b.perfil_id)&&vb.add(b.perfil_id)).slice(0,3),top=topR.data||[];
+ const bid=[...new Set(brs.flatMap(b=>(b.destaques||[]).map(d=>d.id)))],bop=bid.length?Object.fromEntries(((await sb.from('oportunidades').select('id,objeto,uf').in('id',bid)).data||[]).map(o=>[o.id,o])):{};
+ const ago=iso=>{const m=Math.max(0,Math.round((Date.now()-new Date(iso))/6e4));return m<60?m+' min':m<1440?Math.round(m/60)+' h':Math.round(m/1440)+' d';};
+ const kp=(v,l,s,go)=>`<button class="ev-kpi" onclick="${go}"><b>${v}</b><span>${l}</span><small>${s}</small></button>`;
+ const avisoEmpresa=linhaOk?'':`<div class="card ev-next"><span class="ev-next-k">Automatize as buscas</span><h3>Cadastre sua empresa</h3><p>Informe o CNPJ e o sistema busca os dados públicos e sugere a linha de fornecimento (classes e grupos do catálogo) pelo que a empresa já vendeu ao governo. Com isso, licitações e compras planejadas (PCA) passam a ser buscadas automaticamente pela classe/grupo. <b>É opcional:</b> você pode pesquisar só com perfis de busca.</p><button onclick="ir('empresa',{aba:'linha'})">Cadastrar empresa e linha</button></div>`;
+ const blocoEmpresa=linhaOk?`<div class="card"><h3>Busca automática pela linha de fornecimento${pj&&pj.razao_social?' · '+esc(pj.razao_social):''}</h3><p class="sub">Classes e grupos da empresa cruzados com licitações abertas e com o PCA. ${temPerfil?'Os perfis de busca continuam valendo em paralelo.':'Você também pode criar perfis de busca para refinar.'}</p>
+  <div class="ev-kpis">${kp(fmtN(r.lic_confirmadas),'Licitações na sua linha','código ou classificação confirmados',"ir('oport',{conf:'confirmada'})")}${kp(fmtN(r.lic_revisar),'Possíveis, para revisar','pela descrição',"ir('oport',{conf:'revisar'})")}${kp(fmtN(r.pca_confirmadas),'Compras planejadas (PCA)','planejamento, não é licitação aberta',"ir('pca')")}${kp(fmtN(ints.length),'Licitações de interesse',ints.filter(x=>x.status==='em_analise').length+' em análise',"ir('interesses')")}</div>
+  <p class="ev-hint">Itens lidos em ${fmtN(r.abertas_com_itens)} de ${fmtN(r.abertas)} licitações abertas; a leitura avança a cada coleta. Última coleta: ${r.ultima_coleta?dt(r.ultima_coleta):'—'}.</p></div>`:'';
+ const briefing=!temPerfil?avisoPerfilBusca(pode('perfis')):(brs.length?brs.map(b=>`<div class="card brief"><h3>${AI('Briefing gerado por IA (Gemini)')}${esc(b.titulo||'Briefing')} <span class="m">· ${esc(b.perfis_busca&&b.perfis_busca.nome||'')} · há ${ago(b.gerado_em)}</span></h3><p style="margin:6px 0 8px;line-height:1.5">${esc(b.resumo||'')}</p>${(b.destaques||[]).map(d=>`<div class="br" style="grid-template-columns:1fr"><span class="bl" style="cursor:pointer" onclick="ir('triagem')"><b>${esc(((bop[d.id]||{}).objeto||'#'+d.id).slice(0,90))}</b> <span class="m">${esc((bop[d.id]||{}).uf||'')} — ${esc(d.motivo||'')}</span></span></div>`).join('')}${(b.alertas||[]).length?`<div style="margin-top:6px">${b.alertas.map(a=>`<span class="tag w">${esc(a)}</span>`).join(' ')}</div>`:''}</div>`).join(''):`<div class="card"><h3>Briefing</h3><p class="sub">Seus perfis de busca estão salvos. O briefing é gerado a cada coleta completa; o primeiro aparece aqui assim que for gerado.</p></div>`);
+ main.innerHTML=bannerPlano()+`<div class="top"><div><h2>${pj&&pj.razao_social?esc(pj.razao_social):'Início'}</h2><p class="sub">Pesquise por perfis de busca${linhaOk?' e pela linha de fornecimento da empresa':''}; a empresa é opcional.</p></div></div>
+ <div class="ev-kpis">${kp(fmtN(D.abertos),'Editais abertos','no PNCP agora',"ir('oportunidades')")}${kp(fmtN(D.abertos7),'Encerram em 7 dias','editais abertos',"ir('oportunidades')")}${kp(fmtN(D.pca),'Itens de PCA','previsão de compras',"ir('pca')")}${temPerfil?kp(fmtN(D.radar),'No radar',fmtN(D.radar_novo)+' novos',"ir('triagem')"):''}</div>
+ ${avisoEmpresa}${briefing}${blocoEmpresa}
+ ${temPerfil&&top.length?`<div class="card"><h3>Melhores oportunidades dos seus perfis</h3>${top.map(x=>cardOp(x.oportunidades,{score:x.score,perfil:x.perfis_busca&&x.perfis_busca.nome,just:x.justificativa})).join('')}</div>`:''}`;
 };
 async function habResumo(pjId){
  const [{data:cat},{data:he},{data:docs}]=await Promise.all([sb.from('hab_catalogo').select('codigo,naturezas,obrigatorio,validade_dias'),sb.from('hab_empresas').select('natureza').eq('pessoa_juridica_id',pjId).maybeSingle(),sb.from('hab_documentos').select('codigo,valido_ate,criado_em').eq('pessoa_juridica_id',pjId).order('criado_em',{ascending:false})]);
@@ -71,12 +68,14 @@ V.empresa=async()=>{
   <button type="button" class="${aba==='linha'?'on':''}" data-t="linha" onclick="abaSel(this)">Linha de fornecimento<span class="n ${inc.length?'c-green':'c-red'}">${inc.length||'!'}</span></button>
   <button type="button" class="${aba==='dados'?'on':''}" data-t="dados" onclick="abaSel(this)">Dados da empresa</button></div>
  <div class="ev-pane" data-g="emp" data-t="linha" ${aba==='linha'?'':'hidden'}>
+  <div id="lfauto"></div>
   <div class="card ev-destaque"><h3>Informe o que sua empresa fornece para encontrar licitações e compras planejadas compatíveis.</h3>
    <p class="sub">Escolha as classificações oficiais do Catálogo do Compras.gov.br (CATMAT para materiais, CATSER para serviços). Uma classe abrangente não significa que você fornece tudo dentro dela: refine com PDMs, itens ou serviços específicos, ou marque o que <b>não</b> fornece.</p>
+   <p class="ev-hint"><b>A classe (material) e o grupo (serviço) são a chave</b> que liga a linha da empresa ao PCA e às licitações. Escolha classes ou grupos inteiros e refine com PDM ou item quando precisar.</p>
    ${linhas&&linhas.length?lfLista(inc,exc):pend('Nenhuma linha cadastrada ainda','',"Sem a linha, o sistema não tem como direcionar oportunidades: a pesquisa ampla continua disponível em Licitações.")}
   </div>
   <div class="card"><h3>Adicionar à linha</h3>
-   <div class="ev-tabs sm" data-g="lfadd" role="tablist"><button type="button" class="on" data-t="busca" onclick="abaSel(this)">Pesquisar</button><button type="button" data-t="nav" onclick="abaSel(this);lfNav('M')">Navegar pelos níveis</button><button type="button" data-t="ia" onclick="abaSel(this)">Sugestões da IA</button><button type="button" data-t="sicaf" onclick="abaSel(this)">Tenho as linhas do SICAF</button></div>
+   <div class="ev-tabs sm" data-g="lfadd" role="tablist"><button type="button" class="on" data-t="busca" onclick="abaSel(this)">Pesquisar</button><button type="button" data-t="nav" onclick="abaSel(this);lfNav('M')">Por grupo / classe</button><button type="button" data-t="ia" onclick="abaSel(this)">Sugestões da IA</button><button type="button" data-t="sicaf" onclick="abaSel(this)">Tenho as linhas do SICAF</button></div>
    <div class="ev-pane" data-g="lfadd" data-t="busca"><div class="bar"><input id="lfq" placeholder="Nome, descrição ou código (ex.: carne bovina, 8905, 21121)" onkeydown="if(event.key==='Enter')lfBuscar()"><select id="lft"><option value="">Materiais e serviços</option><option value="M">Só materiais</option><option value="S">Só serviços</option></select><button onclick="lfBuscar()">Pesquisar</button></div><div id="lfres"></div></div>
    <div class="ev-pane" data-g="lfadd" data-t="nav" hidden><div class="bar"><select id="lfnt" onchange="lfNav(this.value)"><option value="M">Materiais (Grupo › Classe › PDM › Item)</option><option value="S">Serviços (Seção › Divisão › Grupo › Classe › Subclasse › Serviço)</option></select></div><div id="lfnav"></div></div>
    <div class="ev-pane" data-g="lfadd" data-t="ia" hidden><p class="sub">Descreva produtos e serviços com suas palavras. A IA aponta classificações <b>que existem no catálogo</b> e explica o motivo; nada entra na linha sem a sua confirmação. O CNAE não equivale a CATMAT/CATSER e só serve de contexto.</p>
@@ -91,15 +90,16 @@ V.empresa=async()=>{
  </div>
  <div class="ev-pane" data-g="emp" data-t="dados" ${aba==='dados'?'':'hidden'}>${empForm(pj)}</div>
  </div>`;
+ empAuto(false);
 };
 function lfLinha(l){
  const s=SIT_LF[l.situacao]||SIT_LF.ativo;
  return `<div class="lf-row ${l.modo==='excluir'?'exc':''}"><div class="lf-main">
-  <div class="lf-top"><span class="chip ${l.tipo==='M'?'c-blue':'c-violet'}">${TIPO_CAT[l.tipo]}</span><span class="chip c-mut">${NIVEL[l.nivel]||l.nivel} ${esc(l.codigo)}</span><span class="chip ${s[0]}">${s[1]} ${s[2]}</span></div>
+  <div class="lf-top"><span class="chip ${l.tipo==='M'?'c-blue':'c-violet'}">${TIPO_CAT[l.tipo]}</span><span class="chip c-mut">${NIVEL[l.nivel]||l.nivel} ${esc(l.codigo)}</span><span class="chip ${s[0]}">${s[1]} ${s[2]}</span>${l.principal?'<span class="chip c-green">★ Linha principal</span>':''}</div>
   <b class="lf-nome">${esc(l.nome)}</b>${l.rotulo?`<small class="lf-cam">${esc(l.rotulo)}</small>`:''}
   ${l.especialidade?`<small class="lf-esp">${l.modo==='excluir'?'Motivo':'Especialidade'}: ${esc(l.especialidade)}</small>`:''}
-  <small class="lf-orig">${esc(ORIGEM_LF[l.origem]||l.origem)} · atualizado em ${dt(l.atualizado_em)}${l.ia_motivo?` · motivo da IA: ${esc(l.ia_motivo)}`:''}</small></div>
-  <div class="lf-ac"><button class="sec sm" onclick="lfEditar('${l.id}')">Editar</button><button class="sec sm" onclick="lfRemover('${l.id}')">Remover</button></div></div>`;
+  ${l.evidencia?`<small class="lf-esp">Evidência: ${esc(l.evidencia)}</small>`:''}<small class="lf-orig">${esc(ORIGEM_LF[l.origem]||l.origem)} · atualizado em ${dt(l.atualizado_em)}${l.ia_motivo?` · motivo da IA: ${esc(l.ia_motivo)}`:''}</small></div>
+  <div class="lf-ac">${l.modo==='incluir'&&!l.principal?`<button class="sec sm" onclick="lfPrincipal('${l.id}')">Tornar principal</button>`:''}<button class="sec sm" onclick="lfEditar('${l.id}')">Editar</button><button class="sec sm" onclick="lfRemover('${l.id}')">Remover</button></div></div>`;
 }
 function lfLista(inc,exc){
  const g=t=>inc.filter(l=>l.tipo===t);
@@ -110,10 +110,21 @@ function lfResRow(r,origem,motivo){
  const k=`${r.tipo}|${r.nivel}|${r.codigo}`;window.__LFR=window.__LFR||{};window.__LFR[k]={...r,origem:origem||'manual',motivo:motivo||null};
  const ja=(window.__EMP&&window.__EMP.linhas||[]).find(l=>l.tipo===r.tipo&&l.nivel===r.nivel&&l.codigo===String(r.codigo));
  const abre=(r.nivel!=='item'&&r.nivel!=='servico');
+ const chv=lfChave(r);
  return `<div class="lf-row res ${r.ativo===false?'inat':''}"><div class="lf-main"><div class="lf-top"><span class="chip ${r.tipo==='M'?'c-blue':'c-violet'}">${TIPO_CAT[r.tipo]}</span><span class="chip c-mut">${NIVEL[r.nivel]||r.nivel} ${esc(r.codigo)}</span>${r.ativo===false?'<span class="chip c-amber">! Inativa no catálogo</span>':''}${ja?`<span class="chip c-green">✓ Já está na linha (${ja.modo==='excluir'?'exclusão':'incluída'})</span>`:''}</div>
-  <b class="lf-nome">${esc(r.nome)}</b>${r.rotulo?`<small class="lf-cam">${esc(r.rotulo)}</small>`:''}${motivo?`<small class="lf-esp">${AI()} ${esc(motivo)}</small>`:''}</div>
-  <div class="lf-ac">${abre?`<button class="sec sm" onclick="lfAbrir('${k}')">Detalhar</button>`:''}<button class="sm" onclick="lfAdd('${k}','incluir')">${origem==='ia'?'Confirmar':'Fornece'}</button><button class="sec sm" onclick="lfAdd('${k}','excluir')">Não fornece</button></div></div>`;
+  <b class="lf-nome">${esc(r.nome)}</b>${r.rotulo?`<small class="lf-cam">${esc(r.rotulo)}</small>`:''}${chv.length?`<small class="lf-chave">Chave do PCA: ${chv.map(x=>`<b>${x.nivel==='classe'?'Classe':'Grupo'} ${esc(x.codigo)}</b>${x.nome?' '+esc(x.nome):''}`).join(' · ')}</small>`:''}${motivo?`<small class="lf-esp">${AI()} ${esc(motivo)}</small>`:''}</div>
+  <div class="lf-ac">${abre?`<button class="sec sm" onclick="lfAbrir('${k}')">Detalhar</button>`:''}<button class="sm" onclick="lfAdd('${k}','incluir')">${origem==='ia'?'Confirmar':'Fornece'}</button>${chv.map(x=>`<button class="sm" onclick="lfAddChave('${k}','${x.nivel}')" title="Inclui ${x.nivel==='classe'?'a classe':'o grupo'} inteiro${x.nome?' ('+esc(x.nome)+')':''}">${x.nivel==='classe'?'Classe':'Grupo'} ${esc(x.codigo)} inteira</button>`).join('')}<button class="sec sm" onclick="lfAdd('${k}','excluir')">Não fornece</button></div></div>`;
 }
+// classe (material) e grupo (serviço) do resultado: é o nível que o PCA usa como classificação superior
+function lfChave(r){
+ const c=r.caminho||{},out=[],nomeDe=cod=>{const m=String(r.rotulo||'').split('›').map(x=>x.trim()).find(x=>x.startsWith(cod+' '));return m?m.slice(cod.length+1):'';};
+ if(r.tipo==='M'){if(c.classe&&!(r.nivel==='classe'||r.nivel==='grupo'))out.push({nivel:'classe',codigo:c.classe,nome:nomeDe(c.classe)});}
+ else{if(c.grupo&&!['grupo','secao','divisao'].includes(r.nivel))out.push({nivel:'grupo',codigo:c.grupo,nome:nomeDe(c.grupo)});
+  if(c.classe&&!['classe','grupo','secao','divisao'].includes(r.nivel))out.push({nivel:'classe',codigo:c.classe,nome:nomeDe(c.classe)});}
+ return out;
+}
+function lfAddChave(k,nivel){const r=window.__LFR[k];if(!r)return;const c=r.caminho||{};const kk=`${r.tipo}|${nivel}|${c[nivel]}`;window.__LFR[kk]={tipo:r.tipo,nivel,codigo:String(c[nivel]),nome:'',caminho:null,origem:r.origem||'manual',motivo:r.motivo||null};lfAdd(kk,'incluir');}
+async function lfPrincipal(id){try{await rpc('definir_linha_principal',{p_id:id});toast('Linha principal definida');V.empresa();}catch(e){toast(e.message);}}
 async function lfBuscar(){
  const q=$('#lfq').value.trim(),t=$('#lft').value||null,box=$('#lfres');if(!q)return;
  box.innerHTML='<div class="vazio">Pesquisando no catálogo…</div>';
@@ -191,6 +202,32 @@ async function lfSugerir(){
   box.innerHTML=(r.sugestoes||[]).length?`<p class="ev-hint">${AI()} ${r.sugestoes.length} sugestão(ões), todas conferidas no catálogo oficial. Confirme uma a uma.</p>`+r.sugestoes.map(x=>lfResRow(x,'ia',x.motivo)).join(''):'<div class="vazio">A IA não encontrou classificações seguras para essa descrição. Use a pesquisa.</div>';
  }catch(e){box.innerHTML=`<div class="vazio">${esc(e.message)}</div>`;}
 }
+// Cadastro automático pelo CNPJ: dados públicos (Receita via BrasilAPI) + o que o CNPJ já vendeu em atas de registro de preços,
+// traduzido para classe (material) e grupo (serviço). Só acrescenta; nunca remove nem altera linhas existentes.
+async function empAuto(forcar){
+ const E=window.__EMP,pj=E&&E.pj,box=$('#lfauto');if(!pj||!pj.cnpj||!box)return;
+ const jaFez=pj.dados_publicos&&pj.dados_publicos.historico_em;
+ const auto=!forcar&&!(E.linhas||[]).length&&!jaFez&&!window.__AUTO_FEITO;
+ if(!forcar&&!auto){box.innerHTML=(E.linhas||[]).length?`<div class="ev-hint">Linha preenchida a partir de ${jaFez?'consulta pública em '+dt(pj.dados_publicos.historico_em):'seus registros'}. <a class="l" onclick="empAuto(true)">Atualizar pelo histórico público do CNPJ</a></div>`:`<div class="ev-hint"><a class="l" onclick="empAuto(true)">Buscar a linha pelo histórico público do CNPJ</a></div>`;return;}
+ window.__AUTO_FEITO=true;
+ box.innerHTML='<div class="card"><div class="vazio">Consultando os dados públicos do CNPJ e o que a empresa já forneceu ao governo…</div></div>';
+ const tk=(await sb.auth.getSession()).data.session.access_token,H={authorization:'Bearer '+tk};
+ const nota=[];let rec=null,hist=null,add=0;
+ try{const r=await fetch('/api/catalogo?cnpj='+encodeURIComponent(pj.cnpj),{headers:H}).then(x=>x.json());if(!r.erro){rec=r;}else nota.push('Dados cadastrais: '+r.erro);}catch(e){nota.push('Dados cadastrais indisponíveis agora.');}
+ try{const r=await fetch('/api/catalogo?historico='+encodeURIComponent(pj.cnpj),{headers:H}).then(x=>x.json());if(r.erro)throw new Error(r.erro);hist=r;}catch(e){nota.push('Histórico de fornecimento indisponível agora ('+e.message+').');}
+ const rf=rec&&rec.receita;
+ const upd={dados_publicos:{fonte:'BrasilAPI (Receita Federal) e Dados Abertos Compras.gov.br',receita:rf||null,sicaf:rec&&rec.sicaf||null,historico_registros:hist?hist.registros:null,historico_em:hist?new Date().toISOString():null},dados_publicos_em:new Date().toISOString()};
+ if(rf){if(!pj.razao_social&&rf.razao_social)upd.razao_social=rf.razao_social;if(!pj.uf&&rf.uf)upd.uf=rf.uf;if(!pj.municipio&&rf.municipio)upd.municipio=rf.municipio;if(!pj.porte&&rf.porte)upd.porte=rf.porte;if(!pj.cnae_principal&&rf.cnae)upd.cnae_principal=rf.cnae;if(!pj.nome_fantasia&&rf.nome_fantasia)upd.nome_fantasia=rf.nome_fantasia;}
+ await sb.from('pessoas_juridicas').update(upd).eq('id',pj.id);
+ if(hist&&(hist.itens||[]).length){try{add=await rpc('salvar_linhas_historico',{p_itens:hist.itens});}catch(e){nota.push('Não foi possível gravar a linha: '+e.message);}}
+ const cn=rf?[rf.cnae_desc,...(rf.cnaes_sec||[]).map(x=>x.descricao)].filter(Boolean):[];
+ if(add>0){lfMudou();toast(`Linha de fornecimento preenchida: ${add} classe(s)/grupo(s)`);return V.empresa();}
+ box.innerHTML=`<div class="card ev-destaque"><h3>${hist&&(hist.itens||[]).length?'A linha já estava completa':'Não encontramos fornecimento anterior deste CNPJ'}</h3>
+  <p class="sub">${hist?(hist.itens||[]).length?`O histórico público (${fmtN(hist.registros)} itens de atas nos últimos 3 anos) cai em classes/grupos que já estão na linha.`:'O CNPJ não aparece como fornecedor em atas de registro de preços dos últimos 3 anos, ou é uma empresa nova. Isso não impede o uso: escolha a classe ou o grupo, ou deixe a IA sugerir a partir da atividade.':'A consulta pública não respondeu agora.'}${nota.length?' '+esc(nota.join(' ')):''}</p>
+  ${cn.length&&!(E.linhas||[]).length?`<p class="sub">Atividades registradas na Receita (CNAE, usadas só como ponto de partida; CNAE não equivale a CATMAT/CATSER): ${esc(cn.slice(0,6).join('; '))}.</p><div class="ev-actions"><button onclick="lfDoCnae()">${AI('Usa o Gemini')} Sugerir classes e grupos pelas atividades</button></div>`:''}</div>`;
+ window.__CNAE_TXT=cn.join('. ');
+}
+function lfDoCnae(){const t=window.__CNAE_TXT||'';const ta=$('#lfia');if(ta&&!ta.value.trim())ta.value=t;document.querySelector('[data-g="lfadd"][data-t="ia"]')?.click();lfSugerir();}
 async function lfSicaf(){
  const tipo=$('#lfst2').value,cods=[...new Set(($('#lfsc').value.match(/^\s*(\d{2,9})/gm)||[]).map(x=>x.trim()))],box=$('#lfscres');
  if(!cods.length)return toast('Cole ao menos um código.');

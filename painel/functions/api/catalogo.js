@@ -1,5 +1,7 @@
 // Consultas públicas sob demanda (exige login). Nada aqui grava no banco.
 //  ?pdm=CODIGO&pagina=N  → itens de material de um PDM (API de Dados Abertos do Compras.gov.br, 4_consultarItemMaterial)
+//  ?historico=CNPJ       → o que o CNPJ já vendeu em atas de registro de preços (Compras.gov.br, filtro niFornecedor),
+//                          agregado por PDM (material) ou código de serviço; o banco sobe isso para classe/grupo
 //  ?cnpj=NUMERO          → dados cadastrais públicos (BrasilAPI/Receita) e situação na base pública do SICAF
 //                          (modulo-fornecedor/1_consultarFornecedor; essa base NÃO traz linhas de fornecimento)
 const SB = "https://tkbkkqebsxvmxnqiwjfl.supabase.co";
@@ -38,6 +40,30 @@ export async function onRequestGet({ request }) {
         rotulo: `${r.codigoGrupo} ${r.nomeGrupo} › ${r.codigoClasse} ${r.nomeClasse} › ${r.codigoPdm} ${r.nomePdm}` }));
       return J({ itens, paginas: j.totalPaginas || 1, total: j.totalRegistros || itens.length }, 200, "public, max-age=86400");
     }
+    if (q.get("historico")) {
+      const c = (q.get("historico") || "").replace(/\D/g, "");
+      if (c.length !== 14) return J({ erro: "CNPJ inválido" }, 400);
+      const hoje = new Date(), ini = new Date(hoje.getTime() - 3 * 365 * 86400000), f = d => d.toISOString().slice(0, 10);
+      const agg = new Map(); let total = 0, paginas = 1, parcial = false;
+      for (let pag = 1; pag <= Math.min(paginas, 8); pag++) {
+        let j;
+        try { j = await obter(`${DA}/modulo-arp/2_consultarARPItem?pagina=${pag}&tamanhoPagina=500&niFornecedor=${c}&dataVigenciaInicialMin=${f(ini)}&dataVigenciaInicialMax=${f(hoje)}`); }
+        catch (e) { if (pag === 1) throw e; parcial = true; break; }
+        if (!j) break;
+        total = j.totalRegistros || total; paginas = j.totalPaginas || 1;
+        for (const r of j.resultado || []) {
+          if (r.itemExcluido) continue;
+          const t = /serv/i.test(r.tipoItem || "") ? "S" : "M", cod = t === "M" ? r.codigoPdm : r.codigoItem;
+          if (!cod) continue;
+          const k = t + cod, a = agg.get(k) || { t, c: String(cod), n: 0, v: 0, u: null };
+          a.n++; a.v += Number(r.valorTotal) || 0;
+          const d = (r.dataAssinatura || r.dataVigenciaInicial || "").slice(0, 10); if (d && (!a.u || d > a.u)) a.u = d;
+          agg.set(k, a);
+        }
+      }
+      if (paginas > 8) parcial = true;
+      return J({ itens: [...agg.values()], registros: total, parcial, janela: [f(ini), f(hoje)], fonte: "atas de registro de preços (Compras.gov.br)" });
+    }
     if (q.get("cnpj")) {
       const c = (q.get("cnpj") || "").replace(/\D/g, "");
       if (c.length !== 14) return J({ erro: "CNPJ inválido" }, 400);
@@ -48,7 +74,7 @@ export async function onRequestGet({ request }) {
       if (!r && rf.status === "rejected" && sf.status === "rejected") return J({ erro: "fontes públicas indisponíveis agora" }, 503);
       return J({
         receita: r ? { razao_social: r.razao_social, nome_fantasia: r.nome_fantasia || null, uf: r.uf, municipio: r.municipio,
-          porte: r.porte, cnae: r.cnae_fiscal ? String(r.cnae_fiscal) : null, cnae_desc: r.cnae_fiscal_descricao || null, situacao: r.descricao_situacao_cadastral || null } : null,
+          porte: r.porte, cnae: r.cnae_fiscal ? String(r.cnae_fiscal) : null, cnae_desc: r.cnae_fiscal_descricao || null, cnaes_sec: (r.cnaes_secundarios || []).slice(0, 30).map(x => ({ codigo: String(x.codigo), descricao: x.descricao })), situacao: r.descricao_situacao_cadastral || null } : null,
         sicaf: s ? { ativo: s.ativo, habilitadoLicitar: s.habilitadoLicitar, porteEmpresaNome: s.porteEmpresaNome, naturezaJuridicaNome: s.naturezaJuridicaNome } : null,
         receita_erro: rf.status === "rejected" ? String(rf.reason.message) : null, sicaf_erro: sf.status === "rejected" ? String(sf.reason.message) : null });
     }
