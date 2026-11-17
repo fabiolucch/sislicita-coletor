@@ -2134,7 +2134,7 @@ if __name__ == "__main__":
             print(f"[{nome}] ERRO: {erro}", file=sys.stderr)
             resumo.append((nome, 0, str(erro)[:200]))
         gravar_uso()
-    for rpc in ("atualizar_dashboard", "atualizar_servico"):  # resumos do Inicio e da aba Servicos ficam em cache
+    for rpc in ("atualizar_dashboard", "atualizar_servico", "atualizar_resumo_global"):  # resumos do Inicio e da aba Servicos ficam em cache
         try:
             requests.post(f"{SB}/rpc/{rpc}", headers=HDR, data="{}", timeout=400).raise_for_status()
         except Exception as e:

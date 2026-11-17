@@ -575,7 +575,10 @@ async oportunidades(){
   if(eu!==window.__goSeq)return;
   $('#aviso').innerHTML=av.map(a=>`<div class="just" style="margin:0 0 10px">${esc(a)}</div>`).join('');
   $('#lista').innerHTML=data.length?data.map(o=>cardOp(o)).join(''):'<div class="vazio">Nenhum edital encontrado com esses filtros.</div>';
-  if(sit==='a'&&(t||$('#fu').value||$('#fm').value!=='')){
+  if(sit==='a'&&!t&&!window.__ORG&&($('#fu').value||$('#fm').value!=='')){ // sem assunto a contagem de encerrados varre dezenas de milhares de linhas (20-40 s): não contar
+   $('#aviso').insertAdjacentHTML('beforeend','<div class="just" style="margin:0 0 10px">Esta pesquisa está só nos editais <b>abertos</b>. <a class="l" onclick="$(\'#fs\').value=\'t\';pg=0;go()">Ver abertos e encerrados</a></div>');
+  }
+  if(sit==='a'&&(t||window.__ORG)){
    let h2=sb.from('oportunidades').select('id',{count:'exact',head:true}).lt('data_fim_proposta',agora);
    if(t)h2=h2.textSearch('objeto_tsv',t,{type:'websearch',config:'portuguese'});if($('#fu').value)h2=h2.eq('uf',$('#fu').value);if($('#fm').value!=='')h2=h2.ilike('modalidade',MODS[+$('#fm').value][1]);if(window.__ORG)h2=h2.eq('orgao_cnpj',window.__ORG);
    if(d1)h2=h2.gte('data_publicacao',d1);if(d2)h2=h2.lte('data_publicacao',d2);if($('#vmin').value)h2=h2.gte('valor_estimado',$('#vmin').value);if($('#vmax').value)h2=h2.lte('valor_estimado',$('#vmax').value);
