@@ -112,16 +112,23 @@ html body button.icon.sm{min-width:var(--h-sm)}
 .aib-t{display:inline-block;padding:1px 6px;margin-left:var(--sp-1);border-radius:var(--r-sm);font:600 10px/1.4 var(--mono);color:#6d28d9;background:#ede9fe;border:1px solid #c4b5fd;vertical-align:middle}
 .aib{color:#6d28d9}
 
-/* ───────── 7. ABAS — Tabs ───────── */
-:where(#app) main .ev-tabs,:where(#app) main .ev-sub{display:flex;gap:var(--sp-1);padding:var(--sp-1);margin:0 0 var(--sp-3);background:var(--sf2);border:1px solid var(--line);border-radius:var(--r-md);overflow-x:auto;scrollbar-width:none;max-width:100%}
-html body .ev-tabs>button,html body .ev-sub button,html body .an-tabs button,html body .ev-tabs.sm button{
-  flex:none;min-height:var(--h-md);padding:0 var(--sp-4);background-color:transparent;color:var(--mut);border:0;border-radius:var(--r-sm);font-size:var(--fs-sec);font-weight:600;white-space:nowrap}
-html body .ev-tabs.sm button{min-height:var(--h-sm);padding:0 var(--sp-3)}
-html body .ev-tabs>button:hover:not(:disabled),html body .ev-sub button:hover:not(:disabled){background-color:#0000000a;color:var(--tx)}
-html body .ev-tabs>button.on,html body .ev-sub button.on,html body .an-tabs button.on{background-color:#fff;color:var(--tx);box-shadow:inset 0 -2px 0 var(--primary)}
-.ev-tabs .n,.ev-sub .n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-left:6px;border-radius:var(--r-sm);font-size:11px;font-weight:700;background:#e4e6ea;color:var(--tx2)}
-.ev-tabs>button.on .n{background:#ffedd5;color:var(--pri3)}
+/* ───────── 7. ABAS — Tabs (padrão único: .ev-tabs, .ev-sub, .an-tabs) ─────────
+   Inativa: branca com borda; ativa: grafite (cor do menu) com texto branco e contador laranja — destaque claro de onde o usuário está. */
+:where(#app) main .ev-tabs,:where(#app) main .ev-sub,.ev-tabs,.ev-sub{display:flex;flex-wrap:nowrap;gap:var(--sp-2);padding:0 0 var(--sp-1);margin:0 0 var(--sp-4);background:transparent;border:0;border-radius:0;overflow-x:auto;scrollbar-width:thin;max-width:100%}
+html body .ev-tabs>button,html body .ev-sub>button,html body .ev-sub button,html body .an-tabs button{
+  flex:none;display:inline-flex;align-items:center;gap:var(--sp-2);min-height:var(--h-md);padding:0 var(--sp-4);
+  background-color:#fff;color:var(--tx2);border:1px solid var(--campo-bd);border-radius:var(--r-md);box-shadow:none;
+  font-size:var(--fs-body);font-weight:600;white-space:nowrap}
+html body .ev-tabs>button:hover:not(:disabled),html body .ev-sub button:hover:not(:disabled){background-color:var(--raise);border-color:#8f959e;color:var(--tx)}
+html body .ev-tabs>button.on,html body .ev-tabs>button.on:hover,html body .ev-sub button.on,html body .ev-sub button.on:hover,html body .an-tabs button.on{
+  background-color:var(--nav-bg);border-color:var(--nav-bg);color:#fff;box-shadow:inset 0 -3px 0 var(--primary)}
+html body .ev-tabs.sm>button{min-height:var(--h-sm);padding:0 var(--sp-3);font-size:var(--fs-sec)}
+.ev-tabs .n,.ev-sub .n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin:0;border-radius:var(--r-sm);font-size:11px;font-weight:700;background:#e4e6ea;color:var(--tx2)}
+.ev-tabs>button.on .n,.ev-sub button.on .n{background:var(--primary);color:#fff}
+.ev-tabs .n.c-red{background:#fee2e2;color:#991b1b}.ev-tabs .n.c-green{background:#dcfce7;color:#166534}
+.ev-tabs>button.on .n.c-red,.ev-tabs>button.on .n.c-green{background:var(--primary);color:#fff}
 .ev-steps li.ok .n{background:#dcfce7;color:#166534}
+@media(max-width:640px){html body .ev-tabs>button,html body .ev-sub button,html body .an-tabs button{padding:0 var(--sp-3)}}
 
 /* ───────── 8. MENU LATERAL (escuro) e barra superior mobile ───────── */
 #app>aside,aside{--tx:#f3f4f6;--tx2:#e5e7eb;--mut:#b4bac3;--bd:var(--nav-bd);--line:#3d424a;--raise:#3a3f46;--pri3:#fdba74;
@@ -223,3 +230,19 @@ html body .landing-primary:hover,html body .landing-plan-btn:hover{background-co
 /* tabelas: ocupam toda a largura do card; se não couberem, o card rola por dentro (sem estourar a página) */
 :where(#app) main table{display:table;width:100%;max-width:none;overflow:visible}
 :where(#app) main .card:has(>table),:where(#app) main .card:has(>div>table){overflow-x:auto}
+
+/* formulário de dados da empresa: 3 colunas alinhadas; CNAE ocupa 2 colunas com a descrição ao lado */
+.emp-form{grid-template-columns:repeat(3,minmax(0,1fr))!important;align-items:start}
+.emp-form>div{min-width:0}
+.emp-form .emp-cnae{grid-column:span 2}
+.emp-form .emp-wide{grid-column:1/-1}
+.emp-cnae-r{display:grid;grid-template-columns:minmax(120px,170px) minmax(0,1fr);gap:var(--sp-3);align-items:center}
+.emp-cnae-d{font-size:var(--fs-sec);color:var(--tx2);line-height:1.35}
+.emp-form .ev-hint{margin:var(--sp-1) 0 0}
+@media(max-width:900px){.emp-form{grid-template-columns:repeat(2,minmax(0,1fr))!important}.emp-form .emp-cnae{grid-column:1/-1}}
+@media(max-width:560px){.emp-form{grid-template-columns:1fr!important}.emp-cnae-r{grid-template-columns:1fr}}
+/* botões dentro de listas de resultado (.res): linhas clicáveis são brancas; botões de ação seguem o padrão */
+html body .res>button:not(.sm):not(.sec){background-color:#fff;color:var(--tx);border:1px solid var(--bd);border-radius:var(--r-md);text-align:left;justify-content:flex-start}
+html body .res>button:not(.sm):not(.sec):hover:not(:disabled){border-color:var(--primary);background-color:var(--primary-soft);color:var(--tx)}
+html body .res button.sm:not(.sec),html body .lf-ac button:not(.sec){background-color:var(--primary);color:#fff;border:1px solid var(--primary);text-align:center}
+html body .res button.sm:not(.sec):hover:not(:disabled),html body .lf-ac button:not(.sec):hover:not(:disabled){background-color:var(--primary-hover);border-color:var(--primary-hover);color:#fff}

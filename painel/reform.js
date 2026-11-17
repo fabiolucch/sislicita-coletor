@@ -86,13 +86,13 @@ TELAS.empresa='Empresa e linha de fornecimento';
 V.empresa=async()=>{
  const [{data:pjs},linhas,R]=await Promise.all([sb.from('pessoas_juridicas').select('*').order('propria',{ascending:false}).limit(1),rpc('minha_linha').catch(()=>[]),rpc('resumo_linha').catch(()=>null)]);
  const pj=(pjs||[])[0];window.__EMP={pj,linhas:linhas||[],R};
- const aba=abaIni('emp',(window.ARG&&window.ARG.aba)||((linhas||[]).length?'linha':(pj&&pj.uf?'linha':'dados')),['dados','linha']);
+ const aba=abaIni('emp',(window.ARG&&window.ARG.aba)||((linhas||[]).length?'linha':(pj&&pj.uf&&pj.cnae_principal?'linha':'dados')),['dados','linha']);
  const inc=(linhas||[]).filter(l=>l.modo==='incluir'),exc=(linhas||[]).filter(l=>l.modo==='excluir');
  main.innerHTML=`<div class="top"><div><h2>Empresa</h2><p class="sub">Comece pelo que a empresa fornece. Você pode salvar e continuar depois.</p></div><div id="lfst" class="ev-hint"></div></div>
  <div class="ev-root">
  <div class="ev-tabs" data-g="emp" data-mem="emp" role="tablist">
-  <button type="button" class="${aba==='linha'?'on':''}" data-t="linha" onclick="abaSel(this)">Linha de fornecimento<span class="n ${inc.length?'c-green':'c-red'}">${inc.length||'!'}</span></button>
-  <button type="button" class="${aba==='dados'?'on':''}" data-t="dados" onclick="abaSel(this)">Dados da empresa</button></div>
+  <button type="button" class="${aba==='dados'?'on':''}" data-t="dados" onclick="abaSel(this)">Dados da empresa</button>
+  <button type="button" class="${aba==='linha'?'on':''}" data-t="linha" onclick="abaSel(this)">Linha de fornecimento<span class="n ${inc.length?'c-green':'c-red'}">${inc.length||'!'}</span></button></div>
  <div class="ev-pane" data-g="emp" data-t="linha" ${aba==='linha'?'':'hidden'}>
   <div id="lfauto"></div><div id="lfcnae"></div>
   <div class="card ev-destaque"><h3>Informe o que sua empresa fornece para encontrar licitações e compras planejadas compatíveis.</h3>
@@ -116,7 +116,7 @@ V.empresa=async()=>{
  </div>
  <div class="ev-pane" data-g="emp" data-t="dados" ${aba==='dados'?'':'hidden'}>${empForm(pj)}</div>
  </div>`;
- empAuto(false);lfCnae();lfRestaurar();
+ empDadosAuto();empAuto(false);lfCnae();lfRestaurar();
 };
 function lfLinha(l){
  const s=SIT_LF[l.situacao]||SIT_LF.ativo;
@@ -256,6 +256,27 @@ async function lfSugerir(){
 }
 // Cadastro automático pelo CNPJ: dados públicos (Receita via BrasilAPI) + o que o CNPJ já vendeu em atas de registro de preços,
 // traduzido para classe (material) e grupo (serviço). Só acrescenta; nunca remove nem altera linhas existentes.
+// Preenche sozinho UF, município, porte, CNAE principal e razão/fantasia vazios a partir do CNPJ (BrasilAPI), grava e mostra na tela.
+async function empDadosAuto(){
+ const E=window.__EMP,pj=E&&E.pj;if(!pj||!pj.cnpj||!$('#ecn'))return;
+ const falta=!pj.uf||!pj.municipio||!pj.porte||!pj.cnae_principal||!pj.razao_social||!(pj.cnaes||[]).length;
+ const h=$('#ecnh');if(!falta||window.__DADOS_AUTO===pj.cnpj)return;window.__DADOS_AUTO=pj.cnpj;
+ try{
+  const tk=(await sb.auth.getSession()).data.session.access_token;
+  const r=await fetch('/api/catalogo?cnpj='+encodeURIComponent(pj.cnpj),{headers:{authorization:'Bearer '+tk}}).then(x=>x.json());
+  const rf=r&&r.receita;if(!rf){if(h)h.textContent='Não foi possível consultar o CNPJ agora; preencha manualmente ou tente de novo mais tarde.';return;}
+  const upd={},set=(id,v)=>{const e=$('#'+id);if(e&&v&&!e.value){e.value=v;}};
+  if(!pj.razao_social&&rf.razao_social){upd.razao_social=rf.razao_social;set('erz',rf.razao_social);}
+  if(!pj.nome_fantasia&&rf.nome_fantasia){upd.nome_fantasia=rf.nome_fantasia;set('efa',rf.nome_fantasia);}
+  if(!pj.uf&&rf.uf){upd.uf=rf.uf;$('#euf').value=rf.uf;const m=$('#emun');m.dataset.uf=rf.uf;m.dataset.atual=rf.municipio||'';munPreencher(m);}
+  if(!pj.municipio&&rf.municipio){upd.municipio=rf.municipio;if(pj.uf){const m=$('#emun');m.dataset.atual=rf.municipio;munPreencher(m);}}
+  if(!pj.porte&&rf.porte){upd.porte=rf.porte;const p=$('#epo');[...p.options].some(o=>o.value===rf.porte||o.text===rf.porte)&&(p.value=rf.porte);}
+  if(!pj.cnae_principal&&rf.cnae){upd.cnae_principal=String(rf.cnae);set('ecn',String(rf.cnae));}
+  if(rf.cnae_desc&&$('#ecnd')&&!$('#ecnd').textContent)$('#ecnd').textContent=rf.cnae_desc;
+  if(!(pj.cnaes||[]).length&&rf.cnae){upd.cnaes=[{codigo:String(rf.cnae),descricao:rf.cnae_desc||'',principal:true},...(rf.cnaes_sec||[]).map(x=>({codigo:String(x.codigo),descricao:x.descricao||'',principal:false}))];}
+  if(Object.keys(upd).length){const {error}=await sb.from('pessoas_juridicas').update(upd).eq('id',pj.id);if(!error){Object.assign(pj,upd);if(h)h.textContent='Dados preenchidos automaticamente pela Receita Federal (CNPJ). Confira e ajuste se precisar.'+(upd.cnaes&&upd.cnaes.length>1?` Mais ${upd.cnaes.length-1} atividade(s) secundária(s) usadas nas sugestões da linha.`:'');}}
+ }catch(e){if(h)h.textContent='Não foi possível consultar o CNPJ agora.';}
+}
 async function empAuto(forcar){
  const E=window.__EMP,pj=E&&E.pj,box=$('#lfauto');if(!pj||!pj.cnpj||!box)return;
  const jaFez=pj.dados_publicos&&pj.dados_publicos.historico_em;
@@ -336,14 +357,15 @@ function empForm(pj){
  if(!pj)return pend('Nenhuma empresa cadastrada nesta organização','',"Use Minha organização para cadastrar o CNPJ.");
  const dp=pj.dados_publicos||null;
  return `<div class="card"><h3>Dados da empresa</h3><p class="sub">Poucos campos agora; o restante pode ser preenchido depois.</p>
- <div class="ev-form"><div><label>CNPJ</label><input id="ecnpj" value="${esc(pj.cnpj)}" disabled></div>
- <div><label>Razão social</label><input id="erz" value="${esc(pj.razao_social||'')}"></div>
- <div><label>Nome fantasia</label><input id="efa" value="${esc(pj.nome_fantasia||'')}"></div>
- <div><label>UF da sede</label>${ufSelect('euf',pj.uf,"ufMud(this,'emun')")}</div>
- <div><label>Município</label>${munSelect('emun',pj.uf,pj.municipio)}</div>
- <div><label>Porte</label><select id="epo"><option value="">—</option>${['MEI','Microempresa','Empresa de pequeno porte','Demais'].map(x=>`<option ${x===pj.porte?'selected':''}>${x}</option>`).join('')}</select></div>
- <div><label>CNAE principal <small>(só contexto; não é linha de fornecimento)</small></label><input id="ecn" value="${esc(pj.cnae_principal||'')}"></div>
- <div style="grid-column:1/-1"><label>O que a empresa faz (texto livre)</label><textarea id="eda" rows="3">${esc(pj.descricao_atividades||'')}</textarea></div></div>
+ <div class="ev-form emp-form"><div><label for="ecnpj">CNPJ</label><input id="ecnpj" value="${esc(pj.cnpj)}" disabled></div>
+ <div><label for="erz">Razão social</label><input id="erz" value="${esc(pj.razao_social||'')}"></div>
+ <div><label for="efa">Nome fantasia</label><input id="efa" value="${esc(pj.nome_fantasia||'')}"></div>
+ <div><label for="euf">UF da sede</label>${ufSelect('euf',pj.uf,"ufMud(this,'emun')")}</div>
+ <div><label for="emun">Município</label>${munSelect('emun',pj.uf,pj.municipio)}</div>
+ <div><label for="epo">Porte</label><select id="epo"><option value="">—</option>${['MEI','Microempresa','Empresa de pequeno porte','Demais'].map(x=>`<option ${x===pj.porte?'selected':''}>${x}</option>`).join('')}</select></div>
+ <div class="emp-cnae"><label for="ecn">CNAE principal</label><div class="emp-cnae-r"><input id="ecn" inputmode="numeric" placeholder="Preenchido pelo CNPJ" value="${esc(pj.cnae_principal||'')}"><span id="ecnd" class="emp-cnae-d">${esc(((pj.cnaes||[]).find(x=>x.principal)||{}).descricao||'')}</span></div>
+  <div class="ev-hint" id="ecnh">Atividade econômica principal da Receita Federal, trazida automaticamente pelo CNPJ. Serve de contexto: não é linha de fornecimento.</div></div>
+ <div class="emp-wide"><label for="eda">O que a empresa faz (texto livre)</label><textarea id="eda" rows="3">${esc(pj.descricao_atividades||'')}</textarea></div></div>
  <div class="ev-actions"><button onclick="empSalvar()">Salvar</button><button class="sec" onclick="empPublicos()">Buscar dados públicos do CNPJ</button></div>
  ${dp?`<p class="ev-hint">Dados públicos consultados em ${dt(pj.dados_publicos_em)} (fonte: ${esc(dp.fonte||'—')}). Confira antes de usar.</p>`:''}<div id="epub"></div></div>`;
 }
