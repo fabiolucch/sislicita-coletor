@@ -546,7 +546,7 @@ function anRender(){
 }
 function anResumo(){
  const A=window.__AN,op=A.op||{},d=dias(op.data_fim_proposta),an=A.an,D=an&&an.dados||{};
- const ia=(k,r)=>D[k]!=null&&D[k]!==''&&!(Array.isArray(D[k])&&!D[k].length)?`<div><span>${r} <small class="aib-t">IA</small></span><b>${esc(typeof D[k]==='object'?JSON.stringify(D[k]):String(D[k]===true?'Sim':D[k]===false?'Não':D[k]))}</b></div>`:'';
+ const ia=(k,r)=>D[k]!=null&&D[k]!==''&&!(Array.isArray(D[k])&&!D[k].length)?`<div><span>${r}</span><b>${esc(typeof D[k]==='object'?JSON.stringify(D[k]):String(D[k]===true?'Sim':D[k]===false?'Não':D[k]))}</b></div>`:'';
  const tot=A.itens.reduce((a,i)=>a+Number(i.valor_total||0),0);
  return `<div class="card"><h3>Dados oficiais (PNCP)</h3><div class="dkv">
   <div><span>Órgão</span><b>${esc(op.orgao_nome||'—')}</b>${op.unidade_nome?`<small>${esc(op.unidade_nome)}</small>`:''}</div>
@@ -561,7 +561,7 @@ function anResumo(){
   ${op.link_pncp?`<p><a class="l" href="${esc(op.link_pncp)}" target="_blank" rel="noopener">Abrir no PNCP (edital e anexos) ↗</a></p>`:''}</div>
  <div class="card"><h3>Condições lidas no edital ${an?`<small class="aib-t">IA</small>`:''}</h3>
   ${an?`<p class="ev-hint">${AI()} Extraído por IA ${an.fonte==='edital'?'do texto do edital':'só do objeto (o edital não pôde ser lido)'} em ${dt(an.analisado_em)}. A extração não informa página ou trecho; confira cada ponto no documento oficial.</p>
-   <div class="dkv">${ia('criterio_julgamento','Critério de julgamento')}${ia('prazo_entrega','Prazo de entrega')}${ia('local_entrega','Local de entrega')}${ia('pagamento','Pagamento')}${ia('vigencia','Vigência')}${ia('garantia','Garantia exigida')}${ia('exige_amostra','Exige amostra')}${ia('exige_visita_tecnica','Exige visita técnica')}${ia('exclusivo_me_epp','Exclusivo ME/EPP')}</div>`
+   <div class="dkv">${ia('criterio_julgamento','Critério de julgamento')}${ia('prazo_entrega','Prazo de entrega')}${ia('local_entrega','Local de entrega')}${ia('pagamento','Pagamento')}${ia('vigencia','Vigência')}${ia('garantia','Garantia exigida')}${ia('exige_amostra','Exige amostra')}${ia('exige_visita_tecnica','Exige visita técnica')}${ia('exclusivo_me_epp','Exclusivo ME/EPP')}</div>${(()=>{const f=[['prazo_entrega','prazo de entrega'],['vigencia','vigência'],['garantia','garantia exigida'],['criterio_julgamento','critério de julgamento'],['local_entrega','local de entrega'],['pagamento','pagamento']].filter(([k])=>D[k]==null||D[k]===''||(Array.isArray(D[k])&&!D[k].length)).map(x=>x[1]);return f.length?`<p class="ev-hint">A IA não encontrou no edital: ${f.join(', ')}. Confira no documento.</p>`:'';})()}`
   :`<p class="sub">O edital ainda não foi lido por IA. Sem essa leitura, prazos, pagamento e exigências ficam como pendências para você conferir no documento.</p>${pode('ia')?`<button class="sec" onclick="anLerEdital(this)">${AI()} Ler o edital com IA</button>`:''}`}</div>`;
 }
 async function anLerEdital(btn){btn.disabled=true;btn.textContent='Lendo o edital… (pode levar 1 minuto)';
