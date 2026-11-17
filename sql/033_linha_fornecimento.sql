@@ -222,11 +222,15 @@ begin
    where c.tipo = 'S' and c.nivel = 'subclasse' and p.tipo = 'S' and p.nivel = 'classe' and p.codigo = c.caminho->>'classe' and not (c.caminho ? 'grupo');
   update cat_nos c set caminho = p.caminho || c.caminho from cat_nos p
    where c.tipo = 'S' and c.nivel = 'subclasse' and p.tipo = 'S' and p.nivel = 'classe' and p.codigo = c.caminho->>'classe' and not (c.caminho ? 'secao');
-  update cat_nos c set rotulo = (
-    select string_agg(a.codigo || ' ' || a.nome, ' › ' order by cat_ordem(c.tipo, a.nivel))
-    from cat_nos a where a.tipo = c.tipo and a.nivel <> c.nivel and c.caminho ->> a.nivel = a.codigo
-      and cat_ordem(c.tipo, a.nivel) < cat_ordem(c.tipo, c.nivel))
-  where true;
+  -- rótulo legível montado por junção pela chave primária (rápido mesmo com dezenas de milhares de nós)
+  update cat_nos c set rotulo = x.r from (
+    select c2.tipo, c2.nivel, c2.codigo, string_agg(a.codigo || ' ' || a.nome, ' › ' order by cat_ordem(a.tipo, a.nivel)) r
+    from cat_nos c2
+    cross join lateral jsonb_each_text(c2.caminho) e(k, v)
+    join cat_nos a on a.catalogo = c2.catalogo and a.tipo = c2.tipo and a.nivel = e.k and a.codigo = e.v
+    where cat_ordem(c2.tipo, e.k) < cat_ordem(c2.tipo, c2.nivel)
+    group by 1, 2, 3) x
+  where c.catalogo = 'compras' and c.tipo = x.tipo and c.nivel = x.nivel and c.codigo = x.codigo and c.rotulo is distinct from x.r;
 end $$;
 
 revoke all on function public._cat_get(text), public.cat_sincronizar(char, text), public.cat_completar() from public, anon, authenticated;

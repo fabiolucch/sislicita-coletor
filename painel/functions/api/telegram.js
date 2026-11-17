@@ -16,7 +16,6 @@ Este bot avisa você sobre:
 🎯 <b>Oportunidades</b> novas no radar com score ≥ 80 (editais e itens do PCA)
 🧭 <b>Briefing diário</b> por perfil, gerado por IA
 📄 <b>Documentos novos</b> (retificações, esclarecimentos) nos editais do radar, com resumo da mudança
-⏰ <b>Sessões</b> dos seus processos nas próximas 48 h
 🗂️ <b>Documentos das empresas</b> vencendo em até 15 dias
 
 As coletas rodam às 06:17 e 18:17 (Brasília); os avisos chegam ao fim de cada coleta.

@@ -514,6 +514,11 @@ def processar_plano(plano):
                         "classificacao_codigo": it.get("classificacaoSuperiorCodigo"),
                         "classificacao_nome": it.get("classificacaoSuperiorNome"),
                         "grupo_contratacao": it.get("grupoContratacaoNome"),
+                        # campos de catalogo do PCA (verificados em 17/11/2026): catalogoId 1 = Compras.gov.br;
+                        # classificacaoCatalogoId 1 = material (superior = classe), 2 = servico (superior = grupo)
+                        "catalogo_id": it.get("catalogoId"), "classificacao_catalogo_id": it.get("classificacaoCatalogoId"),
+                        "codigo_item": (str(it.get("codigoItem")) if it.get("codigoItem") not in (None, "") else None),
+                        "pdm_codigo": (str(it.get("pdmCodigo")) if it.get("pdmCodigo") not in (None, "") else None),
                     })
             if len(lote) < PCA_PAGINA:
                 break
@@ -562,7 +567,19 @@ def pca():
                 total += upsert("pca_itens", itens, "plano_id,sequencial_pca,numero_item")
             requests.patch(f"{SB}/pca_planos", params={"id": f"eq.{plano['id']}"}, headers=HDR, timeout=60,
                            data=json.dumps({"itens_coletados_em": datetime.now(timezone.utc).isoformat()}))
+    classificar_pca()
     return total
+
+
+def classificar_pca():
+    """Liga os itens novos do PCA ao catalogo oficial (em lotes; idempotente)."""
+    for _ in range(40):
+        r = requests.post(f"{SB}/rpc/pca_classificar_catalogo", headers=HDR, data=json.dumps({"p_lote": 25000}), timeout=600)
+        if r.status_code >= 300:
+            AVISOS.append(("pca", f"classificacao no catalogo falhou ({r.status_code})"))
+            return
+        if not r.json():
+            return
 
 
 # ------------------------------------------------------------------ radar
@@ -619,6 +636,129 @@ def catalogo():
         pag += 1
         time.sleep(0.3)
     return total
+
+
+# ------------------------------------------------------------------ catalogo oficial hierarquico (linha de fornecimento)
+# Hierarquias verificadas na API publica em 17/11/2026 (sem autenticacao):
+#   material: grupo > classe > PDM > item ; servico: secao > divisao > grupo > classe > subclasse > servico
+CAMINHO_CAT = {"M": ["grupo", "classe", "pdm", "item"], "S": ["secao", "divisao", "grupo", "classe", "subclasse", "servico"]}
+CAMPO_CAT = {"grupo": "codigoGrupo", "classe": "codigoClasse", "pdm": "codigoPdm", "item": "codigoItem", "secao": "codigoSecao",
+             "divisao": "codigoDivisao", "subclasse": "codigoSubclasse", "servico": "codigoServico"}
+NIVEIS_CAT = [  # tipo, nivel, endpoint, campo do nome, campo do status, pagina grande
+    ("M", "grupo", "/modulo-material/1_consultarGrupoMaterial", "nomeGrupo", "statusGrupo", False),
+    ("M", "classe", "/modulo-material/2_consultarClasseMaterial", "nomeClasse", "statusClasse", False),
+    ("M", "pdm", "/modulo-material/3_consultarPdmMaterial", "nomePdm", "statusPdm", True),
+    ("S", "secao", "/modulo-servico/1_consultarSecaoServico", "nomeSecao", "statusSecao", False),
+    ("S", "divisao", "/modulo-servico/2_consultarDivisaoServico", "nomeDivisao", "statusDivisao", False),
+    ("S", "grupo", "/modulo-servico/3_consultarGrupoServico", "nomeGrupo", "statusGrupo", False),
+    ("S", "classe", "/modulo-servico/4_consultarClasseServico", "nomeClasse", "statusGrupo", False),
+    ("S", "subclasse", "/modulo-servico/5_consultarSubClasseServico", "nomeSubclasse", "statusSubclasse", False),
+    ("S", "servico", "/modulo-servico/6_consultarItemServico", "nomeServico", "statusServico", True),
+]
+CAT_DIAS = int(os.getenv("CAT_DIAS", "7"))
+
+
+def _cat_no(tipo, nivel, r, campo_nome, campo_status):
+    cod = r.get(CAMPO_CAT[nivel])
+    nome = (r.get(campo_nome) or "").strip().strip('"').strip()
+    if cod in (None, "") or not nome:
+        return None
+    cam = {}
+    for nv in CAMINHO_CAT[tipo]:
+        v = r.get(CAMPO_CAT[nv])
+        if v not in (None, ""):
+            cam[nv] = str(v)
+        if nv == nivel:
+            break
+    st = r.get(campo_status)
+    return {"catalogo": "compras", "tipo": tipo, "nivel": nivel, "codigo": str(cod), "nome": nome,
+            "ativo": True if st is None else bool(st), "caminho": cam, "busca": norm(nome),
+            "fonte_atualizado_em": ts(r.get("dataHoraAtualizacao")), "sincronizado_em": datetime.now(timezone.utc).isoformat()}
+
+
+def catalogo_hier():
+    """Sincroniza a hierarquia oficial (no maximo 1x a cada CAT_DIAS dias). Upsert idempotente: codigos que deixam
+    de vir na fonte sao preservados; inativos ficam marcados como inativos."""
+    r = requests.get(f"{SB}/cat_sync", headers=HDR, timeout=60,
+                     params={"select": "concluido_em", "status": "eq.ok", "order": "concluido_em.asc", "limit": 1})
+    r.raise_for_status()
+    feito = (r.json() or [{}])[0].get("concluido_em")
+    if feito and not os.getenv("CAT_FORCAR") and datetime.fromisoformat(feito) > datetime.now(timezone.utc) - timedelta(days=CAT_DIAS):
+        print(f"[catalogo_hier] sincronizado em {feito[:10]}; nada a fazer", flush=True)
+        return 0
+    total = 0
+    for tipo, nivel, ep, cnome, cst, grande in NIVEIS_CAT:
+        chave, inicio = f"{tipo}:{nivel}", datetime.now(timezone.utc).isoformat()
+        try:
+            pag, n = 1, 0
+            while True:
+                par = {"pagina": pag}
+                if grande:
+                    par["tamanhoPagina"] = 500
+                j = get(f"{CAT}{ep}", par) or {}
+                rows = [x for x in (_cat_no(tipo, nivel, r_, cnome, cst) for r_ in j.get("resultado", [])) if x]
+                if rows:
+                    n += upsert("cat_nos", rows, "catalogo,tipo,nivel,codigo")
+                if pag >= (j.get("totalPaginas") or 1):
+                    break
+                pag += 1
+                time.sleep(0.2)
+            upsert("cat_sync", [{"chave": chave, "total": n, "inseridos": n, "status": "ok", "erro": None,
+                                 "iniciado_em": inicio, "concluido_em": datetime.now(timezone.utc).isoformat()}], "chave")
+            total += n
+        except Exception as e:  # noqa: BLE001 - mantem o que ja estava valido e registra a falha
+            upsert("cat_sync", [{"chave": chave, "total": None, "inseridos": None, "status": "erro", "erro": str(e)[:300],
+                                 "iniciado_em": inicio, "concluido_em": datetime.now(timezone.utc).isoformat()}], "chave")
+            AVISOS.append(("catalogo_hier", f"{chave}: {str(e)[:120]}"))
+    requests.post(f"{SB}/rpc/cat_completar", headers=HDR, data="{}", timeout=600).raise_for_status()
+    return total
+
+
+def resolver_catalogo():
+    """Codigos de item de material (e servicos novos) vistos nos editais e no PCA que ainda nao estao no catalogo local:
+    consulta um a um na API oficial e grava o no com o caminho (PDM, classe, grupo)."""
+    r = requests.post(f"{SB}/rpc/cat_codigos_pendentes", headers=HDR, data=json.dumps({"p_limite": 1500}), timeout=120)
+    r.raise_for_status()
+    pend = r.json() or []
+    achados, ausentes = [], []
+
+    def um(p):
+        tipo, cod = p["tipo"], p["codigo"]
+        if tipo == "M":
+            j = get(f"{CAT}/modulo-material/4_consultarItemMaterial", {"pagina": 1, "codigoItem": cod}) or {}
+            res = j.get("resultado") or []
+            return p, (_cat_no("M", "item", res[0], "descricaoItem", "statusItem") if res else None)
+        j = get(f"{CAT}/modulo-servico/6_consultarItemServico", {"pagina": 1, "codigoServico": cod}) or {}
+        res = j.get("resultado") or []
+        return p, (_cat_no("S", "servico", res[0], "nomeServico", "statusServico") if res else None)
+
+    with cf.ThreadPoolExecutor(WORKERS) as ex:
+        for p, no in ex.map(um, pend):
+            if no:
+                achados.append(no)
+            else:
+                ausentes.append({"tipo": p["tipo"], "codigo": p["codigo"], "verificado_em": datetime.now(timezone.utc).isoformat()})
+    if achados:
+        upsert("cat_nos", achados, "catalogo,tipo,nivel,codigo")
+    if ausentes:
+        upsert("cat_ausentes", ausentes, "tipo,codigo")
+    print(f"[catalogo] {len(achados)} codigos resolvidos; {len(ausentes)} nao encontrados na fonte", flush=True)
+    return len(achados)
+
+
+def correspondencias():
+    """Recalcula, para cada empresa com linha de fornecimento, as licitacoes e itens do PCA compativeis."""
+    r = requests.get(f"{SB}/linhas_fornecimento", headers=HDR, timeout=60, params={"select": "organizacao_id"})
+    r.raise_for_status()
+    orgs = sorted({x["organizacao_id"] for x in r.json()})
+    n = 0
+    for o in orgs:
+        q = requests.post(f"{SB}/rpc/atualizar_correspondencias", headers=HDR, data=json.dumps({"p_org": o}), timeout=600)
+        if q.status_code >= 300:
+            AVISOS.append(("correspondencias", f"{o[:8]}: {q.status_code} {q.text[:100]}"))
+            continue
+        n += 1
+    return n
 
 
 # ------------------------------------------------------------------ ia (Gemini)
@@ -980,40 +1120,83 @@ def radar_abertos(campos):
     return saida
 
 
-def itens():
-    fila = [o for o in radar_abertos("id,numero_controle_pncp,data_fim_proposta,itens_em") if not o.get("itens_em")][:MAX_ITENS]
-    print(f"[itens] {len(fila)} editais para ler os itens", flush=True)
+def _item_row(oid, i, x):
+    """Item da contratação no PNCP. Campos de catálogo verificados na API em 17/11/2026:
+    materialOuServico (M/S), catalogo{id,...} (1 = Catálogo do Compras.gov.br), catalogoCodigoItem."""
+    cat = x.get("catalogo") or {}
+    cat_id = cat.get("id") if isinstance(cat, dict) else None
+    cod = str(x.get("catalogoCodigoItem") or "").strip() or None
+    tipo = x.get("materialOuServico") if x.get("materialOuServico") in ("M", "S") else None
+    usa = cat_id == 1 and cod and tipo and cod.isdigit()
+    return {"oportunidade_id": oid, "numero_item": x.get("numeroItem") or i, "descricao": (x.get("descricao") or "")[:600],
+            "tipo": x.get("materialOuServico"), "quantidade": x.get("quantidade"),
+            "unidade": x.get("unidadeMedida"), "valor_unitario": x.get("valorUnitarioEstimado"),
+            "valor_total": x.get("valorTotal"), "criterio": x.get("criterioJulgamentoNome"),
+            "beneficio": x.get("tipoBeneficioNome"), "sigiloso": x.get("orcamentoSigiloso"),
+            "situacao": x.get("situacaoCompraItemNome"),
+            "catalogo_id": cat_id, "catalogo_codigo_item": cod,
+            "cat_tipo": tipo if usa else None,
+            "cat_nivel": ("item" if tipo == "M" else "servico") if usa else None,
+            "cat_codigo": cod if usa else None,
+            "fonte_atualizado_em": ts(x.get("dataAtualizacao"))}
 
+
+def ler_itens(fila, rotulo):
+    """Le todos os itens (todas as paginas) e substitui os do edital: elimina duplicidade sem perder atualizacao."""
     def um(o):
         try:
             k = chave_pncp(o)
             if not k:
                 return o, []
-            lista = get(f"{PNCP}/pncp/v1/orgaos/{k[0]}/compras/{k[1]}/{k[2]}/itens",
-                        params={"pagina": 1, "tamanhoPagina": 200}) or []
-            rows = []
-            for i, x in enumerate(lista, 1):
-                rows.append({"oportunidade_id": o["id"], "numero_item": i, "descricao": (x.get("descricao") or "")[:600],
-                             "tipo": x.get("materialOuServico"), "quantidade": x.get("quantidade"),
-                             "unidade": x.get("unidadeMedida"), "valor_unitario": x.get("valorUnitarioEstimado"),
-                             "valor_total": x.get("valorTotal"), "criterio": x.get("criterioJulgamentoNome"),
-                             "beneficio": x.get("tipoBeneficioNome"), "sigiloso": x.get("orcamentoSigiloso"),
-                             "situacao": x.get("situacaoCompraItemNome")})
+            rows, pag = [], 1
+            while True:
+                lista = get(f"{PNCP}/pncp/v1/orgaos/{k[0]}/compras/{k[1]}/{k[2]}/itens",
+                            params={"pagina": pag, "tamanhoPagina": 200}) or []
+                rows += [_item_row(o["id"], len(rows) + i, x) for i, x in enumerate(lista, 1)]
+                if len(lista) < 200 or pag >= 25:
+                    break
+                pag += 1
             return o, rows
         except Exception as e:  # noqa: BLE001
-            print(f"[itens] falha em {o.get('id')}: {e}", flush=True)
+            print(f"[{rotulo}] falha em {o.get('id')}: {e}", flush=True)
             return o, None
 
     total = 0
     with cf.ThreadPoolExecutor(WORKERS) as ex:
         for o, rows in ex.map(um, fila):
             if rows is None:
-                continue
+                continue  # falhou: fica pendente
             if rows:
+                requests.delete(f"{SB}/oportunidade_itens", params={"oportunidade_id": f"eq.{o['id']}"}, headers=HDR, timeout=60)
                 total += upsert("oportunidade_itens", rows, "oportunidade_id,numero_item")
             requests.patch(f"{SB}/oportunidades", params={"id": f"eq.{o['id']}"}, headers=HDR, timeout=60,
                            data=json.dumps({"itens_em": datetime.now(timezone.utc).isoformat()}))
     return total
+
+
+def itens():
+    fila = [o for o in radar_abertos("id,numero_controle_pncp,data_fim_proposta,itens_em") if not o.get("itens_em")][:MAX_ITENS]
+    print(f"[itens] {len(fila)} editais do radar para ler os itens", flush=True)
+    return ler_itens(fila, "itens")
+
+
+MAX_ITENS_LINHA = int(os.getenv("MAX_ITENS_LINHA", "2500"))
+
+
+def itens_linha():
+    """Itens (com codigos de catalogo) dos editais abertos: primeiro os sugeridos pela linha de fornecimento de
+    alguma empresa (texto/semantica), depois os demais, mais recentes primeiro. Cobertura cresce a cada coleta."""
+    agora = datetime.now(timezone.utc).isoformat()
+    r = requests.post(f"{SB}/rpc/fila_itens_linha", headers=HDR, data=json.dumps({"p_limite": MAX_ITENS_LINHA}), timeout=300)
+    r.raise_for_status()
+    fila = [o for o in r.json() if (o.get("data_fim_proposta") or "") >= agora]
+    print(f"[itens_linha] {len(fila)} editais abertos para ler os itens", flush=True)
+    n = ler_itens(fila, "itens_linha")
+    try:
+        resolver_catalogo()
+    except Exception as e:  # noqa: BLE001
+        AVISOS.append(("itens_linha", f"codigos de catalogo nao resolvidos ({str(e)[:120]})"))
+    return n
 
 
 def baixar(url, limite=30_000_000):
@@ -1678,8 +1861,8 @@ def h(s):
 
 
 TG_DESC = ("Radar de licitações públicas do EditalVector. Avisa sobre oportunidades com score alto no radar, "
-           "briefing diário por IA, documentos novos (retificações) nos editais acompanhados, sessões próximas "
-           "dos seus processos e documentos de empresas vencendo. Envie /start para vincular este chat e /status "
+           "briefing diário por IA, documentos novos (retificações) nos editais acompanhados "
+           "e documentos de empresas vencendo. Envie /start para vincular este chat e /status "
            "para ver se o sistema está operando.")
 TG_CMDS = [{"command": "start", "description": "Vincular este chat e ver o que o bot faz"},
            {"command": "status", "description": "Situação do sistema agora"},
@@ -1746,9 +1929,12 @@ def tg(chat, texto):
 def alertas():
     agora = datetime.now(timezone.utc)
     # alertas gerados aqui (sessoes proximas e documentos vencendo) tambem aparecem no painel
+    # acompanhamento de processos esta desligado nesta versao (app_flags): sem lembrete de sessao enquanto estiver
+    fl = requests.get(f"{SB}/app_flags", headers=HDR, timeout=60, params={"select": "ativo", "chave": "eq.processos"}).json()
+    proc_on = bool(fl and isinstance(fl, list) and fl[0].get("ativo"))
     pr = requests.get(f"{SB}/processos", headers=HDR, timeout=60, params={
         "select": "id,titulo,orgao,data_sessao,empresas(nome)", "status": "not.in.(ganho,perdido,desistiu)",
-        "data_sessao": f"gte.{agora.isoformat()}", "and": f"(data_sessao.lte.{(agora + timedelta(days=2)).isoformat()})"}).json()
+        "data_sessao": f"gte.{agora.isoformat()}", "and": f"(data_sessao.lte.{(agora + timedelta(days=2)).isoformat()})"}).json() if proc_on else []
     linhas = [{"tipo": "sessao", "ref": f"{p['id']}:{p['data_sessao'][:16]}", "titulo": f"Sessão em breve: {(p.get('titulo') or '')[:120]}",
                "texto": f"{(p.get('empresas') or {}).get('nome', '')} · {p.get('orgao') or ''} · {datetime.fromisoformat(p['data_sessao']).astimezone(timezone(timedelta(hours=-3))).strftime('%d/%m %H:%M')}",
                "link": PAINEL + "/#processos"} for p in pr if isinstance(p, dict)]
@@ -1756,7 +1942,7 @@ def alertas():
         "select": "id,tipo,validade,empresas(nome)", "validade": f"lte.{(agora + timedelta(days=15)).date()}"}).json()
     linhas += [{"tipo": "doc_vencendo", "ref": f"{d['id']}:{d['validade']}", "titulo": f"Documento {'vencido' if d['validade'] < str(agora.date()) else 'vencendo'}: {d['tipo']}",
                 "texto": f"{(d.get('empresas') or {}).get('nome', '')} · validade {datetime.strptime(d['validade'], '%Y-%m-%d').strftime('%d/%m/%Y')}",
-                "link": PAINEL + "/#empresas"} for d in dv if isinstance(d, dict) and d.get("validade")]
+                "link": PAINEL + "/#habilitacao"} for d in dv if isinstance(d, dict) and d.get("validade")]
     if linhas:
         requests.post(f"{SB}/alertas", params={"on_conflict": "tipo,ref"}, headers={**HDR, "Prefer": "resolution=ignore-duplicates,return=minimal"},
                       data=json.dumps(linhas), timeout=60)
@@ -1901,7 +2087,8 @@ def fechar_execucao(modo, resumo, falhou, segundos):
 
 # a ordem importa no modo "tudo": o interesse so e calculado depois que a IA e a analise
 # do edital ja rodaram, e antes do briefing/alertas, que usam a nota para escolher o que mostrar
-ETAPAS = {"editais": editais, "vetores": vetores, "triagem": triagem, "pca": pca, "radar": radar, "ia": ia, "radar_ia": radar_ia, "itens": itens,
+ETAPAS = {"catalogo_hier": catalogo_hier, "editais": editais, "vetores": vetores, "triagem": triagem, "pca": pca, "radar": radar,
+          "itens_linha": itens_linha, "correspondencias": correspondencias, "ia": ia, "radar_ia": radar_ia, "itens": itens,
           "vigia": vigia, "docs": docs, "radar_pca_ia": radar_pca_ia, "interesse": interesse,
           "briefing": briefing, "aprender": aprender, "alertas": alertas,
           "contratos": contratos, "resultados": resultados, "fornecedores": fornecedores,
@@ -1911,7 +2098,7 @@ EXTRAS = {"catalogo": catalogo}
 # Etapas sem as quais a coleta nao cumpriu seu papel: so elas marcam a execucao como falha.
 ESSENCIAIS = {"editais", "vetores", "triagem", "radar"}
 # Etapas longas ou que ja fazem a propria repeticao: repetir na hora so gastaria tempo.
-SEM_REPETIR = {"historico", "ia", "radar_ia", "radar_pca_ia", "docs", "pca", "contratos", "resultados"}
+SEM_REPETIR = {"catalogo_hier", "itens_linha", "historico", "ia", "radar_ia", "radar_pca_ia", "docs", "pca", "contratos", "resultados"}
 
 if __name__ == "__main__":
     modo = sys.argv[1] if len(sys.argv) > 1 else "tudo"

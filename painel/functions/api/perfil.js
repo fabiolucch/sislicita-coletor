@@ -76,19 +76,26 @@ export async function onRequestPost({ request, env }) {
   if (ativo !== true) return J({ erro: "conta suspensa ou sem acesso" }, 403);
   if (!env.GEMINI_API_KEY) return J({ erro: "GEMINI_API_KEY não configurada" }, 500);
   const b = await request.json().catch(() => ({}));
-  const okPlano = await sb(auth, "rpc/tem_recurso", { method: "POST", body: JSON.stringify({ p_recurso: "perfis" }) }).then(r => r.ok ? r.json() : false).catch(() => false);
-  if (okPlano !== true) return J({ erro: "Perfis de busca fazem parte dos planos Básico e Premium.", plano: true }, 402);
   try {
-    if (b.acao === "sugerir") return J({ texto: await sugerir(env, String(b.texto || "").slice(0, 3000)) });
     const id = String(b.perfil || "");
+    const p = /^[0-9a-f-]{36}$/.test(id) ? (await (await sb(auth, `perfis_busca?id=eq.${id}&select=*`)).json())[0] : null;
+    // o perfil automático da linha de fornecimento é o direcionamento básico: vale para todos os planos
+    const linha = p && p.origem === "linha";
+    if (!linha) {
+      const okPlano = await sb(auth, "rpc/tem_recurso", { method: "POST", body: JSON.stringify({ p_recurso: "perfis" }) }).then(r => r.ok ? r.json() : false).catch(() => false);
+      if (okPlano !== true) return J({ erro: "Perfis de busca fazem parte dos planos Básico e Premium.", plano: true }, 402);
+    }
+    if (b.acao === "sugerir") return J({ texto: await sugerir(env, String(b.texto || "").slice(0, 3000)) });
     if (!/^[0-9a-f-]{36}$/.test(id)) return J({ erro: "perfil inválido" }, 400);
-    const p = (await (await sb(auth, `perfis_busca?id=eq.${id}&select=*`)).json())[0];
     if (!p) return J({ erro: "perfil não encontrado" }, 404);
+    if (linha && b.acao !== "salvar" && b.acao !== "triar") return J({ erro: "ação indisponível no perfil da linha" }, 400);
 
     if (b.acao === "salvar") {
       const t = textoPerfil(p);
       const emb_desc = t ? await vetor(env, t, "RETRIEVAL_QUERY") : null;
-      const r = await sb(auth, `perfis_busca?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ emb_desc }) });
+      const r = linha
+        ? await sb(auth, "rpc/salvar_emb_perfil_linha", { method: "POST", body: JSON.stringify({ p_id: id, p_emb: emb_desc }) })
+        : await sb(auth, `perfis_busca?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ emb_desc }) });
       if (!r.ok) throw new Error("gravar perfil: " + (await r.text()).slice(0, 160));
     } else if (b.acao === "exemplo") {
       const op = Number(b.oportunidade), tipo = b.tipo;
