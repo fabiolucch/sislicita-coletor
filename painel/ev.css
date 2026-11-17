@@ -419,14 +419,14 @@ main .card,.kp,.legc{border-radius:10px}
 #mtop .mbrand,#mtop .mtit{color:#e5e7eb!important}
 #mtop .mbtn{background:#3a3f46!important;border:1px solid #4a5058!important;color:#fff!important;border-radius:6px!important}
 button.sec.on,.stbtn{border-radius:6px}
-/* botão principal: laranja padrão, texto branco; secundário: branco com borda */
-button,.lf-ac button,.res button.sm,.hdoc-ac .anexar,.lc-acts .lc-go{background:#ea580c;color:#fff!important;border:1px solid #ea580c}
-button:hover:not(:disabled),.lf-ac button:hover:not(:disabled),.lc-acts .lc-go:hover:not(:disabled){background:#c2410c;border-color:#c2410c;color:#fff}
-button.sec,.gh,a.gh,.lf-ac button.sec,.res button.sec{background:#fff;color:var(--tx)!important;border:1px solid var(--campo-bd)}
-button.sec:hover:not(:disabled),.gh:hover,.lf-ac button.sec:hover{background:var(--raise);color:var(--tx)!important}
-.res>button:not(.sm){background:#fff;color:var(--tx)!important;border:1px solid var(--bd);border-radius:8px}
-.res>button:not(.sm):hover{border-color:var(--pri);background:#fff7ed}
-.hdoc-ac .anexar,.hab-prog button{color:#fff!important}
+/* botão principal: laranja padrão, texto branco; secundário: branco com borda.
+   "html body" sobe a especificidade para vencer o reset de botões do Tailwind (que deixa o fundo transparente). */
+html body button,html body .lf-ac button,html body .res button.sm,html body .hdoc-ac .anexar,html body .lc-acts .lc-go{background-color:#ea580c;background-image:none;color:#fff;border:1px solid #ea580c}
+html body button:hover:not(:disabled),html body .lc-acts .lc-go:hover:not(:disabled){background-color:#c2410c;border-color:#c2410c;color:#fff}
+html body button.sec,html body .gh,html body a.gh,html body .lf-ac button.sec,html body .res button.sec{background-color:#fff;color:var(--tx);border:1px solid var(--campo-bd)}
+html body button.sec:hover:not(:disabled),html body .gh:hover,html body .lf-ac button.sec:hover{background-color:#f1f2f4;color:var(--tx);border-color:#9aa0a9}
+html body .res>button:not(.sm){background-color:#fff;color:var(--tx);border:1px solid var(--bd);border-radius:8px}
+html body .res>button:not(.sm):hover{border-color:var(--pri);background-color:#fff7ed}
 button.bad,button.danger,button.perigo{background:#fff;color:var(--bad)!important;border:1px solid #e3b4b4}
 aside .sair,aside .theme-toggle,#mtop .mbtn{color:#e5e7eb!important}
 button:disabled{opacity:.5}
@@ -437,7 +437,7 @@ button:disabled{opacity:.5}
 /* ═════════ Responsivo: nada passa da tela; tudo quebra linha ou rola dentro do próprio bloco ═════════ */
 html,body{max-width:100%;overflow-x:clip}
 main,main>*{min-width:0;max-width:100%}
-main :where(h1,h2,h3,h4,p,li,span,small,b,a,label,td,th,div,summary,legend,dd,dt){overflow-wrap:anywhere}
+main :where(h1,h2,h3,h4,p,li,span,small,b,a,label,td,th,div,summary,legend,dd,dt){overflow-wrap:break-word;word-break:normal}
 main :where(img,svg,video,canvas,iframe){max-width:100%}
 main :where(input,select,textarea){max-width:100%;min-width:0}
 main button,main .gh,main a.gh{max-width:100%;white-space:normal;text-align:center;line-height:1.25}
@@ -467,3 +467,14 @@ main table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolli
 .hab-prog .pc b{white-space:nowrap}
 .landing-login,.landing-nav button:not(.cta){background:#fff!important;color:var(--tx)!important;border:1px solid var(--campo-bd)!important}
 .landing-lead{text-align:center}
+
+/* botões que só mudam de estado (filtros/seleção) mantêm fundo claro e texto escuro legível */
+html body button.on:not(.sec),html body .fx button,html body button.chipbtn{color:var(--tx)}
+
+/* rótulos curtos dos filtros não quebram letra a letra */
+.bar label,.bar>span,.ev-filtros label{white-space:nowrap;word-break:keep-all;overflow-wrap:normal}
+/* etiquetas e chips com contraste em fundo claro */
+.tag{background:#f1f2f4;color:var(--tx);border:1px solid var(--bd)}
+.tag.ok{background:#dcfce7;color:#166534;border-color:#86efac}
+.tag.w{background:#fef3c7;color:#92400e;border-color:#f6c560}
+.tag.b{background:#fee2e2;color:#991b1b;border-color:#f5a3a3}
