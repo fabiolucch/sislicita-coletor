@@ -246,3 +246,23 @@ html body .res>button:not(.sm):not(.sec){background-color:#fff;color:var(--tx);b
 html body .res>button:not(.sm):not(.sec):hover:not(:disabled){border-color:var(--primary);background-color:var(--primary-soft);color:var(--tx)}
 html body .res button.sm:not(.sec),html body .lf-ac button:not(.sec){background-color:var(--primary);color:#fff;border:1px solid var(--primary);text-align:center}
 html body .res button.sm:not(.sec):hover:not(:disabled),html body .lf-ac button:not(.sec):hover:not(:disabled){background-color:var(--primary-hover);border-color:var(--primary-hover);color:#fff}
+
+/* resultados do catálogo (adicionar à linha): leitura em camadas — nome, chave do PCA e ações; o resto em área expansível */
+.lf-resumo{margin:var(--sp-2) 0 var(--sp-3);font-size:var(--fs-sec);color:var(--tx2)}
+#app .lf-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--sp-3) var(--sp-4);align-items:start;padding:var(--sp-3) var(--sp-4);margin:0 0 var(--sp-2);background:#fff;border:1px solid var(--bd);border-radius:var(--r-md)}
+#app .lf-row[hidden]{display:none}
+#app .lf-row:hover{border-color:#a9aeb6}
+#app .lf-row .lf-nome{font-size:var(--fs-sub);line-height:1.3;margin:var(--sp-1) 0}
+#app .lf-row .lf-ac{flex-wrap:nowrap;justify-content:flex-end;align-items:flex-start}
+.lf-row .lf-chave{display:block;margin:var(--sp-1) 0;padding:var(--sp-1) var(--sp-2);background:var(--primary-soft);border-left:3px solid var(--primary);border-radius:var(--r-sm);font-size:var(--fs-sec);color:var(--tx2)}
+.lf-row .lf-chave b{color:var(--tx)}
+.lf-more{margin-top:var(--sp-2);font-size:var(--fs-sec)}
+.lf-more>summary{cursor:pointer;color:var(--pri3);font-weight:600;list-style:none;min-height:var(--h-sm);display:flex;align-items:center;gap:var(--sp-2)}
+.lf-more>summary::before{content:"▸";transition:transform .12s}.lf-more[open]>summary::before{transform:rotate(90deg)}
+.lf-more>summary::-webkit-details-marker{display:none}
+.lf-path{list-style:none;margin:var(--sp-1) 0 var(--sp-2);padding:0;border-left:2px solid var(--line)}
+.lf-path li{display:grid;grid-template-columns:84px 56px minmax(0,1fr);gap:var(--sp-2);padding:3px 0 3px var(--sp-3);font-size:var(--fs-sec);color:var(--tx2)}
+.lf-path li.cur{font-weight:700;color:var(--tx)}
+.lf-pn{font-size:var(--fs-cap);color:var(--mut);text-transform:uppercase;letter-spacing:.04em}.lf-pc{font-family:var(--mono);font-size:var(--fs-cap);color:var(--mut)}
+.lf-ac2{display:flex;flex-wrap:wrap;gap:var(--sp-2)}
+@media(max-width:760px){#app .lf-row{grid-template-columns:1fr}#app .lf-row .lf-ac{justify-content:flex-start}.lf-path li{grid-template-columns:70px 48px minmax(0,1fr)}}

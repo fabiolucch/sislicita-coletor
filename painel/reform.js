@@ -132,14 +132,19 @@ function lfLista(inc,exc){
  return `${pend.length?`<div class="ev-pend" role="status"><div><b>${pend.length} classe(s)/grupo(s) encontrada(s) automaticamente aguardam sua confirmação</b><span>Já são usadas na busca. Confirme as que a empresa realmente fornece e remova as demais.</span></div><button onclick="lfConfirmar(${esc(JSON.stringify(pend.map(l=>l.id)))})">Confirmar todas</button></div>`:''}${['M','S'].map(t=>g(t).length?`<h4 class="lf-h">${t==='M'?'Materiais que fornece':'Serviços que presta'} <span class="chip c-mut">${g(t).length}</span></h4>${g(t).map(lfLinha).join('')}`:'').join('')}
  ${exc.length?`<h4 class="lf-h">Não fornece (exclusões) <span class="chip c-mut">${exc.length}</span></h4><p class="ev-hint">Itens dentro destas classificações deixam de contar como compatíveis.</p>${exc.map(lfLinha).join('')}`:''}`;
 }
+const NIVEIS_CAM={M:['Grupo','Classe','PDM'],S:['Seção','Divisão','Grupo','Classe','Subclasse']};
 function lfResRow(r,origem,motivo){
  const k=`${r.tipo}|${r.nivel}|${r.codigo}`;window.__LFR=window.__LFR||{};window.__LFR[k]={...r,origem:origem||'manual',motivo:motivo||null};
  const ja=(window.__EMP&&window.__EMP.linhas||[]).find(l=>l.tipo===r.tipo&&l.nivel===r.nivel&&l.codigo===String(r.codigo));
  const abre=(r.nivel!=='item'&&r.nivel!=='servico');
  const chv=lfChave(r);
- return `<div class="lf-row res ${r.ativo===false?'inat':''}"><div class="lf-main"><div class="lf-top"><span class="chip ${r.tipo==='M'?'c-blue':'c-violet'}">${TIPO_CAT[r.tipo]}</span><span class="chip c-mut">${NIVEL[r.nivel]||r.nivel} ${esc(r.codigo)}</span>${r.ativo===false?'<span class="chip c-amber">! Inativa no catálogo</span>':''}${ja?`<span class="chip c-green">✓ Já está na linha (${ja.modo==='excluir'?'exclusão':'incluída'})</span>`:''}</div>
-  <b class="lf-nome">${esc(r.nome)}</b>${r.rotulo?`<small class="lf-cam">${esc(r.rotulo)}</small>`:''}${chv.length?`<small class="lf-chave">Chave do PCA: ${chv.map(x=>`<b>${x.nivel==='classe'?'Classe':'Grupo'} ${esc(x.codigo)}</b>${x.nome?' '+esc(x.nome):''}`).join(' · ')}</small>`:''}${motivo?`<small class="lf-esp">${AI()} ${esc(motivo)}</small>`:''}</div>
-  <div class="lf-ac">${abre?`<button class="sec sm" onclick="lfAbrir('${k}')">Detalhar</button>`:''}<button class="sm" onclick="lfAdd('${k}','incluir')">${origem==='ia'?'Confirmar':'Fornece'}</button>${chv.map(x=>`<button class="sm" onclick="lfAddChave('${k}','${x.nivel}')" title="Inclui ${x.nivel==='classe'?'a classe':'o grupo'} inteiro${x.nome?' ('+esc(x.nome)+')':''}">${x.nivel==='classe'?'Classe':'Grupo'} ${esc(x.codigo)} inteira</button>`).join('')}<button class="sec sm" onclick="lfAdd('${k}','excluir')">Não fornece</button></div></div>`;
+ const cam=String(r.rotulo||'').split('›').map(x=>x.trim()).filter(Boolean),nv=NIVEIS_CAM[r.tipo]||[];
+ const caminho=cam.length?`<ol class="lf-path">${cam.map((x,i)=>{const m=x.match(/^(\S+)\s+(.*)$/);return `<li><span class="lf-pn">${esc(nv[i]||'')}</span><span class="lf-pc">${esc(m?m[1]:'')}</span><span>${esc(m?m[2]:x)}</span></li>`;}).join('')}<li class="cur"><span class="lf-pn">${esc(NIVEL[r.nivel]||r.nivel)}</span><span class="lf-pc">${esc(r.codigo)}</span><span>${esc(r.nome)}</span></li></ol>`:'';
+ const largos=chv.map(x=>`<button class="sec sm" onclick="lfAddChave('${k}','${x.nivel}')" title="Inclui ${x.nivel==='classe'?'a classe':'o grupo'} inteiro">${x.nivel==='classe'?'Classe':'Grupo'} ${esc(x.codigo)} inteira</button>`).join('');
+ const extra=(caminho||largos||abre)?`<details class="lf-more"><summary>Caminho no catálogo e opções mais amplas</summary>${caminho}<div class="lf-ac2">${abre?`<button class="sec sm" onclick="lfAbrir('${k}')">Ver o que há dentro</button>`:''}${largos}</div></details>`:'';
+ return `<div class="lf-row res ${r.ativo===false?'inat':''}" data-tipo="${r.tipo}"><div class="lf-main"><div class="lf-top"><span class="chip ${r.tipo==='M'?'c-blue':'c-violet'}">${TIPO_CAT[r.tipo]}</span><span class="chip c-mut">${NIVEL[r.nivel]||r.nivel} ${esc(r.codigo)}</span>${r.ativo===false?'<span class="chip c-amber">! Inativa no catálogo</span>':''}${ja?`<span class="chip c-green">✓ Já está na linha (${ja.modo==='excluir'?'exclusão':'incluída'})</span>`:''}</div>
+  <b class="lf-nome">${esc(r.nome)}</b>${chv.length?`<div class="lf-chave">Liga ao PCA por: ${chv.map(x=>`<b>${x.nivel==='classe'?'Classe':'Grupo'} ${esc(x.codigo)}</b>${x.nome?' · '+esc(x.nome):''}`).join(' &nbsp;|&nbsp; ')}</div>`:''}${motivo?`<small class="lf-esp">${AI()} ${esc(motivo)}</small>`:''}${extra}</div>
+  <div class="lf-ac"><button class="sm" onclick="lfAdd('${k}','incluir')">${origem==='ia'?'Confirmar':'Fornece'}</button><button class="sec sm" onclick="lfAdd('${k}','excluir')">Não fornece</button></div></div>`;
 }
 // classe (material) e grupo (serviço) do resultado: é o nível que o PCA usa como classificação superior
 function lfChave(r){
@@ -155,9 +160,14 @@ async function lfBuscar(){
  const q=$('#lfq').value.trim(),t=$('#lft').value||null,box=$('#lfres');if(!q)return;
  box.innerHTML='<div class="vazio">Pesquisando no catálogo…</div>';
  try{const r=await rpc('cat_buscar',{p_q:q,p_tipo:t,p_limite:40,p_offset:0});
-  box.innerHTML=r&&r.length?`<p class="ev-hint">${r.length} resultado(s) no catálogo oficial${r.length===40?' (mostrando os 40 mais próximos; refine a pesquisa)':''}.</p>${r.map(x=>lfResRow(x)).join('')}`:'<div class="vazio">Nada encontrado com esses termos. Tente sinônimos, o nome técnico ou o código.</div>';
+  if(!(r&&r.length)){box.innerHTML='<div class="vazio">Nada encontrado com esses termos. Tente sinônimos, o nome técnico ou o código.</div>';return;}
+  const nM=r.filter(x=>x.tipo==='M').length,nS=r.length-nM;
+  box.innerHTML=`<div class="lf-resumo"><b>${r.length}</b> resultado(s) no catálogo oficial${r.length===40?' · mostrando os 40 mais próximos, refine a pesquisa':''}</div>
+   ${nM&&nS?`<div class="ev-tabs sm" data-g="lfres" role="tablist"><button type="button" class="on" data-t="" onclick="lfFiltroRes(this)">Todos<span class="n">${r.length}</span></button><button type="button" data-t="M" onclick="lfFiltroRes(this)">Materiais<span class="n">${nM}</span></button><button type="button" data-t="S" onclick="lfFiltroRes(this)">Serviços<span class="n">${nS}</span></button></div>`:''}
+   <div id="lfresl">${r.map(x=>lfResRow(x)).join('')}</div>`;
  }catch(e){box.innerHTML=`<div class="vazio">Não foi possível pesquisar agora (${esc(e.message)}).</div>`;}
 }
+function lfFiltroRes(btn){btn.parentElement.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===btn));const t=btn.dataset.t;document.querySelectorAll('#lfresl .lf-row').forEach(e=>{e.hidden=!!t&&e.dataset.tipo!==t;});}
 // navegação por níveis (servidor devolve só os filhos do nível aberto)
 async function lfNav(tipo,nivel,codigo,rotulo){
  const box=$('#lfnav');if(!box)return;window.__LFNAV=window.__LFNAV&&window.__LFNAV.tipo===tipo&&nivel?window.__LFNAV:{tipo,trilha:[],origem:null};
