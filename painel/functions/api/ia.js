@@ -308,6 +308,60 @@ Escolha até 12 que correspondam ao que a empresa fornece, preferindo o nível m
   return { sugestoes };
 }
 
+// Sugestões de classe (CATMAT) / grupo (CATSER) a partir dos CNAEs. A IA só interpreta texto: escolhe entre classes que já existem
+// no catálogo oficial e nunca devolve código inventado; o resultado é confiança "média" e só vira linha se o usuário confirmar.
+async function sugerirPorCnae(env, H, cnaes) {
+  const lista = cnaes.slice(0, 12).filter(c => /^\d{7}$/.test(String(c.codigo)) && c.descricao);
+  if (!lista.length) return { sugestoes: [] };
+  const rpc = (f, body) => fetch(`${SB}/rest/v1/rpc/${f}`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: JSON.stringify(body) });
+  const termos = await gemini(env, `Para cada atividade econômica (CNAE) abaixo, indique até 3 termos curtos (1 a 3 palavras, no estilo do Catálogo de Compras do governo) do que uma empresa com esse CNAE costuma vender ou prestar ao governo. Devolva JSON {"termos":[{"n":número do CNAE,"tipo":"M" para material ou "S" para serviço,"termo":"..."}]}. Não invente códigos. CNAE de comércio varejista ou de atividades que o governo não compra pode ficar sem termos.
+
+${lista.map((c, i) => `${i}. ${c.codigo} — ${String(c.descricao).slice(0, 160)}`).join("\n")}`, true);
+  const classes = new Map(), nomes = [];
+  for (const t of (termos.termos || []).slice(0, 30)) {
+    const c = lista[Number(t.n)]; if (!c) continue;
+    const tipo = t.tipo === "S" ? "S" : "M";
+    const r = await rpc("cat_buscar", { p_q: String(t.termo || "").slice(0, 60), p_tipo: tipo, p_limite: 10, p_offset: 0 });
+    if (!r.ok) continue;
+    for (const x of await r.json()) {
+      if (x.ativo === false) continue;
+      const cam = x.caminho || {};
+      const alvo = x.nivel === "classe" || x.nivel === "grupo" ? { nivel: x.nivel, codigo: x.codigo, nome: x.nome, rotulo: x.rotulo }
+        : x.tipo === "M" && cam.classe ? { nivel: "classe", codigo: String(cam.classe) } : x.tipo === "S" && cam.grupo ? { nivel: "grupo", codigo: String(cam.grupo) } : null;
+      if (!alvo) continue;
+      const k = `${x.tipo}|${alvo.nivel}|${alvo.codigo}`, cur = classes.get(k) || { tipo: x.tipo, ...alvo, ex: [], cnaes: new Set() };
+      if (alvo.nome) { cur.nome = alvo.nome; cur.rotulo = alvo.rotulo; }
+      if (cur.ex.length < 3 && x.nivel !== alvo.nivel) cur.ex.push(x.nome);
+      cur.cnaes.add(c.codigo); classes.set(k, cur);
+    }
+    if (classes.size >= 60) break;
+  }
+  for (const c of classes.values()) if (!c.nome) nomes.push(c);   // só veio PDM/serviço: busca o nome oficial da classe/grupo
+  await Promise.all(nomes.map(async c => {
+    const r = await rpc("cat_buscar", { p_q: c.codigo, p_tipo: c.tipo, p_limite: 10, p_offset: 0 });
+    const f = r.ok ? (await r.json()).find(x => x.nivel === c.nivel && String(x.codigo) === c.codigo) : null;
+    if (f) { c.nome = f.nome; c.rotulo = f.rotulo; }
+  }));
+  const arr = [...classes.values()].filter(c => c.nome);
+  if (!arr.length) return { sugestoes: [] };
+  const esc = await gemini(env, `Atividades (CNAE) da empresa:
+${lista.map((c, i) => `${i}. ${c.codigo} — ${String(c.descricao).slice(0, 160)}`).join("\n")}
+
+Classes (materiais) e grupos (serviços) do catálogo oficial candidatos:
+${arr.map((c, i) => `${i}. [${c.tipo === "M" ? "Material · classe" : "Serviço · grupo"} ${c.codigo}] ${c.nome}${c.ex.length ? " (ex.: " + c.ex.join("; ") + ")" : ""}`).join("\n")}
+
+Escolha até 15 candidatas que uma empresa com esses CNAEs plausivelmente fornece ao governo. Devolva JSON {"escolhas":[{"i":número da candidata,"n":número do CNAE de onde vem,"motivo":"frase curta"}]}. Use apenas números das listas.`, true);
+  const vistos = new Set(), sugestoes = [];
+  for (const e of esc.escolhas || []) {
+    const c = arr[Number(e.i)], cn = lista[Number(e.n)];
+    if (!c || !cn) continue;
+    const k = c.tipo + c.nivel + c.codigo + cn.codigo; if (vistos.has(k)) continue; vistos.add(k);
+    sugestoes.push({ cnae: String(cn.codigo), tipo: c.tipo, nivel: c.nivel, codigo: c.codigo, nome: c.nome, rotulo: c.rotulo || "", motivo: String(e.motivo || "").slice(0, 200) });
+  }
+  if (sugestoes.length) await rpc("salvar_sugestoes_cnae", { p_sugestoes: sugestoes }).catch(() => {});
+  return { sugestoes };
+}
+
 export async function onRequestPost({ request, env }) {
   if (!env.GEMINI_API_KEY) return J({ erro: "GEMINI_API_KEY não configurada no Cloudflare" }, 500);
   const auth = request.headers.get("authorization") || "";
@@ -323,6 +377,12 @@ export async function onRequestPost({ request, env }) {
   if (b.acao === "disputa") {
     const on = await fetch(`${SB}/rest/v1/rpc/flag_ativa`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: JSON.stringify({ p: "disputa" }) }).then(r => r.ok ? r.json() : false).catch(() => false);
     if (on !== true) return J({ erro: "Este recurso não está disponível nesta versão." }, 410);
+  }
+  if (b.acao === "sugerir_cnae") {
+    const ok = await fetch(`${SB}/rest/v1/rpc/tem_recurso`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: JSON.stringify({ p_recurso: "ia" }) }).then(r => r.ok ? r.json() : false).catch(() => false);
+    if (ok !== true) return J({ erro: "As sugestões por IA fazem parte dos planos com IA. A relação por CNAE aprendida de fornecedores reais continua disponível.", plano: true }, 402);
+    try { return J(await sugerirPorCnae(env, H, Array.isArray(b.cnaes) ? b.cnaes : [])); }
+    catch (e) { return J({ erro: String(e.message || e).slice(0, 200) }, 500); }
   }
   if (b.acao === "sugerir_linhas") {
     const ok = await fetch(`${SB}/rest/v1/rpc/tem_recurso`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: JSON.stringify({ p_recurso: "ia" }) }).then(r => r.ok ? r.json() : false).catch(() => false);

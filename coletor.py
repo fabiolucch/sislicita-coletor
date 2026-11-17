@@ -746,6 +746,66 @@ def resolver_catalogo():
     return len(achados)
 
 
+MAX_CNAE_POR_EXECUCAO = 8      # CNAEs processados por coleta (cada um consulta ~40 fornecedores)
+FORNECEDORES_POR_CNAE = 40
+
+
+def itens_arp_do_fornecedor(cnpj):
+    """O que o CNPJ vendeu em atas de registro de preços (últimos 3 anos): lista de (tipo M|S, código do PDM ou do serviço)."""
+    hoje = datetime.now(timezone.utc).date()
+    ini = hoje.replace(year=hoje.year - 3)
+    out = []
+    for pag in (1, 2):
+        j = get(f"{CAT}/modulo-arp/2_consultarARPItem",
+                {"pagina": pag, "tamanhoPagina": 500, "niFornecedor": cnpj, "dataVigenciaInicialMin": ini.isoformat(), "dataVigenciaInicialMax": hoje.isoformat()}, tentativas=3)
+        if not j:
+            break
+        for r in j.get("resultado") or []:
+            if r.get("itemExcluido"):
+                continue
+            t = "S" if "serv" in (r.get("tipoItem") or "").lower() else "M"
+            cod = r.get("codigoPdm") if t == "M" else r.get("codigoItem")
+            if cod:
+                out.append((t, str(cod)))
+        if pag >= (j.get("totalPaginas") or 1):
+            break
+    return out
+
+
+def cnae_catalogo():
+    """Relação CNAE → classe/grupo aprendida de fornecedores reais: para cada CNAE pedido por alguma empresa, amostra de fornecedores
+    ativos do SICAF com esse CNAE principal e o que venderam em atas. O banco traduz PDM/serviço para classe/grupo e calcula o apoio."""
+    r = requests.get(f"{SB}/cnae_fila", headers=HDR, timeout=60,
+                     params={"select": "cnae,tentativas", "processado_em": "is.null", "tentativas": "lt.5", "order": "pedido_em.asc", "limit": MAX_CNAE_POR_EXECUCAO})
+    r.raise_for_status()
+    n = 0
+    for f in r.json():
+        cnae = f["cnae"]
+        try:
+            forn, pag = [], 1
+            while len(forn) < FORNECEDORES_POR_CNAE and pag <= 3:
+                j = get(f"{CAT}/modulo-fornecedor/1_consultarFornecedor", {"pagina": pag, "tamanhoPagina": 50, "codigoCnae": cnae, "ativo": "true"}, tentativas=3)
+                res = (j or {}).get("resultado") or []
+                forn += [x["cnpj"] for x in res if x.get("cnpj")]
+                if not res or pag >= ((j or {}).get("totalPaginas") or 1):
+                    break
+                pag += 1
+            itens, com_ata = [], 0
+            for cnpj in forn[:FORNECEDORES_POR_CNAE]:
+                its = set(itens_arp_do_fornecedor(cnpj))
+                if its:
+                    com_ata += 1
+                    itens += [{"f": cnpj, "t": t, "c": c} for t, c in its]
+            q = requests.post(f"{SB}/rpc/registrar_cnae_catalogo", headers=HDR, data=json.dumps({"p_cnae": cnae, "p_amostra": com_ata, "p_itens": itens}), timeout=120)
+            q.raise_for_status()
+            print(f"[cnae_catalogo] {cnae}: {len(forn)} fornecedores, {com_ata} com atas, {q.text.strip()} classes/grupos", flush=True)
+            n += 1
+        except Exception as e:  # noqa: BLE001
+            AVISOS.append(("cnae_catalogo", f"{cnae}: {str(e)[:120]}"))
+            requests.patch(f"{SB}/cnae_fila", headers=HDR, params={"cnae": f"eq.{cnae}"}, data=json.dumps({"tentativas": f["tentativas"] + 1, "erro": str(e)[:200]}), timeout=60)
+    return n
+
+
 def correspondencias():
     """Recalcula, para cada empresa com linha de fornecimento, as licitacoes e itens do PCA compativeis."""
     r = requests.get(f"{SB}/linhas_fornecimento", headers=HDR, timeout=60, params={"select": "organizacao_id"})
@@ -2088,7 +2148,7 @@ def fechar_execucao(modo, resumo, falhou, segundos):
 # a ordem importa no modo "tudo": o interesse so e calculado depois que a IA e a analise
 # do edital ja rodaram, e antes do briefing/alertas, que usam a nota para escolher o que mostrar
 ETAPAS = {"catalogo_hier": catalogo_hier, "editais": editais, "vetores": vetores, "triagem": triagem, "pca": pca, "radar": radar,
-          "itens_linha": itens_linha, "correspondencias": correspondencias, "ia": ia, "radar_ia": radar_ia, "itens": itens,
+          "itens_linha": itens_linha, "cnae_catalogo": cnae_catalogo, "correspondencias": correspondencias, "ia": ia, "radar_ia": radar_ia, "itens": itens,
           "vigia": vigia, "docs": docs, "radar_pca_ia": radar_pca_ia, "interesse": interesse,
           "briefing": briefing, "aprender": aprender, "alertas": alertas,
           "contratos": contratos, "resultados": resultados, "fornecedores": fornecedores,
@@ -2098,7 +2158,7 @@ EXTRAS = {"catalogo": catalogo}
 # Etapas sem as quais a coleta nao cumpriu seu papel: so elas marcam a execucao como falha.
 ESSENCIAIS = {"editais", "vetores", "triagem", "radar"}
 # Etapas longas ou que ja fazem a propria repeticao: repetir na hora so gastaria tempo.
-SEM_REPETIR = {"catalogo_hier", "itens_linha", "historico", "ia", "radar_ia", "radar_pca_ia", "docs", "pca", "contratos", "resultados"}
+SEM_REPETIR = {"catalogo_hier", "itens_linha", "cnae_catalogo", "historico", "ia", "radar_ia", "radar_pca_ia", "docs", "pca", "contratos", "resultados"}
 
 if __name__ == "__main__":
     modo = sys.argv[1] if len(sys.argv) > 1 else "tudo"

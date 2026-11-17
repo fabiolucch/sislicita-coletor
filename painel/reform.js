@@ -5,7 +5,8 @@
 'use strict';
 const NIVEL={grupo:'Grupo',classe:'Classe',pdm:'PDM (padrão descritivo)',item:'Item',secao:'Seção',divisao:'Divisão',subclasse:'Subclasse',servico:'Serviço'};
 const TIPO_CAT={M:'Material',S:'Serviço'};
-const ORIGEM_LF={manual:'Declarada por você',ia:'Sugerida pela IA e confirmada por você',sicaf_declarado:'Copiada do SICAF por você — não verificada pelo sistema',historico_pncp:'Encontrada automaticamente no histórico público do CNPJ (atas de registro de preços) — não é validação do SICAF'};
+const ORIGEM_LF={manual:'Declarada por você',ia:'Sugerida pela IA e confirmada por você',sicaf_declarado:'Copiada do SICAF por você — não verificada pelo sistema',historico_pncp:'Encontrada automaticamente no histórico público do CNPJ (atas de registro de preços) — não é validação do SICAF',cnae_fornecedores:'Sugerida pelo que fornecedores reais do mesmo CNAE venderam e confirmada por você'};
+const CONF_LF={alta:['c-green','Confiança alta'],media:['c-amber','Confiança média'],baixa:['c-mut','Confiança baixa']};
 const SIT_LF={ativo:['c-green','✓','Ativa no catálogo'],inativo:['c-amber','!','Inativa no catálogo oficial'],a_conferir:['c-amber','?','Item ainda não conferido no catálogo'],nao_encontrado:['c-red','!','Não encontrada no catálogo oficial']};
 window.ST_INT={a_analisar:'A analisar',em_analise:'Em análise',viavel:'Viável',inviavel:'Inviável',arquivada:'Arquivada'};
 const ST_INT_COR={a_analisar:'c-mut',em_analise:'c-blue',viavel:'c-green',inviavel:'c-red',arquivada:'c-mut'};
@@ -68,7 +69,7 @@ V.empresa=async()=>{
   <button type="button" class="${aba==='linha'?'on':''}" data-t="linha" onclick="abaSel(this)">Linha de fornecimento<span class="n ${inc.length?'c-green':'c-red'}">${inc.length||'!'}</span></button>
   <button type="button" class="${aba==='dados'?'on':''}" data-t="dados" onclick="abaSel(this)">Dados da empresa</button></div>
  <div class="ev-pane" data-g="emp" data-t="linha" ${aba==='linha'?'':'hidden'}>
-  <div id="lfauto"></div>
+  <div id="lfauto"></div><div id="lfcnae"></div>
   <div class="card ev-destaque"><h3>Informe o que sua empresa fornece para encontrar licitações e compras planejadas compatíveis.</h3>
    <p class="sub">Escolha as classificações oficiais do Catálogo do Compras.gov.br (CATMAT para materiais, CATSER para serviços). Uma classe abrangente não significa que você fornece tudo dentro dela: refine com PDMs, itens ou serviços específicos, ou marque o que <b>não</b> fornece.</p>
    <p class="ev-hint"><b>A classe (material) e o grupo (serviço) são a chave</b> que liga a linha da empresa ao PCA e às licitações. Escolha classes ou grupos inteiros e refine com PDM ou item quando precisar.</p>
@@ -90,20 +91,20 @@ V.empresa=async()=>{
  </div>
  <div class="ev-pane" data-g="emp" data-t="dados" ${aba==='dados'?'':'hidden'}>${empForm(pj)}</div>
  </div>`;
- empAuto(false);
+ empAuto(false);lfCnae();
 };
 function lfLinha(l){
  const s=SIT_LF[l.situacao]||SIT_LF.ativo;
  return `<div class="lf-row ${l.modo==='excluir'?'exc':''}"><div class="lf-main">
-  <div class="lf-top"><span class="chip ${l.tipo==='M'?'c-blue':'c-violet'}">${TIPO_CAT[l.tipo]}</span><span class="chip c-mut">${NIVEL[l.nivel]||l.nivel} ${esc(l.codigo)}</span><span class="chip ${s[0]}">${s[1]} ${s[2]}</span>${l.principal?'<span class="chip c-green">★ Linha principal</span>':''}</div>
+  <div class="lf-top"><span class="chip ${l.tipo==='M'?'c-blue':'c-violet'}">${TIPO_CAT[l.tipo]}</span><span class="chip c-mut">${NIVEL[l.nivel]||l.nivel} ${esc(l.codigo)}</span><span class="chip ${s[0]}">${s[1]} ${s[2]}</span>${l.modo==='incluir'&&l.confirmada===false?'<span class="chip c-amber">! Aguardando sua confirmação</span>':''}${l.confianca&&l.origem!=='manual'&&l.origem!=='sicaf_declarado'?`<span class="chip ${CONF_LF[l.confianca][0]}">${CONF_LF[l.confianca][1]}</span>`:''}${l.principal?'<span class="chip c-green">★ Linha principal</span>':''}</div>
   <b class="lf-nome">${esc(l.nome)}</b>${l.rotulo?`<small class="lf-cam">${esc(l.rotulo)}</small>`:''}
   ${l.especialidade?`<small class="lf-esp">${l.modo==='excluir'?'Motivo':'Especialidade'}: ${esc(l.especialidade)}</small>`:''}
   ${l.evidencia?`<small class="lf-esp">Evidência: ${esc(l.evidencia)}</small>`:''}<small class="lf-orig">${esc(ORIGEM_LF[l.origem]||l.origem)} · atualizado em ${dt(l.atualizado_em)}${l.ia_motivo?` · motivo da IA: ${esc(l.ia_motivo)}`:''}</small></div>
-  <div class="lf-ac">${l.modo==='incluir'&&!l.principal?`<button class="sec sm" onclick="lfPrincipal('${l.id}')">Tornar principal</button>`:''}<button class="sec sm" onclick="lfEditar('${l.id}')">Editar</button><button class="sec sm" onclick="lfRemover('${l.id}')">Remover</button></div></div>`;
+  <div class="lf-ac">${l.modo==='incluir'&&l.confirmada===false?`<button class="sm" onclick="lfConfirmar(['${l.id}'])">Confirmar</button>`:''}${l.modo==='incluir'&&!l.principal?`<button class="sec sm" onclick="lfPrincipal('${l.id}')">Tornar principal</button>`:''}<button class="sec sm" onclick="lfEditar('${l.id}')">Editar</button><button class="sec sm" onclick="lfRemover('${l.id}')">Remover</button></div></div>`;
 }
 function lfLista(inc,exc){
- const g=t=>inc.filter(l=>l.tipo===t);
- return `${['M','S'].map(t=>g(t).length?`<h4 class="lf-h">${t==='M'?'Materiais que fornece':'Serviços que presta'} <span class="chip c-mut">${g(t).length}</span></h4>${g(t).map(lfLinha).join('')}`:'').join('')}
+ const g=t=>inc.filter(l=>l.tipo===t),pend=inc.filter(l=>l.confirmada===false);
+ return `${pend.length?`<div class="ev-pend" role="status"><div><b>${pend.length} classe(s)/grupo(s) encontrada(s) automaticamente aguardam sua confirmação</b><span>Já são usadas na busca. Confirme as que a empresa realmente fornece e remova as demais.</span></div><button onclick="lfConfirmar(${esc(JSON.stringify(pend.map(l=>l.id)))})">Confirmar todas</button></div>`:''}${['M','S'].map(t=>g(t).length?`<h4 class="lf-h">${t==='M'?'Materiais que fornece':'Serviços que presta'} <span class="chip c-mut">${g(t).length}</span></h4>${g(t).map(lfLinha).join('')}`:'').join('')}
  ${exc.length?`<h4 class="lf-h">Não fornece (exclusões) <span class="chip c-mut">${exc.length}</span></h4><p class="ev-hint">Itens dentro destas classificações deixam de contar como compatíveis.</p>${exc.map(lfLinha).join('')}`:''}`;
 }
 function lfResRow(r,origem,motivo){
@@ -217,17 +218,62 @@ async function empAuto(forcar){
  try{const r=await fetch('/api/catalogo?historico='+encodeURIComponent(pj.cnpj),{headers:H}).then(x=>x.json());if(r.erro)throw new Error(r.erro);hist=r;}catch(e){nota.push('Histórico de fornecimento indisponível agora ('+e.message+').');}
  const rf=rec&&rec.receita;
  const upd={dados_publicos:{fonte:'BrasilAPI (Receita Federal) e Dados Abertos Compras.gov.br',receita:rf||null,sicaf:rec&&rec.sicaf||null,historico_registros:hist?hist.registros:null,historico_em:hist?new Date().toISOString():null},dados_publicos_em:new Date().toISOString()};
- if(rf){if(!pj.razao_social&&rf.razao_social)upd.razao_social=rf.razao_social;if(!pj.uf&&rf.uf)upd.uf=rf.uf;if(!pj.municipio&&rf.municipio)upd.municipio=rf.municipio;if(!pj.porte&&rf.porte)upd.porte=rf.porte;if(!pj.cnae_principal&&rf.cnae)upd.cnae_principal=rf.cnae;if(!pj.nome_fantasia&&rf.nome_fantasia)upd.nome_fantasia=rf.nome_fantasia;}
+ if(rf){upd.situacao_cadastral=rf.situacao||null;if(rf.cnae)upd.cnaes=[{codigo:String(rf.cnae),descricao:rf.cnae_desc||'',principal:true},...(rf.cnaes_sec||[]).map(x=>({codigo:String(x.codigo),descricao:x.descricao||'',principal:false}))];if(!pj.razao_social&&rf.razao_social)upd.razao_social=rf.razao_social;if(!pj.uf&&rf.uf)upd.uf=rf.uf;if(!pj.municipio&&rf.municipio)upd.municipio=rf.municipio;if(!pj.porte&&rf.porte)upd.porte=rf.porte;if(!pj.cnae_principal&&rf.cnae)upd.cnae_principal=rf.cnae;if(!pj.nome_fantasia&&rf.nome_fantasia)upd.nome_fantasia=rf.nome_fantasia;}
  await sb.from('pessoas_juridicas').update(upd).eq('id',pj.id);
  if(hist&&(hist.itens||[]).length){try{add=await rpc('salvar_linhas_historico',{p_itens:hist.itens});}catch(e){nota.push('Não foi possível gravar a linha: '+e.message);}}
  const cn=rf?[rf.cnae_desc,...(rf.cnaes_sec||[]).map(x=>x.descricao)].filter(Boolean):[];
- if(add>0){lfMudou();toast(`Linha de fornecimento preenchida: ${add} classe(s)/grupo(s)`);return V.empresa();}
+ if(upd.cnaes)pj.cnaes=upd.cnaes;
+ if(add>0){lfMudou();toast(`Linha encontrada pelo histórico: ${add} classe(s)/grupo(s) para confirmar`);return V.empresa();}
  box.innerHTML=`<div class="card ev-destaque"><h3>${hist&&(hist.itens||[]).length?'A linha já estava completa':'Não encontramos fornecimento anterior deste CNPJ'}</h3>
   <p class="sub">${hist?(hist.itens||[]).length?`O histórico público (${fmtN(hist.registros)} itens de atas nos últimos 3 anos) cai em classes/grupos que já estão na linha.`:'O CNPJ não aparece como fornecedor em atas de registro de preços dos últimos 3 anos, ou é uma empresa nova. Isso não impede o uso: escolha a classe ou o grupo, ou deixe a IA sugerir a partir da atividade.':'A consulta pública não respondeu agora.'}${nota.length?' '+esc(nota.join(' ')):''}</p>
-  ${cn.length&&!(E.linhas||[]).length?`<p class="sub">Atividades registradas na Receita (CNAE, usadas só como ponto de partida; CNAE não equivale a CATMAT/CATSER): ${esc(cn.slice(0,6).join('; '))}.</p><div class="ev-actions"><button onclick="lfDoCnae()">${AI('Usa o Gemini')} Sugerir classes e grupos pelas atividades</button></div>`:''}</div>`;
- window.__CNAE_TXT=cn.join('. ');
+  ${cn.length&&!(E.linhas||[]).length?`<p class="sub">Veja abaixo as sugestões feitas a partir dos CNAEs da empresa (CNAE não equivale a CATMAT/CATSER; você confirma cada uma).</p>`:''}</div>`;
+ window.__CNAE_TXT=cn.join('. ');lfCnae();
 }
-function lfDoCnae(){const t=window.__CNAE_TXT||'';const ta=$('#lfia');if(ta&&!ta.value.trim())ta.value=t;document.querySelector('[data-g="lfadd"][data-t="ia"]')?.click();lfSugerir();}
+async function lfConfirmar(ids){try{const n=await rpc('confirmar_linhas',{p_ids:ids});toast(n+' confirmada(s)');lfMudou();V.empresa();}catch(e){toast(e.message);}}
+// Etapas 3 e 4: sugestões de classe/grupo pelos CNAEs (relação aprendida de fornecedores reais + IA restrita ao catálogo), com confirmação
+async function lfCnae(){
+ const E=window.__EMP,pj=E&&E.pj,box=$('#lfcnae');if(!pj||!box)return;
+ const cn=Array.isArray(pj.cnaes)?pj.cnaes:[];
+ if(!cn.length){box.innerHTML='';return;}
+ box.innerHTML='<div class="card"><div class="vazio">Procurando classes e grupos para os CNAEs da empresa…</div></div>';
+ const cods=cn.map(x=>String(x.codigo));let rows=[],aviso='';
+ try{rows=(await rpc('sugestoes_cnae',{p_cnaes:cods}))||[];}catch(e){box.innerHTML='';return;}
+ const faltam=cn.filter(x=>!rows.some(r=>r.cnae===String(x.codigo)));
+ const chave='cnaeia:'+pj.cnpj;let ult=0;try{ult=+localStorage.getItem(chave)||0;}catch(e){}
+ if(faltam.length&&Date.now()-ult>7*864e5){
+  try{const tk=(await sb.auth.getSession()).data.session.access_token;
+   const r=await fetch('/api/ia',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+tk},body:JSON.stringify({acao:'sugerir_cnae',cnaes:faltam.map(x=>({codigo:String(x.codigo),descricao:x.descricao}))})}).then(x=>x.json());
+   try{localStorage.setItem(chave,String(Date.now()));}catch(e){}
+   if(r.erro)aviso=r.erro;else rows=(await rpc('sugestoes_cnae',{p_cnaes:cods}))||rows;
+  }catch(e){aviso='Sugestões por IA indisponíveis agora.';}
+ }
+ const noLinha=new Set((E.linhas||[]).map(l=>`${l.tipo}|${l.nivel}|${l.codigo}`)),G=new Map(),RK={alta:3,media:2,baixa:1};
+ rows.forEach(r=>{const k=`${r.tipo}|${r.nivel}|${r.codigo}`;if(noLinha.has(k)||(window.__LFDESC||{})[k])return;
+  const g=G.get(k)||{...r,cnaes:[]};g.cnaes.push(r.cnae);
+  if((r.origem==='amostra_fornecedores'?10:0)+RK[r.confianca]>(g.origem==='amostra_fornecedores'?10:0)+RK[g.confianca]){Object.assign(g,{origem:r.origem,confianca:r.confianca,apoio:r.apoio,amostra:r.amostra,motivo:r.motivo});}
+  G.set(k,g);});
+ const lista=[...G.values()].sort((a,b)=>RK[b.confianca]-RK[a.confianca]||(b.apoio||0)-(a.apoio||0));
+ window.__LFSUG=Object.fromEntries(lista.map(g=>[`${g.tipo}|${g.nivel}|${g.codigo}`,g]));
+ const desc=c=>(cn.find(x=>String(x.codigo)===c)||{}).descricao||'';
+ const alta=lista.filter(g=>g.confianca==='alta');
+ box.innerHTML=`<div class="card"><h3>Sugestões pelas atividades da empresa (CNAE)</h3>
+  <p class="sub">CNAE não é linha de fornecimento: abaixo estão <b>sugestões</b> de classe/grupo a partir das ${cn.length} atividade(s) da empresa na Receita Federal; só entram na linha depois que você confirmar.</p>
+  <details class="ev-det"><summary>Ver os ${cn.length} CNAE(s) da empresa</summary><ul>${cn.map(x=>`<li><b>${esc(x.codigo)}</b> ${esc(x.descricao||'')}${x.principal?' <span class="chip c-mut">principal</span>':''}</li>`).join('')}</ul></details>
+  ${aviso?`<p class="ev-hint">${esc(aviso)}</p>`:''}
+  ${faltam.length&&rows.length===0?`<p class="ev-hint">Ainda não há sugestões para estes CNAEs. A relação com o catálogo é aprendida na próxima coleta a partir do que fornecedores reais do mesmo CNAE venderam; enquanto isso, use a pesquisa ou as sugestões por IA.</p>`:''}
+  ${alta.length>1?`<div class="ev-actions"><button onclick="lfSugTodas()">Confirmar as ${alta.length} de confiança alta</button></div>`:''}
+  ${lista.length?lista.slice(0,30).map(g=>{const k=`${g.tipo}|${g.nivel}|${g.codigo}`;return `<div class="lf-row res"><div class="lf-main"><div class="lf-top"><span class="chip ${g.tipo==='M'?'c-blue':'c-violet'}">${TIPO_CAT[g.tipo]}</span><span class="chip c-mut">${NIVEL[g.nivel]} ${esc(g.codigo)}</span><span class="chip ${CONF_LF[g.confianca][0]}">${CONF_LF[g.confianca][1]}</span><span class="chip c-mut">${g.origem==='amostra_fornecedores'?'Fornecedores reais':'IA (sugestão)'}</span></div>
+   <b class="lf-nome">${esc(g.nome)}</b>${g.rotulo?`<small class="lf-cam">${esc(g.rotulo)}</small>`:''}
+   <small class="lf-esp">${g.origem==='ia'?AI()+' ':''}${esc(g.motivo||'')}${g.confirmacoes?` · confirmada por ${g.confirmacoes} empresa(s)`:''}</small>
+   <small class="lf-orig">CNAE de origem: ${[...new Set(g.cnaes)].map(c=>esc(c)+' '+esc(desc(c).slice(0,40))).join('; ')}</small></div>
+   <div class="lf-ac"><button class="sm" onclick="lfSugOk('${k}')">Confirmar</button><button class="sec sm" onclick="lfSugNao('${k}')">Não é minha</button></div></div>`;}).join(''):(faltam.length?'':'<div class="vazio">Todas as sugestões já estão na linha ou foram dispensadas.</div>')}</div>`;
+}
+async function lfSugConf(k){const g=window.__LFSUG[k];if(!g)return;
+ await rpc('confirmar_sugestao_cnae',{p_tipo:g.tipo,p_nivel:g.nivel,p_codigo:g.codigo,p_cnaes:[...new Set(g.cnaes)],p_origem:g.origem==='ia'?'ia':'cnae_fornecedores',p_confianca:g.confianca,p_motivo:g.origem==='ia'?g.motivo:null});}
+async function lfSugOk(k){try{await lfSugConf(k);toast('Incluída na linha de fornecimento');lfMudou();V.empresa();}catch(e){toast(e.message);}}
+function lfSugNao(k){(window.__LFDESC=window.__LFDESC||{})[k]=1;lfCnae();}
+async function lfSugTodas(){const ks=Object.keys(window.__LFSUG).filter(k=>window.__LFSUG[k].confianca==='alta');
+ try{for(const k of ks)await lfSugConf(k);toast(ks.length+' incluída(s) na linha');lfMudou();V.empresa();}catch(e){toast(e.message);}}
 async function lfSicaf(){
  const tipo=$('#lfst2').value,cods=[...new Set(($('#lfsc').value.match(/^\s*(\d{2,9})/gm)||[]).map(x=>x.trim()))],box=$('#lfscres');
  if(!cods.length)return toast('Cole ao menos um código.');
