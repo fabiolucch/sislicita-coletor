@@ -42,10 +42,10 @@ html{color-scheme:light;background:var(--bg);max-width:100%;overflow-x:clip}
 body{background:var(--bg);color:var(--tx);font-family:var(--font);font-size:var(--fs-body);line-height:1.5;max-width:100%;overflow-x:clip}
 ::selection{background:#f9731633;color:var(--tx)}
 ::-webkit-scrollbar-thumb{background:#c3c7cd;border-color:var(--bg)}
-main h1,main .top h2,main>h2{font-size:var(--fs-title);line-height:1.2;letter-spacing:-.01em}
-main h3{font-size:var(--fs-sub);line-height:1.3}
-main .sub,main .m{font-size:var(--fs-sec);color:var(--mut)}
-main .ev-hint,main small{font-size:var(--fs-cap)}
+:where(#app) main h1,:where(#app) main .top h2,:where(#app) main>h2{font-size:var(--fs-title);line-height:1.2;letter-spacing:-.01em}
+:where(#app) main h3{font-size:var(--fs-sub);line-height:1.3}
+:where(#app) main .sub,:where(#app) main .m{font-size:var(--fs-sec);color:var(--mut)}
+:where(#app) main .ev-hint,:where(#app) main small{font-size:var(--fs-cap)}
 :where(a){color:var(--pri3)}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
@@ -78,30 +78,30 @@ html body button.icon,html body .icon-btn{min-width:var(--h-md);padding:0}
 html body button.icon.sm{min-width:var(--h-sm)}
 
 /* ───────── 4. CAMPOS — Input / Select / Textarea / Checkbox (40px) ───────── */
-main input:not([type=checkbox]):not([type=radio]):not([type=range]),main select,main textarea,#login input,#login select{
+:where(#app) main input:not([type=checkbox]):not([type=radio]):not([type=range]),:where(#app) main select,:where(#app) main textarea,#login input,#login select{
   min-height:var(--h-md);padding:0 var(--sp-3);border:1px solid var(--campo-bd);border-radius:var(--r-sm);
   background-color:#fff;color:var(--tx);font:400 var(--fs-body)/1.3 var(--font);max-width:100%;min-width:0;box-shadow:none}
-main textarea{padding:var(--sp-2) var(--sp-3);min-height:88px;line-height:1.5}
-main input::placeholder,main textarea::placeholder{color:var(--ph)}
-main input:hover:not(:disabled),main select:hover:not(:disabled),main textarea:hover:not(:disabled){border-color:#8f959e}
-main input:focus,main select:focus,main textarea:focus{border-color:var(--focus);outline:2px solid #2563eb33;outline-offset:0}
-main input:disabled,main select:disabled,main textarea:disabled{background:var(--disabled-bg);color:var(--disabled-tx)}
-main input[type=checkbox],main input[type=radio]{width:18px;height:18px;min-height:0;padding:0;accent-color:var(--primary)}
-main label{display:block;margin:0 0 var(--sp-1);font-size:var(--fs-sec);font-weight:600;color:var(--tx2)}
-main label.ck,main label:has(>input[type=checkbox]),main label:has(>input[type=radio]){display:flex;align-items:center;gap:var(--sp-2);font-weight:500}
-main .ev-form,main .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--sp-3) var(--sp-4)}
+:where(#app) main textarea{padding:var(--sp-2) var(--sp-3);min-height:88px;line-height:1.5}
+:where(#app) main input::placeholder,:where(#app) main textarea::placeholder{color:var(--ph)}
+:where(#app) main input:hover:not(:disabled),:where(#app) main select:hover:not(:disabled),:where(#app) main textarea:hover:not(:disabled){border-color:#8f959e}
+:where(#app) main input:focus,:where(#app) main select:focus,:where(#app) main textarea:focus{border-color:var(--focus);outline:2px solid #2563eb33;outline-offset:0}
+:where(#app) main input:disabled,:where(#app) main select:disabled,:where(#app) main textarea:disabled{background:var(--disabled-bg);color:var(--disabled-tx)}
+:where(#app) main input[type=checkbox],:where(#app) main input[type=radio]{width:18px;height:18px;min-height:0;padding:0;accent-color:var(--primary)}
+:where(#app) main label{display:block;margin:0 0 var(--sp-1);font-size:var(--fs-sec);font-weight:600;color:var(--tx2)}
+:where(#app) main label.ck,:where(#app) main label:has(>input[type=checkbox]),:where(#app) main label:has(>input[type=radio]){display:flex;align-items:center;gap:var(--sp-2);font-weight:500}
+:where(#app) main .ev-form,:where(#app) main .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:var(--sp-3) var(--sp-4)}
 .bar>*,.ev-actions>*{min-width:0}
 /* alinhamento campo + botão na mesma linha */
-main .bar,main .ev-actions{align-items:center}
+:where(#app) main .bar,:where(#app) main .ev-actions{align-items:center}
 
 /* ───────── 5. CARD / SUPERFÍCIES ───────── */
-main .card,.kp,.legc,.bar{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-lg);box-shadow:var(--sh);color:var(--tx);min-width:0;max-width:100%}
-main .card{padding:var(--sp-4) var(--sp-5);margin-bottom:var(--sp-3)}
-main .card>h3:first-child{margin-top:0}
-main .bar{padding:var(--sp-3);gap:var(--sp-2) var(--sp-3);margin-bottom:var(--sp-3)}
-main .ev-kpis{gap:var(--sp-3)}
+:where(#app) main .card,.kp,.legc,.bar{background:var(--card);border:1px solid var(--bd);border-radius:var(--r-lg);box-shadow:var(--sh);color:var(--tx);min-width:0;max-width:100%}
+:where(#app) main .card{padding:var(--sp-4) var(--sp-5);margin-bottom:var(--sp-3)}
+:where(#app) main .card>h3:first-child{margin-top:0}
+:where(#app) main .bar{padding:var(--sp-3);gap:var(--sp-2) var(--sp-3);margin-bottom:var(--sp-3)}
+:where(#app) main .ev-kpis{gap:var(--sp-3)}
 /* indicadores numéricos */
-main .kp .n,main .ev-kpis b{font-size:var(--fs-kpi);line-height:1.2}
+:where(#app) main .kp .n,:where(#app) main .ev-kpis b{font-size:var(--fs-kpi);line-height:1.2}
 
 /* ───────── 6. BADGE / CHIP / TAG (24px) ───────── */
 .chip,.tag{display:inline-flex;align-items:center;gap:var(--sp-1);min-height:24px;padding:2px var(--sp-2);border-radius:var(--r-sm);font-size:var(--fs-cap);font-weight:600;line-height:1.2;max-width:100%;white-space:normal}
@@ -113,7 +113,7 @@ main .kp .n,main .ev-kpis b{font-size:var(--fs-kpi);line-height:1.2}
 .aib{color:#6d28d9}
 
 /* ───────── 7. ABAS — Tabs ───────── */
-main .ev-tabs,main .ev-sub{display:flex;gap:var(--sp-1);padding:var(--sp-1);margin:0 0 var(--sp-3);background:var(--sf2);border:1px solid var(--line);border-radius:var(--r-md);overflow-x:auto;scrollbar-width:none;max-width:100%}
+:where(#app) main .ev-tabs,:where(#app) main .ev-sub{display:flex;gap:var(--sp-1);padding:var(--sp-1);margin:0 0 var(--sp-3);background:var(--sf2);border:1px solid var(--line);border-radius:var(--r-md);overflow-x:auto;scrollbar-width:none;max-width:100%}
 html body .ev-tabs>button,html body .ev-sub button,html body .an-tabs button,html body .ev-tabs.sm button{
   flex:none;min-height:var(--h-md);padding:0 var(--sp-4);background-color:transparent;color:var(--mut);border:0;border-radius:var(--r-sm);font-size:var(--fs-sec);font-weight:600;white-space:nowrap}
 html body .ev-tabs.sm button{min-height:var(--h-sm);padding:0 var(--sp-3)}
@@ -137,10 +137,10 @@ html body aside .sair:hover{background-color:#454a52;border-color:#5a6068}
 html body #mtop .mbtn{background-color:var(--nav-active);border:1px solid #4a5058;color:#fff;border-radius:var(--r-sm);min-height:0}
 
 /* ───────── 9. TABELAS / LISTAS ───────── */
-main table{width:100%;border-collapse:collapse;font-size:var(--fs-sec);display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
-main th{padding:var(--sp-2) var(--sp-3);text-align:left;font-size:var(--fs-cap);font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;background:var(--raise);border-bottom:1px solid var(--bd);white-space:nowrap}
-main td{padding:var(--sp-2) var(--sp-3);border-bottom:1px solid var(--line);vertical-align:top}
-main tr:hover td{background:#fafafb}
+:where(#app) main table{width:100%;border-collapse:collapse;font-size:var(--fs-sec);display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+:where(#app) main th{padding:var(--sp-2) var(--sp-3);text-align:left;font-size:var(--fs-cap);font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;background:var(--raise);border-bottom:1px solid var(--bd);white-space:nowrap}
+:where(#app) main td{padding:var(--sp-2) var(--sp-3);border-bottom:1px solid var(--line);vertical-align:top}
+:where(#app) main tr:hover td{background:#fafafb}
 
 /* ───────── 10. CARD DE LICITAÇÃO (.lc) — cores preservadas; só densidade e alinhamento ───────── */
 .lc{border-radius:var(--r-lg);margin-bottom:var(--sp-3)}
@@ -154,14 +154,14 @@ html body .lc-acts button,html body .lc-acts a.gh,html body .lc-acts .gh{min-hei
 
 /* ───────── 12. RESPONSIVIDADE ─────────
    Nada passa da largura da tela: texto quebra, tabelas rolam por dentro, grades se empilham. */
-main,main>*{min-width:0;max-width:100%}
-main :where(h1,h2,h3,h4,p,li,span,small,b,a,td,th,div,summary,legend,dd,dt){overflow-wrap:break-word}
-main :where(img,svg,video,canvas,iframe){max-width:100%}
-main pre,main code{white-space:pre-wrap;overflow-wrap:anywhere}
+:where(#app) main,:where(#app) main>*{min-width:0;max-width:100%}
+:where(#app) main :where(h1,h2,h3,h4,p,li,span,small,b,a,td,th,div,summary,legend,dd,dt){overflow-wrap:break-word}
+:where(#app) main :where(img,svg,video,canvas,iframe){max-width:100%}
+:where(#app) main pre,:where(#app) main code{white-space:pre-wrap;overflow-wrap:anywhere}
 .bar label,.ev-filtros label{white-space:nowrap;overflow-wrap:normal}
 .card,.lc,.bar,.det,.ev-form>*,.bar>*,.lc-acts>*{min-width:0}
 @media(max-width:1024px){
-  main{padding-left:var(--sp-4)!important;padding-right:var(--sp-4)!important}
+  :where(#app) main{padding-left:var(--sp-4)!important;padding-right:var(--sp-4)!important}
 }
 @media(max-width:900px){
   .hab-head{grid-template-columns:1fr!important}
@@ -170,13 +170,13 @@ main pre,main code{white-space:pre-wrap;overflow-wrap:anywhere}
 }
 @media(max-width:640px){
   :root,html[data-theme]{--h-sm:36px;--h-md:44px;--h-lg:48px;--fs-title:22px}   /* áreas de toque (WCAG 2.2 AA: ≥ 24px; adotamos 44px) */
-  main{padding-left:var(--sp-3)!important;padding-right:var(--sp-3)!important}
+  :where(#app) main{padding-left:var(--sp-3)!important;padding-right:var(--sp-3)!important}
   .bar,.lc-facts{grid-template-columns:1fr!important}
   .ev-kpis{grid-template-columns:1fr 1fr!important}
   .lc-acts button,.lc-acts a.gh{flex:1 1 100%}
-  main .card{padding:var(--sp-3) var(--sp-4)}
+  :where(#app) main .card{padding:var(--sp-3) var(--sp-4)}
 }
-@media(min-width:1600px){main{max-width:1480px}}
+@media(min-width:1600px){:where(#app) main{max-width:1480px}}
 
 /* ───────── 13. PÁGINA INICIAL / LANDING ───────── */
 .landing-login,.landing-nav button:not(.cta){background:#fff!important;color:var(--tx)!important;border:1px solid var(--campo-bd)!important}
@@ -184,7 +184,7 @@ main pre,main code{white-space:pre-wrap;overflow-wrap:anywhere}
 .hab-prog .pc{display:flex;align-items:baseline;gap:var(--sp-3);flex-wrap:wrap}.hab-prog .pc b{white-space:nowrap}
 
 /* filtros: principais sempre à vista; avançados em área expansível */
-main .bar>.bar-av{grid-column:1/-1;flex:1 1 100%;border-top:1px solid var(--line);padding-top:var(--sp-2)}
+:where(#app) main .bar>.bar-av{grid-column:1/-1;flex:1 1 100%;border-top:1px solid var(--line);padding-top:var(--sp-2)}
 .bar-av>summary{cursor:pointer;font-size:var(--fs-sec);font-weight:600;color:var(--tx2);list-style:none;display:flex;align-items:center;gap:var(--sp-2);min-height:var(--h-sm)}
 .bar-av>summary::before{content:"▸";color:var(--mut);transition:transform .12s}.bar-av[open]>summary::before{transform:rotate(90deg)}
 .bar-av>summary::-webkit-details-marker{display:none}.bar-av>summary small{font-weight:400;color:var(--mut)}
@@ -193,4 +193,33 @@ main .bar>.bar-av{grid-column:1/-1;flex:1 1 100%;border-top:1px solid var(--line
 html body button.dtb{min-height:var(--h-md);min-width:var(--h-md);padding:0;background-color:#fff;color:var(--tx);border:1px solid var(--campo-bd);font-size:var(--fs-body)}
 html body button.dtb:hover:not(:disabled){background-color:var(--raise);color:var(--tx)}
 @media(max-width:640px){.bar-av>summary small{display:none}}
-main .top{margin-bottom:var(--sp-4)}main .top h2{margin:0 0 var(--sp-1)}main .top .sub{margin:0}
+:where(#app) main .top{margin-bottom:var(--sp-4)}:where(#app) main .top h2{margin:0 0 var(--sp-1)}:where(#app) main .top .sub{margin:0}
+
+/* entrada automática do navegador (autofill) mantém campo branco e texto escuro */
+input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,select:-webkit-autofill{-webkit-box-shadow:0 0 0 1000px #fff inset!important;box-shadow:0 0 0 1000px #fff inset!important;-webkit-text-fill-color:var(--tx)!important;caret-color:var(--tx)}
+#login input{background-color:#fff;color:var(--tx);border:1px solid var(--campo-bd);border-radius:var(--r-sm)}
+#login .box{background:#fff}
+/* botões da landing: mesmo laranja do sistema, planos */
+html body .landing-primary,html body .landing-plan-btn{background-image:none;background-color:var(--primary);color:#fff;border:1px solid var(--primary);border-radius:var(--r-md);min-height:var(--h-lg);padding:0 var(--sp-5);box-shadow:none}
+html body .landing-primary:hover,html body .landing-plan-btn:hover{background-color:var(--primary-hover);border-color:var(--primary-hover);color:#fff}
+/* lista de clientes e planos (admin): linhas que se reorganizam, sem rolagem lateral */
+.cl-list{display:grid;gap:0;border:1px solid var(--bd);border-radius:var(--r-md);overflow:hidden}
+.cl-head,.cl-row{display:grid;grid-template-columns:minmax(150px,1.4fr) minmax(130px,1fr) minmax(100px,.7fr) minmax(80px,.5fr) minmax(300px,2fr);gap:var(--sp-3);align-items:center;padding:var(--sp-3) var(--sp-4)}
+.cl-head{background:var(--raise);font-size:var(--fs-cap);font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;padding-top:var(--sp-2);padding-bottom:var(--sp-2)}
+.cl-row{border-top:1px solid var(--line)}
+.cl-row .sub{margin-top:2px}
+.cl-act{display:flex;flex-wrap:wrap;gap:var(--sp-2);align-items:center}
+.cl-act select{flex:1 1 120px;width:auto;min-width:0}.cl-act button{flex:none}
+.cl-row [data-l]::before{display:none}
+@media(max-width:1100px){
+  .cl-head{display:none}
+  .cl-row{grid-template-columns:1fr 1fr}
+  .cl-row>div:first-child{grid-column:1/-1;font-weight:600}
+  .cl-row [data-l]::before{display:block;content:attr(data-l);font-size:var(--fs-cap);font-weight:700;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-bottom:2px}
+  .cl-act{grid-column:1/-1}
+}
+@media(max-width:560px){.cl-row{grid-template-columns:1fr}}
+#login .landing-lead{margin:0 auto}
+/* tabelas: ocupam toda a largura do card; se não couberem, o card rola por dentro (sem estourar a página) */
+:where(#app) main table{display:table;width:100%;max-width:none;overflow:visible}
+:where(#app) main .card:has(>table),:where(#app) main .card:has(>div>table){overflow-x:auto}
