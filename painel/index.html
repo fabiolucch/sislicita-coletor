@@ -929,7 +929,7 @@ function cardLic(o,ex={}){
   ['Local',`<b>${esc(local||'Não informado')}</b>`],
   ex.corresp&&ex.corresp.itens_total?['Itens compatíveis',`<b>${ex.corresp.itens_compat??0} de ${ex.corresp.itens_total}</b>${ex.corresp.valor_compat?`<small>${brl(ex.corresp.valor_compat)} nesses itens</small>`:'<small>só parte da licitação</small>'}`]:null
  ].filter(Boolean).map(([r,h])=>`<div><span>${r}</span>${h}</div>`).join('');
- const porque=ia?(ex.just||ex.motivo||''):'';
+ const porque0=ia?(ex.just||ex.motivo||''):'',porque=/^Filtro v2b|parecido com o perfil.?$/i.test(porque0.trim())?'':porque0; // texto genérico do filtro não explica nada: só mostra justificativa específica
  const corpo=[
   ia&&o.ia_resumo?`<p class="lc-ia">${AI()}${esc(o.ia_resumo)}</p>`:'',
   ia&&o.ia_atencao?`<p class="lc-note"><span>⚠</span><span>${esc(o.ia_atencao)}</span></p>`:'',
