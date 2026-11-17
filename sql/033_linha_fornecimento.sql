@@ -55,7 +55,7 @@ create table if not exists public.cat_nos (
   primary key (catalogo, tipo, nivel, codigo),
   check ((tipo = 'M' and nivel in ('grupo','classe','pdm','item')) or (tipo = 'S' and nivel in ('secao','divisao','grupo','classe','subclasse','servico')))
 );
-create index if not exists cat_nos_busca on public.cat_nos using gin (busca extensions.gin_trgm_ops);
+create index if not exists cat_nos_busca on public.cat_nos using gin (busca gin_trgm_ops);
 create index if not exists cat_nos_caminho on public.cat_nos using gin (caminho jsonb_path_ops);
 create index if not exists cat_nos_codigo on public.cat_nos (codigo);
 alter table public.cat_nos enable row level security;
