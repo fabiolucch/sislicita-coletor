@@ -258,33 +258,4 @@ $$;
 grant execute on function public.oportunidades_linha(text, text, text, text, int, int, boolean),
   public.pca_linha(text, text, int, date, date, text, int, int), public.resumo_linha() to authenticated;
 
--- ------------------------------------------------------------------ desligamento reversível (flags em app_flags)
--- Operações exclusivas: sem execução por usuários. Para reativar: grant execute ... to authenticated e app_flags.ativo = true.
-do $$ declare f text; begin
-  foreach f in array array[
-    'atualizar_cobranca(bigint, text, date, text)', 'cancelar_assessoria(bigint)', 'confirmar_contrato_assessoria(bigint)',
-    'confirmar_empenho_assessoria(bigint)', 'confirmar_resultado_assessoria(bigint, text)',
-    'definir_assessoria_processo(bigint, numeric, numeric, text, numeric)', 'listar_assessorias()',
-    'propor_assessoria(bigint, numeric, numeric, text, numeric)', 'responder_assessoria(bigint, boolean)',
-    'salvar_parametros_assessoria(jsonb)', 'solicitar_assessoria(bigint, text)', 'sugerir_comissao(bigint)',
-    'calcular_lances(bigint)', 'disputa_resumo(bigint)', 'iniciar_disputa(bigint, bigint)',
-    'mudar_situacao_disputa(bigint, text)', 'registrar_lance(bigint, integer, numeric, numeric, integer, text, text)']
-  loop
-    if to_regprocedure('public.' || f) is not null then
-      execute format('revoke execute on function public.%s from public, anon, authenticated', f);
-    end if;
-  end loop;
-end $$;
-
--- Tabelas exclusivas: política restritiva (o histórico continua guardado; só a plataforma consulta enquanto desligado)
-do $$ declare t text; m text; begin
-  foreach t in array array['assessoria_parametros', 'parametros_custo', 'assessorias', 'assessoria_cobrancas', 'processo_empenhos',
-                           'disputas', 'disputa_itens', 'disputa_eventos', 'processos', 'processo_viabilidade'] loop
-    m := case when t in ('disputas', 'disputa_itens', 'disputa_eventos') then 'disputa'
-              when t in ('processos', 'processo_viabilidade', 'processo_empenhos') then 'processos' else 'assessoria' end;
-    if to_regclass('public.' || t) is not null then
-      execute format('drop policy if exists modulo_desligado on public.%I', t);
-      execute format('create policy modulo_desligado on public.%I as restrictive for all to authenticated using (public.flag_ativa(%L) or public.eh_admin_plataforma()) with check (public.flag_ativa(%L) or public.eh_admin_plataforma())', t, m, m);
-    end if;
-  end loop;
-end $$;
+-- O desligamento dos módulos (assessoria, disputa, processos) está em 038_desligar_modulos.sql.
