@@ -26,6 +26,31 @@ async function marcarInteresse(opId){try{await rpc('marcar_interesse',{p_oportun
 
 // ------------------------------------------------------------------ início
 // A empresa é opcional: perfis de busca funcionam sozinhos; com empresa e linha de fornecimento a busca automática por classe/grupo se soma a eles.
+/* ---- UF e município automáticos: lista oficial do IBGE (servicodados.ibge.gov.br), guardada no aparelho por 30 dias ---- */
+const IBGE_UF={AC:'Acre',AL:'Alagoas',AM:'Amazonas',AP:'Amapá',BA:'Bahia',CE:'Ceará',DF:'Distrito Federal',ES:'Espírito Santo',GO:'Goiás',MA:'Maranhão',MG:'Minas Gerais',MS:'Mato Grosso do Sul',MT:'Mato Grosso',PA:'Pará',PB:'Paraíba',PE:'Pernambuco',PI:'Piauí',PR:'Paraná',RJ:'Rio de Janeiro',RN:'Rio Grande do Norte',RO:'Rondônia',RR:'Roraima',RS:'Rio Grande do Sul',SC:'Santa Catarina',SE:'Sergipe',SP:'São Paulo',TO:'Tocantins'};
+const IBGE_MEM={};
+async function ibgeMun(uf){
+ if(!uf)return[];if(IBGE_MEM[uf])return IBGE_MEM[uf];
+ try{const c=JSON.parse(localStorage.getItem('ibge:'+uf)||'null');if(c&&Date.now()-c.t<2592e6&&c.l&&c.l.length){return IBGE_MEM[uf]=c.l;}}catch(e){}
+ try{const r=await fetch('https://servicodados.ibge.gov.br/api/v1/localidades/estados/'+encodeURIComponent(uf)+'/municipios?view=nivelado&orderBy=nome');if(!r.ok)throw 0;
+  const l=(await r.json()).map(x=>x['municipio-nome']||x.nome).filter(Boolean);if(!l.length)throw 0;
+  IBGE_MEM[uf]=l;try{localStorage.setItem('ibge:'+uf,JSON.stringify({t:Date.now(),l}));}catch(e){}return l;}catch(e){return[];}
+}
+function ufSelect(id,atual,onch,todas){return `<select id="${id}" ${onch?`onchange="${onch}"`:''}><option value="">${todas||'Selecione a UF'}</option>${UFS.map(u=>`<option value="${u}" ${u===atual?'selected':''}>${u} · ${IBGE_UF[u]||''}</option>`).join('')}</select>`;}
+function munSelect(id,uf,atual,onch){return `<select id="${id}" data-mun data-uf="${esc(uf||'')}" data-atual="${esc(atual||'')}" ${onch?`onchange="${onch}"`:''}><option value="">${uf?'Carregando municípios…':'Selecione a UF primeiro'}</option></select>`;}
+async function munPreencher(sel){
+ const uf=sel.dataset.uf||'',atual=sel.dataset.atual||'';sel.dataset.ok=uf+'|'+atual;
+ if(!uf){sel.innerHTML='<option value="">Selecione a UF primeiro</option>';sel.disabled=true;return;}
+ sel.disabled=false;const l=await ibgeMun(uf);if((sel.dataset.uf||'')!==uf)return;
+ if(!l.length){sel.innerHTML=`<option value="${esc(atual)}">${esc(atual||'Não foi possível carregar a lista (IBGE)')}</option>`;return;}
+ const ach=l.find(x=>x.toLowerCase()===atual.toLowerCase())||'';const lista=atual&&!ach?[atual,...l]:l;
+ sel.innerHTML='<option value="">Selecione o município</option>'+lista.map(m=>`<option value="${esc(m)}" ${m===(ach||atual)?'selected':''}>${esc(m)}</option>`).join('');
+}
+function munAuto(){document.querySelectorAll('select[data-mun]').forEach(s=>{if(s.dataset.ok!==(s.dataset.uf||'')+'|'+(s.dataset.atual||''))munPreencher(s);});}
+// quando a UF muda, a lista de municípios é trocada na hora
+function ufMud(ufSel,munId,atual){const m=document.getElementById(munId);if(!m)return;m.dataset.uf=ufSel.value;m.dataset.atual=atual||'';munPreencher(m);}
+new MutationObserver(()=>munAuto()).observe(document.documentElement,{childList:true,subtree:true});
+
 V.home=async()=>{
  const q=x=>Promise.resolve(x).catch(()=>({data:null}));
  const [R,pjR,intR,D,temPerfil,BRr,topR]=await Promise.all([rpc('resumo_linha').catch(()=>null),
@@ -314,8 +339,8 @@ function empForm(pj){
  <div class="ev-form"><div><label>CNPJ</label><input id="ecnpj" value="${esc(pj.cnpj)}" disabled></div>
  <div><label>Razão social</label><input id="erz" value="${esc(pj.razao_social||'')}"></div>
  <div><label>Nome fantasia</label><input id="efa" value="${esc(pj.nome_fantasia||'')}"></div>
- <div><label>UF da sede</label><select id="euf"><option value="">—</option>${UFS.map(u=>`<option ${u===pj.uf?'selected':''}>${u}</option>`).join('')}</select></div>
- <div><label>Município</label><input id="emun" value="${esc(pj.municipio||'')}"></div>
+ <div><label>UF da sede</label>${ufSelect('euf',pj.uf,"ufMud(this,'emun')")}</div>
+ <div><label>Município</label>${munSelect('emun',pj.uf,pj.municipio)}</div>
  <div><label>Porte</label><select id="epo"><option value="">—</option>${['MEI','Microempresa','Empresa de pequeno porte','Demais'].map(x=>`<option ${x===pj.porte?'selected':''}>${x}</option>`).join('')}</select></div>
  <div><label>CNAE principal <small>(só contexto; não é linha de fornecimento)</small></label><input id="ecn" value="${esc(pj.cnae_principal||'')}"></div>
  <div style="grid-column:1/-1"><label>O que a empresa faz (texto livre)</label><textarea id="eda" rows="3">${esc(pj.descricao_atividades||'')}</textarea></div></div>
@@ -340,7 +365,7 @@ async function empPublicos(){
   await sb.from('pessoas_juridicas').update({dados_publicos:{fonte:'BrasilAPI (Receita Federal) e Dados Abertos Compras.gov.br',receita:rf,sicaf:sf||null},dados_publicos_em:new Date().toISOString()}).eq('id',pj.id);
  }catch(e){box.innerHTML=`<div class="vazio">Consulta indisponível agora (${esc(e.message)}). O cadastro continua funcionando normalmente.</div>`;}
 }
-async function empAplicar(d){Object.entries({erz:d.razao_social,efa:d.nome_fantasia,emun:d.municipio,ecn:d.cnae_principal}).forEach(([k,v])=>{if(v&&$('#'+k))$('#'+k).value=v;});if(d.uf&&$('#euf'))$('#euf').value=d.uf;toast('Campos preenchidos; confira e salve.');}
+async function empAplicar(d){Object.entries({erz:d.razao_social,efa:d.nome_fantasia,ecn:d.cnae_principal}).forEach(([k,v])=>{if(v&&$('#'+k))$('#'+k).value=v;});if(d.uf&&$('#euf'))$('#euf').value=d.uf;if($('#emun')){const m=$('#emun');m.dataset.uf=d.uf||$('#euf').value;m.dataset.atual=d.municipio||'';munPreencher(m);}toast('Campos preenchidos; confira e salve.');}
 
 // ------------------------------------------------------------------ subnavegação de Licitações e PCA
 const SUB_OP=[['oport','Pela linha de fornecimento'],['triagem','Pelos perfis de busca'],['radar','Radar'],['oportunidades','Pesquisa ampla']];
@@ -688,7 +713,7 @@ V.habilitacao=async()=>{
  main.innerHTML=topo+`<div class="card"><div class="hab-head"><div class="ev-form">
    <div style="grid-column:1/-1"><label>Fornecedor</label><select onchange="window.__HABSEL=this.value;ir('habilitacao',{sujeito:this.value})">${sujeitos.map(x=>`<option value="${x.tipo}:${x.id}" ${x.id===sj.id&&x.tipo===sj.tipo?'selected':''}>${x.tipo==='pf'?'Pessoa física':'Pessoa jurídica'} · ${esc(x.nome)} · ${esc(x.doc)}</option>`).join('')}</select></div>
    ${sj.tipo==='pj'?`<div style="grid-column:1/-1"><label>Natureza jurídica</label><select onchange="salvarHab({natureza:this.value||null})"><option value="">Selecione…</option>${Object.entries(NAT).map(([k,v])=>`<option value="${k}" ${k===H.natureza?'selected':''}>${v}</option>`).join('')}</select>${!H.natureza?'<div class="ev-hint">A lista de documentos se ajusta à natureza jurídica.</div>':''}</div>`:''}
-   <div><label>UF da sede</label><input maxlength="2" value="${esc(H.uf||'')}" onchange="salvarHab({uf:this.value.toUpperCase()})"></div><div><label>Município da sede</label><input value="${esc(H.municipio||'')}" onchange="salvarHab({municipio:this.value})"></div></div>
+   <div><label>UF da sede</label>${ufSelect('huf',H.uf,"salvarHab({uf:this.value||null,municipio:null})")}</div><div><label>Município da sede</label>${munSelect('hmun',H.uf,H.municipio,"salvarHab({municipio:this.value||null})")}</div></div>
   <div class="hab-prog"><div class="pc"><b>${pct}%</b><span>dos documentos obrigatórios anexados e válidos no cadastro</span></div><div class="hbar"><i style="width:${pct}%"></i></div>
    <span class="ev-hint" style="margin:0">Documento anexado não significa empresa habilitada: cada edital tem suas exigências.</span></div></div></div>
  <div class="hab-cats">${cats.map(c=>{const e=HAB_EST[c.est];return `<details class="card hab-cat" ${c.g===aberto?'open':''} ontoggle="if(this.open)window.__HABOPEN='${c.g}'"><summary><span class="hdoc-st ${e[0]}">${e[1]}</span><div><b>${c.t}</b><small>${c.x}</small></div><span class="chip ${e[0]}">${e[2]}</span><span class="hab-n">${c.ob.length?`${c.okN}/${c.ob.length}`:''}</span></summary>

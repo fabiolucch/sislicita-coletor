@@ -363,3 +363,107 @@ table td{color:var(--tx);border-color:var(--line)}
 .card>.ev-kpis{margin-top:12px}
 .ev-det{margin:6px 0 10px;font-size:13px}.ev-det summary{cursor:pointer;color:var(--tx2)}.ev-det ul{margin:6px 0 0 18px;padding:0}.ev-det li{margin:3px 0}
 .lf-trilha{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:4px 0 10px}.lf-voltar{margin-right:8px}
+
+/* ═════════ Tema v3 — conteúdo claro, menu escuro, botões flat (mesma paleta cinza + laranja) ═════════ */
+:root,html[data-theme]{
+  color-scheme:light;
+  --bg:#f1f2f4; --side:#2b2e34; --card:#ffffff; --raise:#f4f5f7; --campo:#ffffff;
+  --bd:#d5d8dd; --line:#e3e5e9; --campo-bd:#b9bec6;
+  --tx:#23262b; --tx2:#383c43; --mut:#5d646e; --ph:#8a919b;
+  --pri:#f97316; --pri2:#f9731620; --pri3:#c2410c; --pri-tx:#ffffff;
+  --ok:#15803d; --warn:#b45309; --bad:#b91c1c;
+  --c-blue:#1d4ed8; --c-violet:#6d28d9; --c-green:#15803d; --c-amber:#b45309; --c-red:#b91c1c; --c-orange:#c2410c; --c-mut:#5d646e;
+  --sf:var(--raise); --sf2:#e9ebee; --r:8px; --sh:0 1px 2px #1f23290d,0 2px 8px #1f232910;
+}
+html{color-scheme:light;background:var(--bg)}
+body{background:var(--bg)!important;color:var(--tx)}
+::selection{background:#f9731633;color:#23262b}
+::-webkit-scrollbar-thumb{background:#c3c7cd;border-color:var(--bg)}
+
+/* menu lateral escuro: variáveis próprias só dentro dele */
+#app>aside,aside{--tx:#f3f4f6;--tx2:#e5e7eb;--mut:#b4bac3;--bd:#454a52;--line:#3d424a;--raise:#3a3f46;--pri3:#fdba74;
+  background:#2b2e34!important;border-color:#1f2227!important;color:#d5d9df;box-shadow:none}
+aside a{color:#c9ced6}
+aside a:hover{background:#ffffff12;color:#fff}
+aside a.on,aside .nav-link.on{background:#3a3f46!important;color:#fb923c!important;box-shadow:none!important}
+aside .gr{color:#8f96a0}aside .user{color:#98a0ab}aside .logo b{color:#fff}
+aside .sair,aside .theme-toggle{background:#3a3f46!important;color:#e5e7eb!important;border:1px solid #4a5058!important}
+
+/* botões: planos, cantos pequenos, tamanho uniforme */
+button,.gh,a.gh{border-radius:6px!important;box-shadow:none!important;font-weight:600;letter-spacing:0;text-transform:none}
+main button{min-height:38px;padding:8px 16px}
+main button.sm,.lc-acts button.sm{min-height:32px;padding:6px 12px;font-size:12.5px}
+.lc-acts button,.lc-acts a.gh{border-radius:6px;min-height:36px}
+button{background:var(--pri);color:#fff;border:1px solid var(--pri)}
+button:hover:not(:disabled){background:#ea6a0c;filter:none}
+button.sec,.gh,a.gh{background:#fff;color:var(--tx);border:1px solid var(--campo-bd)}
+button.sec:hover:not(:disabled),.gh:hover{background:var(--raise);border-color:#9aa0a9}
+button.danger,button.perigo{background:#fff;color:var(--bad);border:1px solid #e3b4b4}
+.ev-tabs{background:transparent}
+.ev-tabs>button,.ev-sub button,.an-tabs button{border-radius:6px!important;background:transparent!important;border:0!important;color:var(--mut)}
+.ev-tabs>button.on,.ev-tabs>button.on:hover,.ev-sub button.on{background:#fff!important;color:var(--tx)!important;box-shadow:inset 0 -2px 0 var(--pri)!important}
+
+/* campos, cartões e superfícies */
+input,select,textarea{background:#fff!important;color:var(--tx)!important;border:1px solid var(--campo-bd)!important;border-radius:6px!important}
+input::placeholder,textarea::placeholder{color:var(--ph)}
+input:disabled,select:disabled{background:#eef0f2!important;color:var(--mut)!important}
+.card,.lc,.det .dkv>div,.det .dex>div{background:var(--card);border-color:var(--bd);border-radius:10px;color:var(--tx)}
+.lc{border-radius:10px}
+.lc-ring i::before{background:var(--card)}
+.chip{border-radius:5px}
+.ev-sub{background:var(--sf2);border-color:var(--line);border-radius:8px}
+.ev-tabs{background:var(--sf2);border:1px solid var(--line);border-radius:8px}
+main .bar,.bar{background:#fff;border-radius:10px}
+main .card,.kp,.legc{border-radius:10px}
+#mtop,#mtop.on{background:#2b2e34!important;border-color:#1f2227!important}
+#mtop .mbrand,#mtop .mtit{color:#e5e7eb!important}
+#mtop .mbtn{background:#3a3f46!important;border:1px solid #4a5058!important;color:#fff!important;border-radius:6px!important}
+button.sec.on,.stbtn{border-radius:6px}
+/* botão principal: laranja padrão, texto branco; secundário: branco com borda */
+button,.lf-ac button,.res button.sm,.hdoc-ac .anexar,.lc-acts .lc-go{background:#ea580c;color:#fff!important;border:1px solid #ea580c}
+button:hover:not(:disabled),.lf-ac button:hover:not(:disabled),.lc-acts .lc-go:hover:not(:disabled){background:#c2410c;border-color:#c2410c;color:#fff}
+button.sec,.gh,a.gh,.lf-ac button.sec,.res button.sec{background:#fff;color:var(--tx)!important;border:1px solid var(--campo-bd)}
+button.sec:hover:not(:disabled),.gh:hover,.lf-ac button.sec:hover{background:var(--raise);color:var(--tx)!important}
+.res>button:not(.sm){background:#fff;color:var(--tx)!important;border:1px solid var(--bd);border-radius:8px}
+.res>button:not(.sm):hover{border-color:var(--pri);background:#fff7ed}
+.hdoc-ac .anexar,.hab-prog button{color:#fff!important}
+button.bad,button.danger,button.perigo{background:#fff;color:var(--bad)!important;border:1px solid #e3b4b4}
+aside .sair,aside .theme-toggle,#mtop .mbtn{color:#e5e7eb!important}
+button:disabled{opacity:.5}
+.ev-tabs>button,.ev-sub button,.an-tabs button,.ev-tabs.sm button{background:transparent!important;color:var(--mut)!important;border:0!important}
+.ev-tabs>button:hover:not(:disabled),.ev-sub button:hover:not(:disabled){background:#0000000a!important;color:var(--tx)!important}
+.ev-tabs>button.on,.ev-tabs>button.on:hover,.ev-sub button.on{background:#fff!important;color:var(--tx)!important}
+
+/* ═════════ Responsivo: nada passa da tela; tudo quebra linha ou rola dentro do próprio bloco ═════════ */
+html,body{max-width:100%;overflow-x:clip}
+main,main>*{min-width:0;max-width:100%}
+main :where(h1,h2,h3,h4,p,li,span,small,b,a,label,td,th,div,summary,legend,dd,dt){overflow-wrap:anywhere}
+main :where(img,svg,video,canvas,iframe){max-width:100%}
+main :where(input,select,textarea){max-width:100%;min-width:0}
+main button,main .gh,main a.gh{max-width:100%;white-space:normal;text-align:center;line-height:1.25}
+main pre,main code{white-space:pre-wrap;overflow-wrap:anywhere}
+main table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.chip{white-space:normal;max-width:100%}
+.ev-tabs,.ev-sub,.an-tabs{max-width:100%}
+.ev-tabs>button,.ev-sub button,.an-tabs button{white-space:nowrap}
+.card,.lc,.bar,.det{min-width:0;max-width:100%}
+.ev-form,.ev-kpis,.lc-facts,.hab-nums,.dkv{min-width:0}
+.ev-form>*,.bar>*,.lc-acts>*{min-width:0}
+@media(max-width:900px){
+  main{padding-left:14px!important;padding-right:14px!important}
+  .ev-form{grid-template-columns:1fr!important}
+  .hab-head{grid-template-columns:1fr!important}
+  .lc-acts{flex-wrap:wrap}.lc-acts button,.lc-acts a.gh{flex:1 1 auto}
+  .lc-facts{grid-template-columns:1fr 1fr!important}
+  .bar{grid-template-columns:1fr 1fr!important}
+}
+@media(max-width:560px){
+  .bar,.lc-facts{grid-template-columns:1fr!important}
+  .ev-kpis{grid-template-columns:1fr 1fr!important}
+  h1{font-size:22px!important}
+  .lc-acts button,.lc-acts a.gh{flex:1 1 100%}
+}
+.hab-prog .pc{display:flex!important;align-items:baseline;gap:10px;flex-wrap:wrap}
+.hab-prog .pc b{white-space:nowrap}
+.landing-login,.landing-nav button:not(.cta){background:#fff!important;color:var(--tx)!important;border:1px solid var(--campo-bd)!important}
+.landing-lead{text-align:center}
