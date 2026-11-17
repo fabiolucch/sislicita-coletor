@@ -11,7 +11,7 @@ language sql stable security definer set search_path = public as $$
     'habilitacao', coalesce((select jsonb_agg(jsonb_build_object('codigo', c.codigo, 'nome', c.nome, 'grupo', c.grupo, 'obrigatorio', c.obrigatorio,
          'anexado', u.id is not null, 'valido_ate', u.valido_ate, 'arquivo', u.arquivo_nome) order by c.ordem)
        from hab_catalogo c left join lateral (select h.id, h.valido_ate, h.arquivo_nome from hab_documentos h where h.codigo = c.codigo and h.organizacao_id = d.organizacao_id order by h.criado_em desc limit 1) u on true
-       where c.obrigatorio and (nat.n is null or nat.n = any(c.naturezas))), '[]'::jsonb))
+       where c.obrigatorio and ((nat.n is null and c.naturezas <> array['pf']) or nat.n = any(c.naturezas))), '[]'::jsonb))
   from disputas d join processos p on p.id = d.processo_id left join empresas e on e.id = p.empresa_id
   left join lateral (select he.natureza n from hab_empresas he where he.organizacao_id = d.organizacao_id and he.natureza is not null and he.natureza <> 'pf' order by he.atualizado_em desc limit 1) nat on true
   where d.processo_id = p_processo and public.pode_ler_org(d.organizacao_id);
