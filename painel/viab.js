@@ -414,7 +414,7 @@
       itens.forEach(i => { const z = v * (r[i.n] || 0); i.ind += z; i.ev.push({ quando: 'receb', valor: z, rot }); });
       memoria.push(`${rot}: ${brl2(v)} fixo, rateado pelo valor.`);
     });
-    if (!(E.tributos || []).length) pend.push('Informe os tributos e taxas sobre a venda (pode ser 0 se de fato não houver).');
+    if (!(E.tributos || []).length && !(E.pend_extra || []).length) pend.push('Informe os tributos e taxas sobre a venda (pode ser 0 se de fato não houver).');
 
     // financiamento: só juros e tarifas entram no custo econômico
     const fin = op.financiamento || {};
@@ -521,7 +521,7 @@
     const t = prep.t, mMin = prep.mMin, mAlvo = prep.mAlvo;
     const unit = u.tipo === 'item';
     const ok = its.length && its.every(i => i.okCusto) && !prep.erros.length;
-    const out = { id: u.id, nome: u.nome, tipo: u.tipo, Q: rd(Q, 4), C: rd(C0), t, unit, unidade: unit ? its[0].unidade : '', parcial: !ok || prep.pend.length > 0, aproximacao: false };
+    const out = { id: u.id, nome: u.nome, tipo: u.tipo, itens: u.itens, Q: rd(Q, 4), C: rd(C0), t, unit, unidade: unit ? its[0].unidade : '', parcial: !ok || prep.pend.length > 0, aproximacao: false };
     if (!its.length || Q <= 0) return Object.assign(out, { vazio: true });
     // custo financeiro do giro no custo (opcional): depende do lance → recalcula em cada preço
     const op = prep.op;
@@ -652,7 +652,7 @@
       if (r.minimo != null && r.teto != null && r.minimo > r.teto) avisos.push(`${r.nome}: lance mínimo acima do teto confirmado.`);
     });
     prep.itens.filter(i => i.sobra > 0).forEach(i => avisos.push(`Item ${i.n}: a compra por embalagem deixa sobra de ${rd(i.sobra, 2)} unidade(s); ${E.itens.find(x => x.n === i.n).cotacao.sobra === 'estoque' ? 'a sobra fica em estoque (desembolso no caixa, fora do custo)' : 'o custo da sobra entra no custo do item'}.`));
-    const pend = [...new Set(prep.pend)];
+    const pend = [...new Set([...(E.pend_extra || []), ...prep.pend])];
     return { unidades: res, pendencias: pend, avisos: [...new Set(avisos)], erros: [...new Set(prep.erros)], memoria: prep.memoria, t: prep.t,
       tNomes: prep.tNomes, mMin: prep.mMin, mAlvo: prep.mAlvo, itens: prep.itens.map(i => ({ n: i.n, q: i.q, direto: rd(i.direto), indireto: rd(i.ind), custo: rd(i.custo), desembolso: rd(i.desembolso), sobra: i.sobra, emb: i.emb, origem: i.origem })),
       parcial: pend.length > 0 || prep.erros.length > 0, modo: prep.modo };
@@ -699,5 +699,93 @@
     return { custo: rd(custo), caixa: rd(custo + cau), linhas };
   }
 
-  return { analisar, cenarios2, fluxo, comprometidos, GRUPOS2, BASES2, CEN2, cima, calcular, cenarios, sensibilidade, recomendacao, capitalDeGiro, CATEGORIAS, BASES, CENARIOS_PADRAO, _t: { teto2, c2, rateio } };
+
+  // ==================================================================================================
+  // Tributação automática a partir do perfil da empresa (regime pelo CNPJ, anexo pelo CNAE, faixa escolhida)
+  // Simples: alíquota efetiva = (RBT12 × alíquota nominal − parcela a deduzir) ÷ RBT12 (LC 123/2006, redação LC 155/2016).
+  // Só com a faixa (sem o valor exato), usa o teto da faixa: é a alíquota mais alta possível naquela faixa (conservador).
+  // ==================================================================================================
+  const FAIXAS = [180000, 360000, 720000, 1800000, 3600000, 4800000];
+  const SIMPLES = {
+    I: [[.04, 0], [.073, 5940], [.095, 13860], [.107, 22500], [.143, 87300], [.19, 378000]],
+    II: [[.045, 0], [.078, 5940], [.10, 13860], [.112, 22500], [.147, 85500], [.30, 720000]],
+    III: [[.06, 0], [.112, 9360], [.135, 17640], [.16, 35640], [.21, 125640], [.33, 648000]],
+    IV: [[.045, 0], [.09, 8100], [.102, 12420], [.14, 39780], [.22, 183780], [.33, 828000]],
+    V: [[.155, 0], [.18, 4500], [.195, 9900], [.205, 17100], [.23, 62100], [.305, 540000]],
+  };
+  const ANEXO_TXT = { I: 'Anexo I · comércio', II: 'Anexo II · indústria', III: 'Anexo III · serviços', IV: 'Anexo IV · serviços (INSS patronal fora do DAS)', V: 'Anexo V · serviços (Fator R)' };
+  const FAIXA_TXT = ['até R$ 180 mil', 'de R$ 180 mil a R$ 360 mil', 'de R$ 360 mil a R$ 720 mil', 'de R$ 720 mil a R$ 1,8 milhão', 'de R$ 1,8 milhão a R$ 3,6 milhões', 'de R$ 3,6 milhões a R$ 4,8 milhões'];
+  function faixaDe(rbt12) { for (let k = 0; k < FAIXAS.length; k++) if (rbt12 <= FAIXAS[k]) return k + 1; return null; }
+  function aliqSimples(anexo, rbt12) {
+    const f = faixaDe(rbt12); const T = SIMPLES[anexo]; if (!f || !T || !(rbt12 > 0)) return null;
+    const [al, pd] = T[f - 1]; return (rbt12 * al - pd) / rbt12;
+  }
+  function faixaSimples(anexo, f) {
+    const T = SIMPLES[anexo]; if (!T || !(f >= 1 && f <= 6)) return null;
+    const lo = f === 1 ? 1 : FAIXAS[f - 2] + 0.01, hi = FAIXAS[f - 1];
+    return { min: f === 1 ? T[0][0] : aliqSimples(anexo, lo), max: aliqSimples(anexo, hi), nominal: T[f - 1][0], deduzir: T[f - 1][1] };
+  }
+  // anexo provável pelo CNAE (divisão/classe); devolve o motivo para o usuário conferir
+  function anexoPorCnae(cnae) {
+    const c = String(cnae || '').replace(/\D/g, ''); if (c.length < 4) return null;
+    const d = Number(c.slice(0, 2)), c4 = c.slice(0, 4);
+    if (d >= 45 && d <= 47) return { anexo: 'I', motivo: 'CNAE de comércio (revenda de mercadorias).' };
+    if (d >= 5 && d <= 33) return { anexo: 'II', motivo: 'CNAE de indústria (fabricação ou extração).' };
+    if (d >= 41 && d <= 43) return { anexo: 'IV', motivo: 'Construção civil e obras: Anexo IV (INSS patronal pago à parte).' };
+    if (['8011', '8012', '8020', '8121', '8122', '8129', '6911'].includes(c4)) return { anexo: 'IV', motivo: 'Vigilância, limpeza ou advocacia: Anexo IV.' };
+    if (d === 62 || d === 63 && c4 !== '6311' || ['7111', '7112', '7119', '7020', '7311', '7319', '7410', '7490', '8630', '8640', '8650', '8660'].includes(c4)) return { anexo: 'V', motivo: 'Serviço técnico/intelectual: Anexo V, ou Anexo III se a folha de pagamento for ≥ 28% da receita (Fator R).', fator_r: true };
+    if (d >= 49) return { anexo: 'III', motivo: 'Prestação de serviços em geral: Anexo III.' };
+    return null;
+  }
+  const ATIV = { I: 'comercio', II: 'industria', III: 'servico', IV: 'servico', V: 'servico' };
+  // gera as linhas de tributos da análise a partir do perfil da empresa
+  function tributacao(T, ctx) {
+    T = T || {}; ctx = ctx || {};
+    const out = { tributos: [], pend: [], notas: [], resumo: '' };
+    const reg = T.regime;
+    const lin = (nome, v, extra) => out.tributos.push(Object.assign({ nome, tipo: 'pct', base: 'receita', valor: v, natureza: 'devido', status: 'estimado', auto: true }, extra || {}));
+    if (!reg) { out.pend.push('Escolha o regime tributário em Minha empresa › Dados (o CNPJ costuma trazer).'); out.resumo = 'Regime tributário não definido'; return out; }
+    if (reg === 'mei') {
+      lin('MEI: DAS fixo mensal (não varia com a venda)', 0);
+      out.resumo = 'MEI · DAS fixo, sem tributo proporcional à venda';
+      out.notas.push('MEI tem limite de faturamento anual: confira se o contrato cabe nele.'); return out;
+    }
+    if (reg === 'simples') {
+      let an = T.anexo; if (!an) { out.pend.push('Escolha o anexo do Simples em Minha empresa › Dados.'); out.resumo = 'Simples Nacional · anexo não definido'; return out; }
+      if (an === 'V' && T.fator_r) an = 'III';
+      const rb = num(T.rbt12), f = rb ? faixaDe(rb) : num(T.faixa);
+      if (!f) { out.pend.push('Escolha a faixa de faturamento dos últimos 12 meses em Minha empresa › Dados.'); out.resumo = `Simples Nacional · ${ANEXO_TXT[an]} · faixa não definida`; return out; }
+      const fx = faixaSimples(an, f), al = rb ? aliqSimples(an, rb) : fx.max;
+      lin(`Simples Nacional (DAS) · ${ANEXO_TXT[an]} · faixa ${f}`, rd(al * 100, 2), { origem: rb ? 'faturamento informado' : 'teto da faixa' });
+      out.aliquota = al; out.faixa = fx;
+      out.resumo = `Simples Nacional · ${ANEXO_TXT[an]}${T.fator_r && T.anexo === 'V' ? ' (Fator R)' : ''} · faixa ${f} (${FAIXA_TXT[f - 1]}) · alíquota efetiva ${(al * 100).toFixed(2).replace('.', ',')}%`;
+      if (!rb && f > 1) out.notas.push(`Na faixa ${f} a alíquota efetiva vai de ${(fx.min * 100).toFixed(2).replace('.', ',')}% a ${(fx.max * 100).toFixed(2).replace('.', ',')}%; usamos o teto (conservador). Informe o faturamento exato para refinar.`);
+      if (an === 'IV') out.notas.push('No Anexo IV o INSS patronal (20%) é pago fora do DAS: inclua na mão de obra.');
+      if (f >= 6) out.notas.push('Acima de R$ 3,6 milhões, ICMS e ISS são recolhidos fora do DAS: confira com seu contador.');
+      out.notas.push('Optante do Simples não sofre retenção de IR, CSLL, PIS e Cofins pelo órgão.');
+      return out;
+    }
+    const at = T.atividade || ATIV[T.anexo] || null;
+    if (!at) { out.pend.push('Informe se a empresa vende mercadorias, fabrica ou presta serviços (Minha empresa › Dados).'); out.resumo = 'Atividade não definida'; return out; }
+    const serv = at === 'servico';
+    if (reg === 'presumido') {
+      lin('PIS (cumulativo)', 0.65); lin('Cofins (cumulativa)', 3);
+      lin(serv ? 'IRPJ (32% presumido × 15%)' : 'IRPJ (8% presumido × 15%)', serv ? 4.8 : 1.2);
+      lin(serv ? 'CSLL (32% presumido × 9%)' : 'CSLL (12% presumido × 9%)', serv ? 2.88 : 1.08);
+      out.notas.push('Adicional de IRPJ (10% sobre a parcela do lucro presumido acima de R$ 60 mil por trimestre) não incluído.');
+    } else if (reg === 'real') {
+      lin('PIS (não cumulativo, sem créditos)', 1.65); lin('Cofins (não cumulativa, sem créditos)', 7.6);
+      out.notas.push('No Lucro Real, os créditos de PIS/Cofins sobre compras reduzem esse percentual, e IRPJ/CSLL incidem sobre o lucro: a margem mostrada é antes desses dois.');
+    }
+    if (serv) { const v = num(T.iss); if (v === null) out.pend.push('Escolha a alíquota de ISS em Minha empresa › Dados.'); else lin('ISS', v); }
+    else { const v = num(T.icms); if (v === null) out.pend.push('Escolha o ICMS efetivo em Minha empresa › Dados.'); else lin('ICMS efetivo', v); }
+    if (ctx.esfera === 'F') {
+      out.tributos.push({ nome: serv ? 'Retenção federal (IR 4,8% + CSLL, PIS e Cofins 4,65%)' : 'Retenção federal (IR 1,2% + CSLL, PIS e Cofins 4,65%)', tipo: 'pct', base: 'receita',
+        valor: serv ? 9.45 : 5.85, natureza: 'retencao', compensa_dias: 30, status: 'estimado', auto: true });
+      out.notas.push('Órgão federal: o pagamento sofre retenção na fonte (IN RFB 1.234/2012), compensada na apuração seguinte; afeta só o caixa.');
+    }
+    out.resumo = `${reg === 'presumido' ? 'Lucro Presumido' : 'Lucro Real'} · ${at === 'comercio' ? 'comércio' : at === 'industria' ? 'indústria' : 'serviços'} · ${rd(out.tributos.filter(x => x.natureza !== 'retencao').reduce((a, x) => a + (x.valor || 0), 0), 2).toString().replace('.', ',')}% sobre a venda`;
+    return out;
+  }
+  return { tributacao, anexoPorCnae, aliqSimples, faixaSimples, FAIXA_TXT, ANEXO_TXT, analisar, cenarios2, fluxo, comprometidos, GRUPOS2, BASES2, CEN2, cima, calcular, cenarios, sensibilidade, recomendacao, capitalDeGiro, CATEGORIAS, BASES, CENARIOS_PADRAO, _t: { teto2, c2, rateio } };
 });

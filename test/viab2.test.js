@@ -153,3 +153,24 @@ test('retenção compensável reduz o recebimento imediato, não o lucro', () =>
   assert.equal(r.lance.lucro, 15600);
   assert.ok(r.caixa.serie.some(s => s.evento.startsWith('Retenção')));
 });
+
+test('tributação automática: Simples pela fórmula oficial, faixa pelo teto e retenção só fora do Simples', () => {
+  assert.equal(Math.round(V.aliqSimples('I', 500000) * 1e5) / 1e3, 6.728);        // (500.000 × 9,5% − 13.860) ÷ 500.000
+  const s = V.tributacao({ regime: 'simples', anexo: 'I', faixa: 3 }, { esfera: 'F' });
+  assert.equal(s.tributos.length, 1);
+  assert.equal(s.tributos[0].valor, 7.58);                                          // teto da faixa 3 (conservador)
+  assert.ok(!s.tributos.some(x => x.natureza === 'retencao'));
+  const v = V.tributacao({ regime: 'simples', anexo: 'V', fator_r: true, faixa: 1 });
+  assert.equal(v.tributos[0].valor, 6);                                             // Fator R: Anexo V vai ao III
+  const p = V.tributacao({ regime: 'presumido', atividade: 'servico', iss: 5 }, { esfera: 'F' });
+  assert.equal(p.tributos.filter(x => x.natureza !== 'retencao').reduce((a, x) => a + x.valor, 0), 16.33);
+  assert.equal(p.tributos.find(x => x.natureza === 'retencao').valor, 9.45);
+  const m = V.tributacao({ regime: 'presumido', atividade: 'comercio' });
+  assert.ok(m.pend.some(x => x.includes('ICMS')));                                  // sem ICMS escolhido: pendência, não zero
+  assert.equal(V.tributacao({}).pend.length, 1);
+  assert.equal(V.anexoPorCnae('4691500').anexo, 'I');
+  assert.equal(V.anexoPorCnae('6201501').anexo, 'V');
+  // a pendência do perfil chega ao cálculo como parcial
+  const E = ex(); E.tributos = []; E.pend_extra = m.pend;
+  assert.equal(V.analisar(E).parcial, true);
+});

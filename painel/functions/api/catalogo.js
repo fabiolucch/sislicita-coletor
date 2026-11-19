@@ -74,7 +74,8 @@ export async function onRequestGet({ request }) {
       if (!r && rf.status === "rejected" && sf.status === "rejected") return J({ erro: "fontes públicas indisponíveis agora" }, 503);
       return J({
         receita: r ? { razao_social: r.razao_social, nome_fantasia: r.nome_fantasia || null, uf: r.uf, municipio: r.municipio,
-          porte: r.porte, cnae: r.cnae_fiscal ? String(r.cnae_fiscal) : null, cnae_desc: r.cnae_fiscal_descricao || null, cnaes_sec: (r.cnaes_secundarios || []).slice(0, 30).map(x => ({ codigo: String(x.codigo), descricao: x.descricao })), situacao: r.descricao_situacao_cadastral || null } : null,
+          porte: r.porte, cnae: r.cnae_fiscal ? String(r.cnae_fiscal) : null, cnae_desc: r.cnae_fiscal_descricao || null, cnaes_sec: (r.cnaes_secundarios || []).slice(0, 30).map(x => ({ codigo: String(x.codigo), descricao: x.descricao })), situacao: r.descricao_situacao_cadastral || null,
+          simples: r.opcao_pelo_simples ?? null, mei: r.opcao_pelo_mei ?? null } : null,
         sicaf: s ? { ativo: s.ativo, habilitadoLicitar: s.habilitadoLicitar, porteEmpresaNome: s.porteEmpresaNome, naturezaJuridicaNome: s.naturezaJuridicaNome } : null,
         receita_erro: rf.status === "rejected" ? String(rf.reason.message) : null, sicaf_erro: sf.status === "rejected" ? String(sf.reason.message) : null });
     }

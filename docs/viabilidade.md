@@ -10,6 +10,18 @@ Modo consultoria (mensagens de abordagem, prospecção de fornecedores, contatos
 
 Banco (`sql/043_fluxo_usuario.sql`): novas situações `proposta_enviada`, `ganha`, `perdida`; RPC `triar_oportunidade`; `oportunidades_linha(..., p_so_novas)`.
 
+## Preenchimento automático (o usuário só escolhe os itens e informa o custo)
+- **Etapas da análise:** 1 · Itens e custo → 2 · Premissas → 3 · Cenários e caixa → 4 · Documentos → 5 · Decisão. Tudo que não é custo vem preenchido e é escolhido em listas (sem campo aberto), com a origem indicada: PNCP, IA · edital, Minha empresa, Padrão, Compras.gov.br.
+- **Perfil tributário da empresa** (Minha empresa › Dados › Tributação e metas padrão; coluna `pessoas_juridicas.tributacao`, SQL 044):
+  - regime detectado pelo CNPJ (BrasilAPI: `opcao_pelo_simples`, `opcao_pelo_mei`); se não for Simples/MEI, o usuário escolhe Presumido ou Real;
+  - anexo do Simples sugerido pelo CNAE principal (`anexoPorCnae`) ou pela IA (`/api/ia` ação `anexo_simples`), com Fator R para o Anexo V;
+  - faixa de faturamento dos últimos 12 meses (6 faixas oficiais); alíquota efetiva = (RBT12 × alíquota nominal − parcela a deduzir) ÷ RBT12, usando o teto da faixa (conservador);
+  - Presumido: PIS 0,65% + Cofins 3% + IRPJ e CSLL presumidos (comércio/indústria 1,2% + 1,08%; serviços 4,8% + 2,88%) + ICMS/ISS escolhido; Real: PIS 1,65% + Cofins 7,6% (sem créditos) + ICMS/ISS;
+  - órgão federal e empresa fora do Simples: retenção na fonte (bens 5,85%, serviços 9,45%) entra só no caixa;
+  - margens, prazo dos fornecedores, caixa e crédito padrão.
+- **Prazos:** lidos do edital pela IA; se não encontrados, padrão de 30 dias (marcado como Padrão).
+- **Preço histórico:** mediana das compras públicas dos últimos 12 meses na mesma unidade (`/api/preco`, Compras.gov.br), quando há ao menos 3 compras.
+
 ## Motor (`painel/viab.js`, função `analisar`)
 Símbolos: `Q` quantidade, `C` custo total da execução, `t` soma dos percentuais sobre a mesma receita bruta, `m_min`, `m_alvo`.
 
@@ -36,4 +48,4 @@ Símbolos: `Q` quantidade, `C` custo total da execução, `t` soma dos percentua
 - Os valores vêm só de regras determinísticas; a IA apenas lê o edital para pré-preencher premissas, com origem indicada.
 
 ## Verificação
-`node --test test/viab.test.js test/viab2.test.js` — inclui o exemplo de referência (100 un., C = 90.000, t = 12%, m_min = 10%, m_alvo = 15%): equilíbrio 1.022,73; mínimo 1.153,85; alvo 1.232,88; lance 1.200 → lucro 15.600 (13%); lance 1.050 → lucro 2.400 (2,29%) e redução 8.100; capital de giro 90.000 e falta 30.000 com caixa de 60.000. Também: lote com custo compartilhado, maior desconto, registro de preços sem pedidos, prazo ausente, cotação por embalagem, financiamento e retenção. Isolamento entre empresas conferido no banco (usuário de outra organização não lê, não salva e não decide a análise).
+`node --test test/viab.test.js test/viab2.test.js` — inclui o exemplo de referência (100 un., C = 90.000, t = 12%, m_min = 10%, m_alvo = 15%): equilíbrio 1.022,73; mínimo 1.153,85; alvo 1.232,88; lance 1.200 → lucro 15.600 (13%); lance 1.050 → lucro 2.400 (2,29%) e redução 8.100; capital de giro 90.000 e falta 30.000 com caixa de 60.000. Também: tributação automática (Simples pela fórmula oficial, Fator R, Presumido, retenção federal), lote com custo compartilhado, maior desconto, registro de preços sem pedidos, prazo ausente, cotação por embalagem, financiamento e retenção. Isolamento entre empresas conferido no banco (usuário de outra organização não lê, não salva e não decide a análise).

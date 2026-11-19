@@ -384,6 +384,20 @@ export async function onRequestPost({ request, env }) {
     try { return J(await sugerirPorCnae(env, H, Array.isArray(b.cnaes) ? b.cnaes : [])); }
     catch (e) { return J({ erro: String(e.message || e).slice(0, 200) }, 500); }
   }
+  if (b.acao === "anexo_simples") {
+    const ok = await fetch(`${SB}/rest/v1/rpc/tem_recurso`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: JSON.stringify({ p_recurso: "ia" }) }).then(r => r.ok ? r.json() : false).catch(() => false);
+    if (ok !== true) return J({ erro: "A sugestão por IA faz parte dos planos com IA. A sugestão pelo CNAE continua disponível.", plano: true }, 402);
+    const cn = (Array.isArray(b.cnaes) ? b.cnaes : []).slice(0, 12).map(x => `${String(x.codigo || "").replace(/\D/g, "")} ${String(x.descricao || "").slice(0, 120)}${x.principal ? " (principal)" : ""}`).join("\n");
+    const ativ = String(b.descricao || "").slice(0, 600);
+    const prompt = `Você é contador no Brasil. Indique em qual anexo do Simples Nacional (LC 123/2006, redação da LC 155/2016) a receita de vendas a órgãos públicos desta empresa provavelmente se enquadra.
+CNAEs:\n${cn}\nAtividades descritas pela empresa: ${ativ || "não informado"}
+Regras: revenda de mercadorias = I; fabricação/industrialização = II; serviços conforme art. 18 §5º-B a §5º-I (III, IV ou V; serviços do V vão ao III com Fator R ≥ 28%).
+Responda só JSON: {"anexo":"I|II|III|IV|V","fator_r":true|false,"motivo":"uma frase curta em português, sem citar valores"}`;
+    try { const j = await gemini(env, prompt, true); const a = String(j.anexo || "").toUpperCase().replace(/[^IV]/g, "");
+      if (!["I", "II", "III", "IV", "V"].includes(a)) throw new Error("resposta da IA sem anexo válido");
+      return J({ anexo: a, fator_r: !!j.fator_r, motivo: String(j.motivo || "").slice(0, 240) }); }
+    catch (e) { return J({ erro: String(e.message || e).slice(0, 200) }, 500); }
+  }
   if (b.acao === "sugerir_linhas") {
     const ok = await fetch(`${SB}/rest/v1/rpc/tem_recurso`, { method: "POST", headers: { ...H, "content-type": "application/json" }, body: JSON.stringify({ p_recurso: "ia" }) }).then(r => r.ok ? r.json() : false).catch(() => false);
     if (ok !== true) return J({ erro: "As sugestões por IA fazem parte dos planos com IA. A pesquisa no catálogo continua disponível.", plano: true }, 402);

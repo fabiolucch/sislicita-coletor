@@ -327,3 +327,26 @@ html body #app .an-sim input{width:240px;max-width:100%;flex:0 0 auto}
 @media(max-width:640px){html body #app .an-sim input{width:100%}}
 /* checkbox/radio nativos (o reset do Tailwind zera a borda e o Chrome desenha um quadrado escuro) */
 html body input[type=checkbox],html body input[type=radio]{-webkit-appearance:auto;appearance:auto;border-width:revert;background:revert;accent-color:var(--primary)}
+/* análise simplificada: blocos automáticos e seções recolhíveis */
+.an-auto{display:flex;flex-direction:column;gap:2px;padding:var(--sp-3);background:#f0fdf4;border:1px solid #bbf7d0;border-radius:var(--r-md);margin:var(--sp-2) 0}
+.an-auto b{color:#14532d;font-size:14.5px}.an-auto span{color:var(--tx2);font-size:13px}
+details.an-dados>summary,details.an-grp2>summary{cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+details.an-dados>summary::-webkit-details-marker,details.an-grp2>summary::-webkit-details-marker{display:none}
+details.an-dados>summary::before,details.an-grp2>summary::before{content:"▸";color:var(--primary);transition:transform .15s}
+details.an-dados[open]>summary::before,details.an-grp2[open]>summary::before{transform:rotate(90deg)}
+details.an-dados>summary b,details.an-grp2>summary b{font-size:16px;color:var(--tx)}
+details.an-dados>summary span,details.an-grp2>summary small{color:var(--mut);font-size:13px}
+details.an-dados[open]>summary,details.an-grp2[open]>summary{margin-bottom:var(--sp-3)}
+html body input[type=checkbox],html body input[type=radio]{color-scheme:light;width:18px;min-width:0;height:18px;min-height:0;padding:0;flex:0 0 auto}
+:where(#app) main :is(input,select,textarea),#login :is(input,select){color-scheme:light}
+@media(max-width:640px){
+ #app table.an-m,#app table.an-m tbody{display:block;width:100%}
+ #app table.an-m thead{display:none}
+ #app table.an-m tr{display:grid;grid-template-columns:auto auto 1fr;gap:4px 10px;padding:var(--sp-3);border:1px solid var(--bd);border-radius:var(--r-md);margin-bottom:var(--sp-2);background:#fff}
+ #app table.an-m tr.on{background:#fff7ed;border-color:#fdba74}
+ #app table.an-m td{display:block;border:0;padding:0}
+ #app table.an-m td.m-h{font-weight:600}
+ #app table.an-m td[data-l]{grid-column:1/-1;display:flex;justify-content:space-between;gap:var(--sp-3);align-items:center}
+ #app table.an-m td[data-l]::before{content:attr(data-l);color:var(--mut);font-size:12.5px}
+ #app table.an-m td[data-l] input,#app table.an-m td[data-l] select{max-width:60%}
+}
