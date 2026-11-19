@@ -436,7 +436,8 @@
       pend, avisos, erros, memoria, modo, entregas, meses, aj, op };
   }
   const RATEIO_TXT = { valor: 'pelo valor estimado', quantidade: 'pela quantidade', igual: 'igualmente' };
-  const brl2 = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  let MOEDA = 'BRL';   // moeda das frases e da memória (BRL: R$ 1.234,56; USD: USD $ 1,234.56)
+  const brl2 = v => MOEDA === 'USD' ? 'USD $ ' + Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   // ---------------------------------------------------------------- unidades de disputa
   function unidades(E, itens) {
@@ -640,6 +641,7 @@
   // ---------------------------------------------------------------- análise completa
   function analisar(E, opcoes) {
     const o = opcoes || {};
+    MOEDA = E && E.moeda === 'USD' ? 'USD' : 'BRL';
     const prep = preparar(E, o.ajuste);
     const us = unidades(E, prep.itens);
     const lances = E.lances || {};

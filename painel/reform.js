@@ -471,7 +471,7 @@ async function empPublicos(){
 async function empAplicar(d){Object.entries({erz:d.razao_social,efa:d.nome_fantasia,ecn:d.cnae_principal}).forEach(([k,v])=>{if(v&&$('#'+k))$('#'+k).value=v;});if(d.uf&&$('#euf'))$('#euf').value=d.uf;if($('#emun')){const m=$('#emun');m.dataset.uf=d.uf||$('#euf').value;m.dataset.atual=d.municipio||'';munPreencher(m);}toast('Campos preenchidos; confira e salve.');}
 
 // ------------------------------------------------------------------ subnavegação de Licitações e PCA
-const SUB_OP=[['oport','Na minha linha'],['triagem','Pelos perfis de busca'],['radar','Ranking dos perfis'],['oportunidades','Pesquisa ampla']];
+const SUB_OP=[['oport','Linha de perfil'],['triagem','Pelos perfis de busca'],['radar','Ranking dos perfis'],['oportunidades','Pesquisa ampla']];
 const SUB_PCA=[['pca','Pela linha de fornecimento'],['pca_ampla','Pesquisa ampla']];
 const subnav=(lst,at)=>`<nav class="ev-sub" aria-label="Visões">${lst.map(([k,r])=>`<button type="button" class="${k===at?'on':''}" onclick="ir('${k}')">${r}${(k==='triagem'||k==='radar')&&!pode('radar')?' 🔒':''}</button>`).join('')}</nav>`;
 ['triagem','radar','oportunidades'].forEach(k=>{const f=V[k];if(!f)return;V[k]=async()=>{await f();main.insertAdjacentHTML('afterbegin',subnav(SUB_OP,k)+(k==='oportunidades'?'<p class="ev-hint ev-amplo">Pesquisa ampla: mostra licitações fora da sua linha de fornecimento. Use quando quiser explorar além do direcionamento.</p>':''));};});
@@ -488,7 +488,7 @@ V.oport=async()=>{
  const rows=await rpc('oportunidades_linha',{p_conf:F.conf,p_busca:F.busca||null,p_uf:F.uf||null,p_ordem:F.ordem,p_limite:30,p_offset:F.pag*30,p_aplicar_refinos:F.refinos});
  const tot=rows&&rows.length?Number(rows[0].total):0;
  const refinos=[PL.ufs&&PL.ufs.length?'UF: '+PL.ufs.join(', '):'',PL.modalidades&&PL.modalidades.length?PL.modalidades.length+' modalidade(s)':'',PL.valor_min!=null?'mín. '+brl(PL.valor_min):'',PL.valor_max!=null?'máx. '+brl(PL.valor_max):'',PL.dias?`≥ ${PL.dias} dias para propostas`:''].filter(Boolean);
- main.innerHTML=subnav(SUB_OP,'oport')+`<div class="top"><div><h2>Licitações na sua linha</h2><p class="sub">Encontradas pela linha de fornecimento: primeiro as confirmadas por código ou classificação, depois as possíveis para revisar.</p></div></div>
+ main.innerHTML=subnav(SUB_OP,'oport')+`<div class="top"><div><h2>Licitações da linha de perfil</h2><p class="sub">Encontradas pela linha de fornecimento: primeiro as confirmadas por código ou classificação, depois as possíveis para revisar.</p></div></div>
  <div class="card ev-filtros"><div class="bar">
   <select id="ofc"><option value="">Confirmadas e para revisar</option><option value="confirmada" ${F.conf==='confirmada'?'selected':''}>Só confirmadas</option><option value="revisar" ${F.conf==='revisar'?'selected':''}>Só para revisar</option></select>
   <select id="ofu"><option value="">Todas as UFs</option>${UFS.map(u=>`<option ${u===F.uf?'selected':''}>${u}</option>`).join('')}</select>
@@ -601,7 +601,7 @@ function intCard(x){
  <h3 class="lc-obj">${esc(x.objeto||'')}</h3><div class="lc-org"><span>${evi('bank')}<b>${esc(x.orgao_nome||'')}</b></span><span>${evi('pin')}${esc([x.municipio,x.uf].filter(Boolean).join('/'))}</span></div></div><div></div></header>
  <div class="lc-facts"><div><span>Valor estimado</span><b class="mono">${x.valor_sigiloso?'Sigiloso':brl(x.valor_estimado)}</b></div><div><span>Propostas até</span><b>${dt(x.data_fim_proposta)}</b></div>
   <div><span>Última análise</span><b>${x.analisado_em?dt(x.analisado_em):'Ainda não salva'}</b>${r.recomendacao?`<small>${esc(r.recomendacao.tipo==='incompleta'?'Análise incompleta':r.recomendacao.tipo==='favoravel'?'Sem alerta crítico':'Com pontos de atenção')}</small>`:''}</div>
-  <div><span>Lance mínimo</span><b class="mono">${r.total&&r.total.minimo!=null?brlc(r.total.minimo):'—'}</b>${r.total&&r.total.margem!=null?`<small>margem no lance ${pctFmt(r.total.margem)}</small>`:''}</div></div>
+  <div><span>Lance mínimo</span><b class="mono">${r.total&&r.total.minimo!=null?mfmt(r.total.minimo,r.moeda||'BRL'):'—'}</b>${r.total&&r.total.margem!=null?`<small>margem no lance ${pctFmt(r.total.margem)}</small>`:''}</div></div>
  ${x.mudancas&&x.mudancas.length?'<div class="lc-body"><p class="lc-note"><span>!</span><span>Os dados oficiais mudaram desde a última análise salva. Revise os pontos indicados.</span></p></div>':''}
  <footer class="lc-acts"><div class="lc-l">${x.link_pncp?`<a class="gh" href="${esc(x.link_pncp)}" target="_blank" rel="noopener">${ic('ext')}PNCP</a>`:''}</div><div class="lc-r"><button class="lc-go" onclick="ir('analise',{id:'${x.id}'})">${x.analisado_em?'Abrir análise':'Analisar viabilidade'}</button></div></footer></article>`;
 }
@@ -612,7 +612,7 @@ function intCard(x){
 TELAS.analise='Análise de viabilidade';
 const AN_ABAS=[['itens','1 · Itens e custo'],['premissas','2 · Premissas'],['cen','3 · Cenários e caixa'],['docs','4 · Documentos'],['decisao','5 · Decisão']];
 const JULG={item:'Menor preço por item',lote:'Menor preço por lote (global)',desconto:'Maior desconto'};
-const ORIG={pncp:['c-blue','PNCP'],ia:['c-violet','IA · edital'],voce:['c-mut','Você'],empresa:['c-green','Minha empresa'],padrao:['c-amber','Padrão'],compras:['c-blue','Compras.gov.br'],cnpj:['c-blue','CNPJ'],cnae:['c-blue','Pelo CNAE'],ia_anexo:['c-violet','Sugerido pela IA']};
+const ORIG={cotacao:['c-blue','Cotação do dia'],pncp:['c-blue','PNCP'],ia:['c-violet','IA · edital'],voce:['c-mut','Você'],empresa:['c-green','Minha empresa'],padrao:['c-amber','Padrão'],compras:['c-blue','Compras.gov.br'],cnpj:['c-blue','CNPJ'],cnae:['c-blue','Pelo CNAE'],ia_anexo:['c-violet','Sugerido pela IA']};
 const origem=k=>{const o=ORIG[k];return o?`<span class="chip ${o[0]} an-or">${o[1]}</span>`:'';};
 V.analise=async()=>{
  const id=(window.ARG&&window.ARG.id)||window.__ANID;if(!id){ir('interesses');return;}window.__ANID=id;
@@ -634,9 +634,10 @@ V.analise=async()=>{
   comp[i.numero_item]=exc?'excluido':inc?'compativel':'fora';});
  let docs=null;if(pj){docs=await habConferir(pj.id,op&&op.data_fim_proposta).catch(()=>null);}
  const P=anPremissas(li.premissas||{},li,itens||[],comp,an&&an.dados||{},T);
+ if(!P.moeda){P.moeda=/internacional/i.test(((op&&op.objeto)||'')+' '+((op&&op.modalidade)||''))?'USD':'BRL';if(P.moeda==='USD')P.origem.moeda='pncp';}
  const mesma=window.__AN&&window.__AN.li&&window.__AN.li.id===li.id;
  window.__AN={li,op:op||{},itens:itens||[],an,linhas:linhas||[],pj,T,co,comp,docs,nos:nos||[],P,aba:mesma&&AN_PANE[window.__AN.aba]?window.__AN.aba:'itens',sujo:!li.premissas||li.premissas.v!==2};
- anRender();anHistorico();
+ anRender();anHistorico();anCambio();
 };
 // premissas v2 (converte análises salvas no formato antigo sem perder o que foi digitado)
 function anPremissas(P0,li,itens,comp,D,T){
@@ -689,9 +690,12 @@ async function habConferir(pjId,dataRef){
 }
 function anEntrada(){
  const A=window.__AN,P=A.P;
- return {julgamento:P.julgamento,precisao:P.precisao,modo_custo:P.modo_custo,srp:!!A.op.srp,srp_cfg:P.srp_cfg,
-  itens:A.itens.filter(i=>P.sel.includes(i.numero_item)).map(i=>Object.assign({n:i.numero_item,descricao:i.descricao,unidade:i.unidade||'',qtd:i.quantidade,ref:i.sigiloso?null:i.valor_unitario,lote:P.lotes[i.numero_item]||''},P.it[i.numero_item]||{})),
-  custos:P.custos,tributos:P.trib_auto?anTribAuto().tributos:P.tributos,pend_extra:P.trib_auto?anTribAuto().pend:[],margem_min:P.margem_min,margem_alvo:P.margem_alvo,operacao:P.operacao,lances:P.lances,cenarios:P.cenarios};
+ const usd=P.moeda==='USD',cb=Number(P.cambio)>0?Number(P.cambio):null,conv=v=>v==null?null:usd?(cb?Math.round(v/cb*100)/100:null):v;
+ return {moeda:P.moeda||'BRL',julgamento:P.julgamento,precisao:P.precisao,modo_custo:P.modo_custo,srp:!!A.op.srp,srp_cfg:P.srp_cfg,
+  pend_moeda:usd&&!cb,
+  itens:A.itens.filter(i=>P.sel.includes(i.numero_item)).map(i=>{const it=Object.assign({},P.it[i.numero_item]||{});if(P.origem[`it.${i.numero_item}.historico`]==='compras')it.historico=conv(it.historico);
+   return Object.assign({n:i.numero_item,descricao:i.descricao,unidade:i.unidade||'',qtd:i.quantidade,ref:i.sigiloso?null:conv(i.valor_unitario),lote:P.lotes[i.numero_item]||''},it);}),
+  custos:P.custos,tributos:P.trib_auto?anTribAuto().tributos:P.tributos,pend_extra:[...(P.trib_auto?anTribAuto().pend:[]),...(P.moeda==='USD'&&!(Number(P.cambio)>0)?['Informe a cotação do dólar para converter os valores do PNCP.']:[])],margem_min:P.margem_min,margem_alvo:P.margem_alvo,operacao:P.operacao,lances:P.lances,cenarios:P.cenarios};
 }
 function anTribAuto(){const A=window.__AN;return VIAB.tributacao(A.T,{esfera:A.op.esfera});}
 function anCalc(){
@@ -707,6 +711,22 @@ const nIn=(path,v,extra='')=>`<input type="number" step="any" inputmode="decimal
 const tIn=(path,v,extra='')=>`<input data-p="${path}" value="${esc(v==null?'':v)}" onchange="anSet(this)" ${extra}>`;
 const sIn=(path,v,ops,extra='')=>`<select data-p="${path}" onchange="anSet(this)" ${extra}>${Object.entries(ops).map(([k,r])=>`<option value="${k}" ${String(k)===String(v)?'selected':''}>${r}</option>`).join('')}</select>`;
 const anOrig=path=>origem((window.__AN.P.origem||{})[path]);
+
+// ---------- moeda: reais (R$ 1.234,56) ou dólar em licitação internacional (USD $ 1,234.56)
+function anMoeda(){const A=window.__AN;return (A&&A.P&&A.P.moeda)||'BRL';}
+function mfmt(v,m){if(v==null||isNaN(v))return '—';m=m||anMoeda();const n=Number(v);return m==='USD'?'USD $ '+n.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}):n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});}
+// digitação "da direita para a esquerda": cada número entra nos centavos; sem ponto/vírgula para errar
+const mIn=(path,v,extra='',m)=>`<input type="text" inputmode="numeric" autocomplete="off" class="an-money" data-p="${path}" data-m="1" data-cur="${m||''}" value="${v==null?'':mfmt(v,m)}" placeholder="${(m||anMoeda())==='USD'?'USD $ 0.00':'R$ 0,00'}" oninput="anMask(this)" ${extra}>`;
+const pIn=(path,v,extra='')=>`<input type="text" inputmode="numeric" autocomplete="off" class="an-money" data-p="${path}" data-m="pct" value="${v==null?'':Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%'}" placeholder="0,00%" oninput="anMask(this)" ${extra}>`;
+function anMaskVal(el){const d=el.value.replace(/\D/g,'').replace(/^0+(?=\d)/,'').slice(0,13);if(!d)return null;return Number(d)/100;}
+function anMask(el){
+ const v=anMaskVal(el);
+ el.value=v==null?'':el.dataset.m==='pct'?v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%':mfmt(v,el.dataset.cur||undefined);
+ try{const p=el.dataset.m==='pct'?el.value.length-1:el.value.length;el.setSelectionRange(p,p);}catch(e){}
+ if(el.id==='anLance')return anLance(el,v);
+ const A=window.__AN,path=el.dataset.p.split('.');let o=A.P;for(let i=0;i<path.length-1;i++){const k=isNaN(path[i])?path[i]:Number(path[i]);if(o[k]==null)o[k]={};o=o[k];}
+ const k=path[path.length-1];o[isNaN(k)?k:Number(k)]=v;delete A.P.origem[el.dataset.p];A.sujo=true;anAtualizar();
+}
 function anGet(path){let o=window.__AN.P;for(const k of path.split('.')){if(o==null)return null;o=o[isNaN(k)?k:Number(k)];}return o;}
 function anSet(el,leve){
  const A=window.__AN,P=A.P,path=el.dataset.p.split('.');let v=el.type==='checkbox'?el.checked:el.value;
@@ -720,7 +740,7 @@ function anMut(fn){fn(window.__AN.P);window.__AN.sujo=true;anRender();}
 function anAba(k){window.__AN.aba=k;anRender();const t=document.querySelector('.an-tabs');if(t)t.scrollIntoView({block:'start'});}
 function anUnid(id){window.__AN.P.unidade=id;anRender();}
 // atualização leve: painel de estratégia + quadros calculados da etapa atual
-function anAtualizar(){const C=anCalc();const t=$('#anTop');if(t)t.innerHTML=anTopo(C);const o=$('#anOut');if(o)o.innerHTML=(AN_OUT[window.__AN.aba]||(()=>''))(C);const o2=$('#anOut2');if(o2)o2.innerHTML=anCaixaOut(C);document.querySelectorAll('[id^=cu]').forEach(td=>{const n=td.id.slice(2),i=window.__AN.itens.find(x=>String(x.numero_item)===n),it=window.__AN.P.it[n]||{},q=it.qtd_sim??(i&&i.quantidade);td.textContent=it.custo_total_est!=null&&q?brlc(it.custo_total_est/q):'—';});const b=$('#anSalvar');if(b){b.className='';b.textContent='Salvar análise';}}
+function anAtualizar(){const C=anCalc(),ae=document.activeElement,livre=el=>el&&!(ae&&el.contains(ae));const t=$('#anTop');if(t){if(livre(t))t.innerHTML=anTopo(C);else anTopoParcial(C);}const o=$('#anOut');if(livre(o))o.innerHTML=(AN_OUT[window.__AN.aba]||(()=>''))(C);const o2=$('#anOut2');if(livre(o2))o2.innerHTML=anCaixaOut(C);const b2=$('#anSalvar');document.querySelectorAll('[id^=cu]').forEach(td=>{const n=td.id.slice(2),i=window.__AN.itens.find(x=>String(x.numero_item)===n),it=window.__AN.P.it[n]||{},q=it.qtd_sim??(i&&i.quantidade);td.textContent=it.custo_total_est!=null&&q?mfmt(it.custo_total_est/q):'—';});const b=$('#anSalvar');if(b){b.className='';b.textContent='Salvar análise';}}
 function anRender(){
  const A=window.__AN,{op}=A,C=anCalc();
  main.innerHTML=`<div class="top"><div><h2>Análise de viabilidade</h2><p class="sub">${esc((op.objeto||'').slice(0,180))}</p><p class="ev-hint">${esc(op.orgao_nome||'')}${op.uf?' · '+esc([op.municipio,op.uf].filter(Boolean).join('/')):''}${op.data_fim_proposta?' · propostas até '+dt(op.data_fim_proposta):''}</p></div>
@@ -734,34 +754,44 @@ function anRender(){
 const p2=v=>v==null||isNaN(v)?'—':(v*100).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%';
 const sN=(path,v,ops,ph)=>{const has=ops.some(o=>String(o[0])===String(v));return `<select data-p="${path}" data-n onchange="anSet(this)">${ph!==undefined?`<option value="" ${v==null?'selected':''}>${ph}</option>`:''}${!has&&v!=null?`<option value="${v}" selected>${esc(String(v))}</option>`:''}${ops.map(([k,rt])=>`<option value="${k}" ${String(k)===String(v)?'selected':''}>${rt}</option>`).join('')}</select>`;};
 const DIAS=[0,5,7,10,14,15,20,21,28,30,45,60,90,120].map(d=>[d,d===0?'No mesmo dia (0)':d+' dias']);
-const REAIS=[0,5e3,1e4,2.5e4,5e4,1e5,2.5e5,5e5,1e6,2e6,5e6].map(v=>[v,v===0?'Nenhum':brl(v)]);
-function anTopo(C){
+const REAIS_V=[0,5e3,1e4,2.5e4,5e4,1e5,2.5e5,5e5,1e6,2e6,5e6];
+function anTopoK(C){
  const {r,u,us}=C,A=window.__AN;
- if(!u)return `<div class="an-vazio"><b>Escolha o que vai disputar.</b><span>Selecione itens na etapa 1 para ver preço de equilíbrio, lance mínimo e lucro.</span><button onclick="anAba('itens')">Selecionar itens</button></div>`;
  const st=r.erros.length?['c-red','Premissas inconsistentes']:r.parcial?['c-amber','Cálculo parcial']:['c-green','Cálculo completo'];
  const un=u.unit,suf=un?` <small>/ ${esc(u.unidade||'un.')}</small>`:'';
- const val=(a,b)=>un?brlc(a):brlc(b);
- const L=u.lance,cx=u.caixa;
- const lanceVal=u.tipo==='desconto'?(A.P.lances[u.id]||{}).desconto:(A.P.lances[u.id]||{}).valor;
- const F=u.frases||{};
- return `<div class="an-top-h"><div><span class="an-k">Estratégia de lance</span>${us.length>1?`<div class="an-un">${us.map(x=>`<button type="button" class="${x.id===u.id?'on':''}" onclick="anUnid('${x.id}')">${esc(x.nome)}</button>`).join('')}</div>`:`<b class="an-un1">${esc(u.nome)} · ${fmtN(u.Q,2)} ${esc(u.unidade||'')}</b>`}</div><span class="chip ${st[0]}">${st[1]}</span></div>
- <div class="an-kpis">
+ const semNada=u.sem_custo&&u.sem_custo.length===u.itens.length;
+ const val=(a,b)=>semNada?'—':un?mfmt(a):mfmt(b);
+ const L=semNada?null:u.lance,cx=u.caixa;
+ return `<div class="an-top-h"><div><span class="an-k">Estratégia de lance</span>${us.length>1?`<div class="an-un">${us.map(x=>`<button type="button" class="${x.id===u.id?'on':''}" onclick="anUnid('${x.id}')">${esc(x.nome)}${x.sem_custo&&x.sem_custo.length?' <small>· sem custo</small>':''}</button>`).join('')}</div>`:`<b class="an-un1">${esc(u.nome)} · ${fmtN(u.Q,2)} ${esc(u.unidade||'')}</b>`}</div><span class="chip ${st[0]}">${st[1]}</span></div>
+ ${semNada?`<div class="an-vazio"><b>Informe o custo para calcular o lance.</b><span>${u.itens.length>1?'Os itens '+u.itens.join(', ')+' ainda não têm':'O item '+u.itens[0]+' ainda não tem'} custo. É o único dado que só a sua empresa tem.</span><button onclick="anAba('itens')">Informar custo</button></div>`:`<div class="an-kpis">
   <div><span>Preço de equilíbrio</span><b>${val(u.equilibrio,u.equilibrio_total)}${u.equilibrio!=null?suf:''}</b><small>lucro zero</small></div>
   <div class="an-k-min"><span>Lance mínimo recomendado</span><b>${val(u.minimo,u.minimo_total)}${u.minimo!=null?suf:''}</b><small>${r.mMin!=null?'margem mínima '+pctFmt(r.mMin*100):'informe a margem mínima'}</small></div>
   <div><span>Preço para a margem-alvo</span><b>${val(u.alvo,u.alvo_total)}${u.alvo!=null?suf:''}</b><small>${r.mAlvo!=null?'margem '+pctFmt(r.mAlvo*100):'informe a margem-alvo'}</small></div>
-  <div class="${L&&L.lucro<0?'neg':L&&L.folga!=null&&L.folga<0?'warn':''}"><span>Lucro no lance simulado</span><b>${L?brlc(L.lucro):'—'}</b><small>${L?'margem '+p2(L.margem):'—'}</small></div>
-  <div class="${cx.ok&&cx.falta>0?'neg':''}"><span>Capital de giro necessário</span><b>${cx.ok?brlc(cx.capital):'Pendente'}</b><small>${cx.ok?(cx.falta==null?'informe o caixa':cx.falta>0?'faltam '+brlc(cx.falta):'coberto'):'faltam prazos'}</small></div>
- </div>
- <div class="an-sim"><label for="anLance">Simular meu lance${u.tipo==='desconto'?' (desconto %)':un?' (R$ por '+esc(u.unidade||'unidade')+')':' (R$ total)'}</label>
-  <div><input id="anLance" type="number" step="any" inputmode="decimal" value="${lanceVal==null?'':lanceVal}" placeholder="${u.tipo==='desconto'?(L&&L.desconto!=null?(L.desconto*100).toFixed(2):''):un?(u.alvo??''):(u.alvo_total??'')}" oninput="anLance(this)">
-  ${L&&L.R?`<span class="ev-hint">${un?`Total: ${brlc(L.R)}`:u.tipo==='desconto'?`Valor: ${brlc(L.R)}`:''}${u.lance_padrao?' · sem lance digitado, simulando o preço-alvo':''}</span>`:''}</div></div>
+  <div class="${L&&L.lucro<0?'neg':L&&L.folga!=null&&L.folga<0?'warn':''}"><span>Lucro no lance simulado</span><b>${L?mfmt(L.lucro):'—'}</b><small>${L?'margem '+p2(L.margem):'—'}</small></div>
+  <div class="${cx.ok&&cx.falta>0?'neg':''}"><span>Capital de giro necessário</span><b>${cx.ok?mfmt(cx.capital):'Pendente'}</b><small>${cx.ok?(cx.falta==null?'informe o caixa':cx.falta>0?'faltam '+mfmt(cx.falta):'coberto'):'faltam prazos'}</small></div>
+ </div>`}`;
+}
+function anTopoF(C){
+ const {r,u}=C,F=u.frases||{};
+ if(u.sem_custo&&u.sem_custo.length===u.itens.length)return '';
+ return `${u.sem_custo&&u.sem_custo.length?`<p class="lc-note"><span>!</span><span>Falta o custo ${u.sem_custo.length>1?'dos itens '+u.sem_custo.join(', '):'do item '+u.sem_custo[0]}: até você informar, os valores acima tratam esse custo como zero. <a class="l" onclick="anAba('itens')">Informar custo</a></span></p>`:''}
  ${Object.keys(F).length?`<ul class="an-fr">${F.margem?`<li><b>Margem</b>${esc(F.margem)}</li>`:''}${F.limite?`<li><b>Limite na disputa</b>${esc(F.limite)}</li>`:''}${F.caixa?`<li><b>Caixa</b>${esc(F.caixa)}</li>`:''}${F.edital?`<li><b>Edital</b>${esc(F.edital)}</li>`:''}${F.historico?`<li><b>Preço histórico</b>${esc(F.historico)}</li>`:''}</ul>`:''}
- ${u.sem_custo&&u.sem_custo.length?`<p class="lc-note"><span>!</span><span>Falta o custo ${u.sem_custo.length>1?'dos itens '+u.sem_custo.join(', '):'do item '+u.sem_custo[0]}: até você informar, os valores acima tratam esse custo como zero. <a class="l" onclick="anAba('itens')">Informar custo</a></span></p>`:''}
  ${r.parcial&&r.pendencias.length?`<p class="ev-hint an-pend">Faltam ${r.pendencias.length} dado(s): ${esc(r.pendencias[0])}${r.pendencias.length>1?` <a class="l" onclick="anAba('decisao')">ver todos</a>`:''}</p>`:''}`;
 }
-function anLance(el){const A=window.__AN,C=anCalc(),u=C.u;if(!u)return;const v=el.value===''?null:Number(el.value);
+function anSimH(C){const u=C.u,L=u&&u.lance;if(!L||!L.R||(u.sem_custo&&u.sem_custo.length===u.itens.length))return '';return `${u.unit?`Total: ${mfmt(L.R)}`:u.tipo==='desconto'?`Valor: ${mfmt(L.R)}`:''}${u.lance_padrao?' · sem lance digitado, simulando o preço-alvo':''}`;}
+function anTopo(C){
+ const {u}=C,A=window.__AN;
+ if(!u)return `<div class="an-vazio"><b>Escolha o que vai disputar.</b><span>Marque os itens e informe o custo para ver preço de equilíbrio, lance mínimo e lucro.</span><button onclick="anAba('itens')">Selecionar itens</button></div>`;
+ const Lp=A.P.lances[u.id]||{},desc=u.tipo==='desconto';
+ return `<div id="anTopK">${anTopoK(C)}</div>
+ <div class="an-sim"><label for="anLance">Simular meu lance${desc?' (desconto)':u.unit?' (por '+esc(u.unidade||'unidade')+')':' (valor total)'}</label>
+  <div>${desc?pIn('lance',Lp.desconto,'id="anLance"'):mIn('lance',Lp.valor,'id="anLance"')}<span class="ev-hint" id="anSimH">${anSimH(C)}</span></div></div>
+ <div id="anTopF">${anTopoF(C)}</div>`;
+}
+function anTopoParcial(C){if(!C.u)return;const k=$('#anTopK'),f=$('#anTopF'),h=$('#anSimH');if(k)k.innerHTML=anTopoK(C);if(f)f.innerHTML=anTopoF(C);if(h)h.innerHTML=anSimH(C);}
+function anLance(el,v){const A=window.__AN,u=anCalc().u;if(!u)return;
  A.P.lances[u.id]=Object.assign({},A.P.lances[u.id]||{},u.tipo==='desconto'?{desconto:v}:{valor:v});if(!u.unit&&u.tipo!=='desconto')delete A.P.lances[u.id].itens;A.sujo=true;
- const C2=anCalc(),t=$('#anTop');t.innerHTML=anTopo(C2);const n=$('#anLance');n.focus();const o=$('#anOut');if(o)o.innerHTML=(AN_OUT[A.aba]||(()=>''))(C2);const o2=$('#anOut2');if(o2)o2.innerHTML=anCaixaOut(C2);}
+ const C2=anCalc();anTopoParcial(C2);const o=$('#anOut');if(o&&!o.contains(document.activeElement))o.innerHTML=(AN_OUT[A.aba]||(()=>''))(C2);const o2=$('#anOut2');if(o2)o2.innerHTML=anCaixaOut(C2);const b=$('#anSalvar');if(b){b.className='';b.textContent='Salvar análise';}}
 async function anLerEdital(btn){btn.disabled=true;btn.textContent='Lendo o edital… (pode levar 1 minuto)';
  try{const tk=(await sb.auth.getSession()).data.session.access_token;const r=await fetch('/api/ia',{method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+tk},body:JSON.stringify({acao:'analisar',oportunidade_id:window.__AN.op.id})}).then(x=>x.json());
   if(r.erro)throw new Error(r.erro);toast('Edital lido');V.analise();}catch(e){btn.disabled=false;btn.textContent='Ler o edital com IA';toast(e.message);}}
@@ -777,7 +807,7 @@ function anCustos(C){
  const linha=(l,k)=>`<div class="an-custo"><div><label>Categoria</label>${sIn(`custos.${k}.categoria`,l.categoria,Object.fromEntries((VIAB.GRUPOS2[l.grupo||'indireta']||VIAB.GRUPOS2.indireta).cats.map(c=>[c,c])))}</div>
   <div><label>Descrição</label>${tIn(`custos.${k}.descricao`,l.descricao,'placeholder="opcional"')}</div>
   <div><label>Como incide</label>${sIn(`custos.${k}.base`,l.base,VIAB.BASES2)}</div>
-  <div><label>${l.base==='pct_receita'?'Percentual (%)':'Valor (R$)'}</label>${nIn(`custos.${k}.valor`,l.valor,'min="0" placeholder="informe"')}</div>
+  <div><label>${l.base==='pct_receita'?'Percentual':'Valor'}</label>${l.base==='pct_receita'?pIn(`custos.${k}.valor`,l.valor):mIn(`custos.${k}.valor`,l.valor)}</div>
   ${sel.length>1?`<div><label>Aplica a</label>${sIn(`custos.${k}.alvo.tipo`,(l.alvo||{}).tipo||'todos',Object.assign({todos:'Todos os itens'},lotes.length?{lote:'Um lote'}:{},{item:'Um item'}))}</div>`:''}
   ${(l.alvo||{}).tipo==='lote'?`<div><label>Lote</label>${sIn(`custos.${k}.alvo.ref`,l.alvo.ref,Object.fromEntries(lotes.map(x=>[x,x])))}</div>`:''}
   ${(l.alvo||{}).tipo==='item'?`<div><label>Item</label>${sIn(`custos.${k}.alvo.ref`,l.alvo.ref,Object.fromEntries(sel.map(i=>[i.numero_item,'Item '+i.numero_item])))}</div>`:''}
@@ -793,24 +823,24 @@ function anCustos(C){
   <div class="ev-sub an-modo"><button type="button" class="${rap?'on':''}" onclick="anMut(P=>P.modo_custo='rapido')">Estimativa rápida</button><button type="button" class="${rap?'':'on'}" onclick="anMut(P=>P.modo_custo='detalhado')">Composição detalhada</button></div>
   <p class="ev-hint">${rap?'Comece com o custo total de cada item (tudo o que você gasta para entregar, <b>sem os tributos sobre a venda</b>). Depois detalhe: quando houver composição, a soma dela passa a ser o custo.':'A soma da composição é o custo total desta simulação. Cada despesa é contada uma vez; despesas compartilhadas entre itens são rateadas pelo critério escolhido.'}</p></div>
  ${rap?`<div class="card"><h3>Custo total estimado por item</h3><div class="tbw"><table class="tb an-tb"><thead><tr><th>Item</th><th>Descrição</th><th>Qtd.</th><th>Custo total estimado (R$)</th><th>Situação</th></tr></thead><tbody>
-  ${sel.map(i=>{const n=i.numero_item,it=P.it[n]||{};return `<tr><td>${n}</td><td>${esc((i.descricao||'').slice(0,90))}</td><td>${fmtN(it.qtd_sim??i.quantidade,2)} ${esc(i.unidade||'')}</td><td>${nIn(`it.${n}.custo_total_est`,it.custo_total_est,'min="0" placeholder="informe"')}</td><td>${stSel(`it.${n}.status`,it.status)}</td></tr>`;}).join('')}
+  ${sel.map(i=>{const n=i.numero_item,it=P.it[n]||{};return `<tr><td>${n}</td><td>${esc((i.descricao||'').slice(0,90))}</td><td>${fmtN(it.qtd_sim??i.quantidade,2)} ${esc(i.unidade||'')}</td><td>${mIn(`it.${n}.custo_total_est`,it.custo_total_est,'min="0" placeholder="informe"')}</td><td>${stSel(`it.${n}.status`,it.status)}</td></tr>`;}).join('')}
   </tbody></table></div><p class="ev-hint">Na estimativa rápida o custo varia na mesma proporção da quantidade. Para ver a diluição de despesas fixas e o frete por entrega, use a composição detalhada.</p></div>`
  :`<div class="card"><h3>Produto ou serviço: custo por unidade</h3><p class="sub">Informe o custo por unidade de fornecimento do edital, ou a <b>cotação do fornecedor</b> se ele vende em outra unidade (ex.: caixa com 12).</p>
   ${sel.map(i=>{const n=i.numero_item,it=P.it[n]||{},ct=it.cotacao||{},usaCt=ct.preco_emb!=null||it.modo_ct;const R=C.r.itens.find(x=>x.n===n)||{};
    return `<div class="an-it"><div class="an-it-h"><b>Item ${n}</b><span>${esc((i.descricao||'').slice(0,110))}</span><small>${fmtN(it.qtd_sim??i.quantidade,2)} ${esc(i.unidade||'un.')} · cotação ${usaCt?'por embalagem':'por unidade'} <a class="l" onclick="anMut(P=>{P.it[${n}]=P.it[${n}]||{};P.it[${n}].modo_ct=${usaCt?'false':'true'};${usaCt?`if(P.it[${n}].cotacao)P.it[${n}].cotacao.preco_emb=null;`:''}})">${usaCt?'usar custo por unidade':'cotação em outra unidade'}</a></small></div>
-   <div class="ev-form">${usaCt?`<div><label>Preço da embalagem (R$)</label>${nIn(`it.${n}.cotacao.preco_emb`,ct.preco_emb,'min="0" placeholder="informe"')}</div><div><label>${esc(i.unidade||'Unidades')} por embalagem</label>${nIn(`it.${n}.cotacao.unid_por_emb`,ct.unid_por_emb,'min="0" placeholder="ex.: 12"')}</div>
+   <div class="ev-form">${usaCt?`<div><label>Preço da embalagem (R$)</label>${mIn(`it.${n}.cotacao.preco_emb`,ct.preco_emb,'min="0" placeholder="informe"')}</div><div><label>${esc(i.unidade||'Unidades')} por embalagem</label>${nIn(`it.${n}.cotacao.unid_por_emb`,ct.unid_por_emb,'min="0" placeholder="ex.: 12"')}</div>
      <div><label>Compra mínima (embalagens)</label>${nIn(`it.${n}.cotacao.minimo_emb`,ct.minimo_emb,'min="0" placeholder="0"')}</div><div><label>Sobra da embalagem</label>${sIn(`it.${n}.cotacao.sobra`,ct.sobra||'custo',{custo:'Entra no custo deste contrato',estoque:'Fica em estoque (só caixa)'})}</div>`
-     :`<div><label>Custo por ${esc(i.unidade||'unidade')} (R$)</label>${nIn(`it.${n}.custo_unit`,it.custo_unit,'min="0" placeholder="informe"')}</div>`}
+     :`<div><label>Custo por ${esc(i.unidade||'unidade')} (R$)</label>${mIn(`it.${n}.custo_unit`,it.custo_unit,'min="0" placeholder="informe"')}</div>`}
      <div><label>Situação</label>${stSel(`it.${n}.status`,it.status)}</div><div><label>% importado (câmbio)</label>${nIn(`it.${n}.importado_pct`,it.importado_pct,'min="0" max="100" placeholder="0"')}</div></div>
-   ${usaCt&&R.emb!=null?`<p class="ev-hint">Compra real: ${fmtN(R.emb)} embalagem(ns) = ${brlc(R.desembolso)}${R.sobra>0?`; sobram ${fmtN(R.sobra,2)} ${esc(i.unidade||'un.')}`:''}. Custo por ${esc(i.unidade||'unidade')}: ${brlc(R.q?R.direto/R.q:null)}.</p>`:''}</div>`;}).join('')}</div>
+   ${usaCt&&R.emb!=null?`<p class="ev-hint">Compra real: ${fmtN(R.emb)} embalagem(ns) = ${mfmt(R.desembolso)}${R.sobra>0?`; sobram ${fmtN(R.sobra,2)} ${esc(i.unidade||'un.')}`:''}. Custo por ${esc(i.unidade||'unidade')}: ${mfmt(R.q?R.direto/R.q:null)}.</p>`:''}</div>`;}).join('')}</div>
  <div class="card"><h3>Outras despesas</h3><p class="sub">Lance cada despesa uma vez, no grupo certo, dizendo como ela incide: por unidade, pedido, entrega, mês, contrato ou lote.</p>${['produto','execucao','indireta'].map(grupo).join('')}</div>`}
  <div class="card"><h3>Custo calculado</h3><div id="anOut">${anCustosOut(C)}</div></div>`;
 }
 function anCustosOut(C){
  const r=C.r;
  return `<div class="tbw"><table class="tb an-tb"><thead><tr><th>Item</th><th>Qtd.</th><th>Produto/serviço</th><th>Demais custos</th><th>Custo total</th><th>Por unidade</th><th>Desembolso</th></tr></thead><tbody>
-  ${r.itens.map(i=>`<tr><td>${i.n}</td><td>${fmtN(i.q,2)}</td><td>${brlc(i.direto)}</td><td>${brlc(i.indireto)}</td><td><b>${brlc(i.custo)}</b></td><td>${brlc(i.q?i.custo/i.q:null)}</td><td>${brlc(i.desembolso)}</td></tr>`).join('')}
-  </tbody><tfoot><tr><th colspan="4">Total</th><th>${brlc(r.itens.reduce((a,i)=>a+i.custo,0))}</th><th></th><th></th></tr></tfoot></table></div>
+  ${r.itens.map(i=>`<tr><td>${i.n}</td><td>${fmtN(i.q,2)}</td><td>${mfmt(i.direto)}</td><td>${mfmt(i.indireto)}</td><td><b>${mfmt(i.custo)}</b></td><td>${mfmt(i.q?i.custo/i.q:null)}</td><td>${mfmt(i.desembolso)}</td></tr>`).join('')}
+  </tbody><tfoot><tr><th colspan="4">Total</th><th>${mfmt(r.itens.reduce((a,i)=>a+i.custo,0))}</th><th></th><th></th></tr></tfoot></table></div>
   ${r.memoria.length?`<details class="an-mem"><summary>Como cada despesa entrou</summary><ul class="an-ul">${r.memoria.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details>`:''}
   ${r.avisos.map(a=>`<p class="lc-note"><span>!</span><span>${esc(a)}</span></p>`).join('')}`;
 }
@@ -819,10 +849,10 @@ function anTrib(C){
  const A=window.__AN,P=A.P;
  const linha=(x,k)=>`<div class="an-custo"><div><label>Nome</label>${tIn(`tributos.${k}.nome`,x.nome)}</div>
   <div><label>Natureza</label>${sIn(`tributos.${k}.natureza`,x.natureza||'devido',{devido:'Tributo/taxa devido',retencao:'Retenção compensável'})}</div>
-  ${x.natureza==='retencao'?`<div><label>% retido do faturamento</label>${nIn(`tributos.${k}.valor`,x.valor,'min="0" max="99.99" placeholder="informe"')}</div><div><label>Compensa em (dias após o recebimento)</label>${nIn(`tributos.${k}.compensa_dias`,x.compensa_dias,'min="0" placeholder="ex.: 30"')}</div>`
+  ${x.natureza==='retencao'?`<div><label>% retido do faturamento</label>${pIn(`tributos.${k}.valor`,x.valor)}</div><div><label>Compensa em (dias após o recebimento)</label>${nIn(`tributos.${k}.compensa_dias`,x.compensa_dias,'min="0" placeholder="ex.: 30"')}</div>`
   :`<div><label>Forma</label>${sIn(`tributos.${k}.tipo`,x.tipo||'pct',{pct:'Percentual',unit:'R$ por unidade',fixo:'R$ fixo no contrato'})}</div>
-   ${(x.tipo||'pct')==='pct'?`<div><label>Base de incidência</label>${sIn(`tributos.${k}.base`,x.base||'receita',{receita:'Sobre a venda (receita bruta)',custo:'Sobre o custo de compra'})}</div><div><label>Alíquota efetiva estimada (%)</label>${nIn(`tributos.${k}.valor`,x.valor,'min="0" max="99.99" placeholder="informe"')}</div>`
-   :`<div><label>Valor (R$)</label>${nIn(`tributos.${k}.valor`,x.valor,'min="0" placeholder="informe"')}</div>`}`}
+   ${(x.tipo||'pct')==='pct'?`<div><label>Base de incidência</label>${sIn(`tributos.${k}.base`,x.base||'receita',{receita:'Sobre a venda (receita bruta)',custo:'Sobre o custo de compra'})}</div><div><label>Alíquota efetiva estimada (%)</label>${pIn(`tributos.${k}.valor`,x.valor)}</div>`
+   :`<div><label>Valor</label>${mIn(`tributos.${k}.valor`,x.valor)}</div>`}`}
   <div><label>Situação</label>${sIn(`tributos.${k}.status`,x.status==='confirmado'?'confirmado':'estimado',{estimado:'Estimado',confirmado:'Confirmado'})}</div>
   <div class="an-del"><button class="sec sm" onclick="anMut(P=>P.tributos.splice(${k},1))">Remover</button></div></div>`;
  return `<div class="card"><h3>Tributos e taxas</h3><p class="sub">O sistema <b>não presume alíquotas pelo CNPJ</b>. Informe a alíquota efetiva que a empresa estima (ex.: Simples Nacional na sua faixa). <b>Retenção compensável</b> (IR, CSLL, INSS retidos pelo órgão) não é custo: reduz o recebimento imediato e volta depois, por isso só entra no caixa.</p>
@@ -836,23 +866,23 @@ function anTrib(C){
 }
 function anTribOut(C){const r=C.r;return `<div class="dkv"><div><span>Percentuais sobre a venda (t)</span><b>${p2(r.t)}</b><small>${esc(r.tNomes.join(' + ')||'—')}</small></div>
  <div><span>Margem mínima</span><b>${r.mMin==null?'—':p2(r.mMin)}</b></div><div><span>Margem-alvo</span><b>${r.mAlvo==null?'—':p2(r.mAlvo)}</b></div>
- <div><span>Para cada R$ 100 vendidos</span><b>${r.mMin==null?'—':brlc(100*(1-r.t-r.mMin))}</b><small>podem ir para custos mantendo a margem mínima</small></div></div>
+ <div><span>Para cada R$ 100 vendidos</span><b>${r.mMin==null?'—':mfmt(100*(1-r.t-r.mMin))}</b><small>podem ir para custos mantendo a margem mínima</small></div></div>
  ${r.erros.map(e=>`<p class="lc-note bad"><span>!</span><span>${esc(e)}</span></p>`).join('')}`;}
 function anCaixaOut(C){const u=C.u;if(!u)return '<p class="ev-hint">Selecione itens.</p>';const cx=u.caixa;
  if(!cx.ok)return `<p class="lc-note"><span>!</span><span>Capital de giro pendente: informe ${esc((cx.falta||[]).join(', '))}. A análise de preço e lucro continua valendo.</span></p>`;
- return `<div class="dkv"><div><span>Capital de giro necessário</span><b>${brlc(cx.capital)}</b><small>maior déficit acumulado, no dia ${cx.dia}</small></div>
-  <div><span>Falta depois do caixa e do crédito</span><b class="${cx.falta>0?'v-red':''}">${cx.falta==null?'Informe o caixa':brlc(cx.falta)}</b>${cx.dia_falta!=null&&cx.falta>0?`<small>no dia ${cx.dia_falta}</small>`:''}</div>
-  <div><span>Custo do dinheiro no período</span><b>${cx.custo_giro==null?'—':brlc(cx.custo_giro)}</b></div></div>
+ return `<div class="dkv"><div><span>Capital de giro necessário</span><b>${mfmt(cx.capital)}</b><small>maior déficit acumulado, no dia ${cx.dia}</small></div>
+  <div><span>Falta depois do caixa e do crédito</span><b class="${cx.falta>0?'v-red':''}">${cx.falta==null?'Informe o caixa':mfmt(cx.falta)}</b>${cx.dia_falta!=null&&cx.falta>0?`<small>no dia ${cx.dia_falta}</small>`:''}</div>
+  <div><span>Custo do dinheiro no período</span><b>${cx.custo_giro==null?'—':mfmt(cx.custo_giro)}</b></div></div>
   <div class="tbw"><table class="tb an-tb an-fluxo"><thead><tr><th>Dia</th><th>Evento</th><th>Valor</th><th>Saldo da operação</th><th>Com caixa e crédito</th></tr></thead><tbody>
-  ${cx.serie.map(s=>`<tr><td>${s.dia}</td><td>${esc(s.evento)}</td><td class="${s.valor<0?'v-red':''}">${brlc(s.valor)}</td><td class="${s.saldo<0?'v-red':''}">${brlc(s.saldo)}</td><td class="${s.disponivel<0?'v-red':''}">${brlc(s.disponivel)}</td></tr>`).join('')}</tbody></table></div>`;}
+  ${cx.serie.map(s=>`<tr><td>${s.dia}</td><td>${esc(s.evento)}</td><td class="${s.valor<0?'v-red':''}">${mfmt(s.valor)}</td><td class="${s.saldo<0?'v-red':''}">${mfmt(s.saldo)}</td><td class="${s.disponivel<0?'v-red':''}">${mfmt(s.disponivel)}</td></tr>`).join('')}</tbody></table></div>`;}
 function anCenOut(C){
  const u=C.u;if(!u||!u.lance)return '<p class="ev-hint">Informe custos e margens para comparar cenários.</p>';
  const c=VIAB.cenarios2(C.E,u.id,window.__AN.P.cenarios);if(!c)return '';
  const nomes={base:'Base',conservador:'Conservador',srp_maxima:'Ata: quantidade máxima',srp_provavel:'Ata: quantidade provável',srp_menores:'Ata: pedidos menores',srp_sem_pedidos:'Ata: nenhum pedido'};
  const ks=Object.keys(c);
  return `<div class="tbw"><table class="tb an-tb"><thead><tr><th>Cenário</th><th>Quantidade</th><th>Lance mínimo</th><th>Lucro no lance</th><th>Margem</th><th>Capital de giro</th><th>Falta de caixa</th></tr></thead><tbody>
-  ${ks.map(k=>{const x=c[k];if(x.vazio)return `<tr><td>${nomes[k]||k}</td><td>0</td><td>—</td><td class="${x.comprometido>0?'v-red':''}">${x.comprometido!=null?brlc(-x.comprometido):'—'}</td><td>—</td><td>${x.caixa!=null?brlc(-x.caixa):'—'}</td><td>—</td></tr>`;
-   return `<tr><td>${nomes[k]||k}</td><td>${fmtN(x.Q,2)}</td><td>${u.unit?brlc(x.minimo):brlc(x.minimo_total)}</td><td class="${x.lucro<0?'v-red':''}">${brlc(x.lucro)}</td><td>${p2(x.margem)}</td><td>${x.capital==null?'Pendente':brlc(x.capital)}</td><td class="${x.falta>0?'v-red':''}">${x.falta==null?'—':brlc(x.falta)}</td></tr>`;}).join('')}</tbody></table></div>
+  ${ks.map(k=>{const x=c[k];if(x.vazio)return `<tr><td>${nomes[k]||k}</td><td>0</td><td>—</td><td class="${x.comprometido>0?'v-red':''}">${x.comprometido!=null?mfmt(-x.comprometido):'—'}</td><td>—</td><td>${x.caixa!=null?mfmt(-x.caixa):'—'}</td><td>—</td></tr>`;
+   return `<tr><td>${nomes[k]||k}</td><td>${fmtN(x.Q,2)}</td><td>${u.unit?mfmt(x.minimo):mfmt(x.minimo_total)}</td><td class="${x.lucro<0?'v-red':''}">${mfmt(x.lucro)}</td><td>${p2(x.margem)}</td><td>${x.capital==null?'Pendente':mfmt(x.capital)}</td><td class="${x.falta>0?'v-red':''}">${x.falta==null?'—':mfmt(x.falta)}</td></tr>`;}).join('')}</tbody></table></div>
   ${c.srp_sem_pedidos&&c.srp_sem_pedidos.linhas.length?`<p class="ev-hint">Sem pedidos, você ainda arca com: ${esc(c.srp_sem_pedidos.linhas.join('; '))}. Marque em Custos o que existe mesmo sem pedidos.</p>`:c.srp_sem_pedidos?'<p class="ev-hint">Sem pedidos: nenhum custo marcado como comprometido (marque em Custos o que existe mesmo sem pedidos).</p>':''}`;
 }
 // ---------- 6 · documentos
@@ -883,19 +913,19 @@ function anMemOut(C){
  const {r,u}=C;if(!u||u.vazio)return '<p class="ev-hint">Selecione itens.</p>';
  const Q=u.Q,Cc=u.C,t=r.t,L=u.lance,un=u.unit;
  const ln=(a,b)=>`<div><span>${a}</span><b>${b}</b></div>`;
- return `<div class="dkv an-memk">${ln('Q · quantidade',fmtN(Q,2)+' '+esc(u.unidade||''))}${ln('C · custo total da execução',brlc(Cc))}${ln('t · percentuais sobre a venda',p2(t))}${ln('m_min · margem mínima',r.mMin==null?'—':p2(r.mMin))}${ln('m_alvo · margem-alvo',r.mAlvo==null?'—':p2(r.mAlvo))}</div>
+ return `<div class="dkv an-memk">${ln('Q · quantidade',fmtN(Q,2)+' '+esc(u.unidade||''))}${ln('C · custo total da execução',mfmt(Cc))}${ln('t · percentuais sobre a venda',p2(t))}${ln('m_min · margem mínima',r.mMin==null?'—':p2(r.mMin))}${ln('m_alvo · margem-alvo',r.mAlvo==null?'—':p2(r.mAlvo))}</div>
  <ul class="an-ul an-form">
-  <li>Equilíbrio = C ÷ (1 − t)${un?' ÷ Q':''} = ${brlc(Cc)} ÷ ${(1-t).toFixed(4)}${un?' ÷ '+fmtN(Q,2):''} = <b>${un?brlc(u.equilibrio):brlc(u.equilibrio_total)}</b> (arredondado para cima)</li>
-  ${r.mMin!=null?`<li>Lance mínimo = C ÷ (1 − t − m_min)${un?' ÷ Q':''} = ${brlc(Cc)} ÷ ${(1-t-r.mMin).toFixed(4)}${un?' ÷ '+fmtN(Q,2):''} = <b>${un?brlc(u.minimo):brlc(u.minimo_total)}</b>; margem real no valor exibido: ${p2(u.margem_no_minimo)}</li>`:''}
-  ${r.mAlvo!=null?`<li>Preço-alvo = C ÷ (1 − t − m_alvo)${un?' ÷ Q':''} = <b>${un?brlc(u.alvo):brlc(u.alvo_total)}</b></li>`:''}
-  ${L?`<li>Receita no lance: R = ${un?brlc(L.unit)+' × '+fmtN(Q,2):u.tipo==='desconto'?brlc(u.base_desc)+' × (1 − '+p2(L.desconto)+')':'valor global'} = <b>${brlc(L.R)}</b></li>
-  <li>Lucro = R × (1 − t) − C = ${brlc(L.R)} × ${(1-t).toFixed(4)} − ${brlc(L.custo)} = <b>${brlc(L.lucro)}</b>; margem = lucro ÷ R = <b>${p2(L.margem)}</b></li>
-  ${L.custo_max!=null?`<li>Custo máximo para a margem mínima neste lance = R × (1 − t − m_min) = ${brlc(L.custo_max)}; redução necessária = máx(0, C − custo máximo) = <b>${brlc(L.reducao)}</b></li>`:''}`:''}
-  ${u.desconto_max!=null?`<li>Desconto máximo = 1 − lance mínimo ÷ base = 1 − ${brlc(u.minimo_total)} ÷ ${brlc(u.base_desc)} = <b>${p2(u.desconto_max)}</b></li>`:''}
-  ${u.teto_total!=null&&r.mMin!=null?`<li>Teto confirmado ${brlc(u.teto_total)}: custo máximo = teto × (1 − t − m_min) = ${brlc(u.teto_total*(1-t-r.mMin))}; redução necessária = <b>${brlc(u.teto_reducao)}</b></li>`:''}
+  <li>Equilíbrio = C ÷ (1 − t)${un?' ÷ Q':''} = ${mfmt(Cc)} ÷ ${(1-t).toFixed(4)}${un?' ÷ '+fmtN(Q,2):''} = <b>${un?mfmt(u.equilibrio):mfmt(u.equilibrio_total)}</b> (arredondado para cima)</li>
+  ${r.mMin!=null?`<li>Lance mínimo = C ÷ (1 − t − m_min)${un?' ÷ Q':''} = ${mfmt(Cc)} ÷ ${(1-t-r.mMin).toFixed(4)}${un?' ÷ '+fmtN(Q,2):''} = <b>${un?mfmt(u.minimo):mfmt(u.minimo_total)}</b>; margem real no valor exibido: ${p2(u.margem_no_minimo)}</li>`:''}
+  ${r.mAlvo!=null?`<li>Preço-alvo = C ÷ (1 − t − m_alvo)${un?' ÷ Q':''} = <b>${un?mfmt(u.alvo):mfmt(u.alvo_total)}</b></li>`:''}
+  ${L?`<li>Receita no lance: R = ${un?mfmt(L.unit)+' × '+fmtN(Q,2):u.tipo==='desconto'?mfmt(u.base_desc)+' × (1 − '+p2(L.desconto)+')':'valor global'} = <b>${mfmt(L.R)}</b></li>
+  <li>Lucro = R × (1 − t) − C = ${mfmt(L.R)} × ${(1-t).toFixed(4)} − ${mfmt(L.custo)} = <b>${mfmt(L.lucro)}</b>; margem = lucro ÷ R = <b>${p2(L.margem)}</b></li>
+  ${L.custo_max!=null?`<li>Custo máximo para a margem mínima neste lance = R × (1 − t − m_min) = ${mfmt(L.custo_max)}; redução necessária = máx(0, C − custo máximo) = <b>${mfmt(L.reducao)}</b></li>`:''}`:''}
+  ${u.desconto_max!=null?`<li>Desconto máximo = 1 − lance mínimo ÷ base = 1 − ${mfmt(u.minimo_total)} ÷ ${mfmt(u.base_desc)} = <b>${p2(u.desconto_max)}</b></li>`:''}
+  ${u.teto_total!=null&&r.mMin!=null?`<li>Teto confirmado ${mfmt(u.teto_total)}: custo máximo = teto × (1 − t − m_min) = ${mfmt(u.teto_total*(1-t-r.mMin))}; redução necessária = <b>${mfmt(u.teto_reducao)}</b></li>`:''}
  </ul>
  ${u.composicao?`<h4>Composição dos preços unitários ${u.composicao_manual?'(manual)':'(proporcional ao valor estimado)'}</h4><div class="tbw"><table class="tb an-tb"><thead><tr><th>Item</th><th>Qtd.</th><th>Preço unitário</th><th>Teto unit.</th><th>Subtotal</th></tr></thead><tbody>
-  ${u.composicao.map(c=>`<tr><td>${c.n}</td><td>${fmtN(c.q,2)}</td><td>${nIn(`lances.${u.id}.itens.${c.n}`,c.preco,'min="0"')}</td><td>${c.teto==null?'—':brlc(c.teto)}</td><td class="${c.acima_teto?'v-red':''}">${brlc((c.preco||0)*c.q)}</td></tr>`).join('')}</tbody><tfoot><tr><th colspan="4">Total da composição</th><th>${brlc(u.composicao_total)}</th></tr></tfoot></table></div>
+  ${u.composicao.map(c=>`<tr><td>${c.n}</td><td>${fmtN(c.q,2)}</td><td>${mIn(`lances.${u.id}.itens.${c.n}`,c.preco,'min="0"')}</td><td>${c.teto==null?'—':mfmt(c.teto)}</td><td class="${c.acima_teto?'v-red':''}">${mfmt((c.preco||0)*c.q)}</td></tr>`).join('')}</tbody><tfoot><tr><th colspan="4">Total da composição</th><th>${mfmt(u.composicao_total)}</th></tr></tfoot></table></div>
   <p class="ev-hint">Edite os unitários para compor o lote; com todos preenchidos, a composição manual passa a ser o lance. ${u.composicao_manual?`<a class="l" onclick="anMut(P=>{delete P.lances['${u.id}'].itens})">Voltar ao rateio automático</a>`:''}</p>`:''}
  <p class="ev-hint">Valores calculados por regras fixas (não por IA). Pisos arredondados para cima na precisão de ${window.__AN.P.precisao??2} casas; totais = preço unitário × quantidade.</p>`;
 }
@@ -918,22 +948,26 @@ function anItens2(C){
   ${A.itens.length?`<div class="ev-actions" style="margin-top:0"><button class="sec sm" onclick="anSelTodos('linha')">Só os da minha linha</button><button class="sec sm" onclick="anSelTodos('todos')">Todos</button><button class="sec sm" onclick="anSelTodos('nenhum')">Nenhum</button></div>
   <div class="tbw"><table class="tb an-tb an-m"><thead><tr><th></th><th>Item</th><th>Descrição</th><th>Quantidade</th><th>Estimado unit. ${origem('pncp')}</th><th>Preço histórico ${origem('compras')}</th>${usaLote?'<th>Lote</th>':''}<th>Linha</th></tr></thead><tbody>
   ${A.itens.map(i=>{const n=i.numero_item,on=P.sel.includes(n),c=CMP[A.comp[n]]||CMP.sem_codigo,it=P.it[n]||{},h=P.hist_info[n];return `<tr class="${on?'on':''}"><td class="m-ck"><input type="checkbox" ${on?'checked':''} onchange="anSel(${n},this.checked)" aria-label="Disputar item ${n}"></td><td class="m-h">${n}</td><td class="m-h">${esc((i.descricao||'').slice(0,140))}</td>
-   <td data-l="Quantidade">${fmtN(i.quantidade,2)} ${esc(i.unidade||'')}</td><td data-l="Estimado unit.">${i.sigiloso?'Sigiloso':brlc(i.valor_unitario)}</td>
-   <td data-l="Preço histórico">${it.historico!=null?`${brlc(it.historico)}${h&&h.n?`<small class="ev-hint">mediana de ${h.n} compras</small>`:''}`:h&&h.st==='buscando'?'<small class="ev-hint">buscando…</small>':h&&h.st==='sem'?'<small class="ev-hint">sem compras comparáveis</small>':'—'}</td>
+   <td data-l="Quantidade">${fmtN(i.quantidade,2)} ${esc(i.unidade||'')}</td><td data-l="Estimado unit.">${i.sigiloso?'Sigiloso':mfmt(i.valor_unitario)}</td>
+   <td data-l="Preço histórico">${it.historico!=null?`${mfmt(it.historico)}${h&&h.n?`<small class="ev-hint">mediana de ${h.n} compras</small>`:''}`:h&&h.st==='buscando'?'<small class="ev-hint">buscando…</small>':h&&h.st==='sem'?'<small class="ev-hint">sem compras comparáveis</small>':'—'}</td>
    ${usaLote?`<td data-l="Lote">${on?sIn(`lotes.${n}`,P.lotes[n]||'',LOTES):''}</td>`:''}<td data-l="Linha"><span class="chip ${c[0]}">${c[1]}</span></td></tr>`;}).join('')}</tbody></table></div>
   ${usaLote?'<p class="ev-hint">O PNCP não informa os lotes: marque o lote de cada item conforme o edital.</p>':''}`
   :pend('Os itens desta licitação ainda não foram lidos do PNCP','',"A leitura acontece na próxima coleta.")}</div>
  ${sel.length?`<div class="card"><h3>2. Quanto custa para você entregar?</h3><p class="sub">É o único dado que só a sua empresa tem. Informe o custo total de cada item <b>sem os tributos sobre a venda</b>: o resto já vem calculado.</p>
-  ${P.modo_custo==='rapido'?`<div class="tbw"><table class="tb an-tb an-m"><thead><tr><th>Item</th><th>Descrição</th><th>Quantidade</th><th>Seu custo total (R$)</th><th>Custo por unidade</th></tr></thead><tbody>
-   ${sel.map(i=>{const n=i.numero_item,it=P.it[n]||{},q=it.qtd_sim??i.quantidade;return `<tr><td class="m-h">${n}</td><td class="m-h">${esc((i.descricao||'').slice(0,90))}</td><td data-l="Quantidade">${fmtN(q,2)} ${esc(i.unidade||'')}</td><td data-l="Seu custo total (R$)">${nIn(`it.${n}.custo_total_est`,it.custo_total_est,'min="0" placeholder="informe"')}</td><td data-l="Custo por unidade" id="cu${n}">${it.custo_total_est!=null&&q?brlc(it.custo_total_est/q):'—'}</td></tr>`;}).join('')}</tbody></table></div>
+  ${P.modo_custo==='rapido'?`<div class="tbw"><table class="tb an-tb an-m"><thead><tr><th>Item</th><th>Descrição</th><th>Quantidade</th><th>Seu custo total</th><th>Custo por unidade</th></tr></thead><tbody>
+   ${sel.map(i=>{const n=i.numero_item,it=P.it[n]||{},q=it.qtd_sim??i.quantidade;return `<tr><td class="m-h">${n}</td><td class="m-h">${esc((i.descricao||'').slice(0,90))}</td><td data-l="Quantidade">${fmtN(q,2)} ${esc(i.unidade||'')}</td><td data-l="Seu custo total">${mIn(`it.${n}.custo_total_est`,it.custo_total_est,'min="0" placeholder="informe"')}</td><td data-l="Custo por unidade" id="cu${n}">${it.custo_total_est!=null&&q?mfmt(it.custo_total_est/q):'—'}</td></tr>`;}).join('')}</tbody></table></div>
    <p class="ev-hint">Prefere informar o preço do fornecedor (por unidade ou por caixa), frete e outras despesas separadas? <a class="l" onclick="anMut(P=>P.modo_custo='detalhado')">Usar composição detalhada</a></p>`
   :`<p class="ev-hint">Composição detalhada ativa. <a class="l" onclick="anMut(P=>P.modo_custo='rapido')">Voltar ao custo total por item</a></p>`}</div>
   ${P.modo_custo==='detalhado'?anCustos(C).replace(/^<div class="card"><h3>Como você quer informar o custo\?<\/h3>[\s\S]*?<\/p><\/div>/,''):`<div class="card"><h3>Custo calculado</h3><div id="anOut">${anCustosOut(C)}</div></div>`}
   <details class="card an-grp2"><summary><b>Ajustes por item</b><small>quantidade diferente do edital, teto confirmado no edital, preço histórico manual${P.julgamento==='desconto'?', base do desconto':''}</small></summary>
    <div class="tbw"><table class="tb an-tb"><thead><tr><th>Item</th><th>Qtd. simulada</th><th>Teto confirmado no edital</th><th>Preço histórico</th>${P.julgamento==='desconto'?'<th>Base do desconto</th>':''}</tr></thead><tbody>
-   ${sel.map(i=>{const n=i.numero_item,it=P.it[n]||{};return `<tr><td>${n}</td><td>${nIn(`it.${n}.qtd_sim`,it.qtd_sim,'min="0" placeholder="= edital"')}</td><td>${nIn(`it.${n}.teto`,it.teto,'min="0" placeholder="só se o edital fixar"')}</td><td>${nIn(`it.${n}.historico`,it.historico,'min="0"')}</td>${P.julgamento==='desconto'?`<td>${nIn(`it.${n}.base_desc`,it.base_desc,`min="0" placeholder="${i.valor_unitario??''}"`)}</td>`:''}</tr>`;}).join('')}</tbody></table></div>
+   ${sel.map(i=>{const n=i.numero_item,it=P.it[n]||{};return `<tr><td>${n}</td><td>${nIn(`it.${n}.qtd_sim`,it.qtd_sim,'min="0" placeholder="= edital"')}</td><td>${mIn(`it.${n}.teto`,it.teto,'min="0" placeholder="só se o edital fixar"')}</td><td>${mIn(`it.${n}.historico`,it.historico,'min="0"')}</td>${P.julgamento==='desconto'?`<td>${mIn(`it.${n}.base_desc`,it.base_desc,`min="0" placeholder="${i.valor_unitario??''}"`)}</td>`:''}</tr>`;}).join('')}</tbody></table></div>
    <p class="ev-hint">Valor estimado (PNCP), teto confirmado e preço histórico são coisas diferentes: o teto só existe se o edital fixar um valor máximo aceitável.</p></details>`:''}`;
 }
+// cotação do dólar (venda) do dia, só para licitação internacional e quando ainda não informada
+async function anCambio(){const A=window.__AN;if(!A||A.P.moeda!=='USD'||Number(A.P.cambio)>0)return;
+ try{const j=await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL').then(x=>x.json());const v=Number(j&&j.USDBRL&&j.USDBRL.ask);
+  if(v>0&&window.__AN===A){A.P.cambio=Math.round(v*100)/100;A.P.origem.cambio='cotacao';A.sujo=true;anRender();}}catch(e){}}
 // preço histórico automático: mediana das compras públicas dos últimos 12 meses (Compras.gov.br), na mesma unidade
 async function anHistorico(){
  const A=window.__AN;if(!A)return;const P=A.P;let tk=null;
@@ -954,7 +988,9 @@ function anPrem(C){
  const A=window.__AN,P=A.P,O=P.operacao,TA=anTribAuto(),F=O.financiamento||{},K=O.caucao||{};
  const MG=[5,8,10,12,15,18,20,25,30,35,40].map(v=>[v,v+'%']);
  const f=(path,rot,ops,ph)=>`<div><label>${rot} ${anOrig(path)}</label>${sN(path,anGet(path),ops,ph)}</div>`;
- return `<div class="card"><h3>Tributos</h3>
+ return `<div class="card"><h3>Moeda da proposta</h3><div class="ev-form"><div><label>Valores em ${anOrig('moeda')}</label>${sIn('moeda',P.moeda||'BRL',{BRL:'Real (R$ 00.000,00)',USD:'Dólar (USD $ 00,000.00) · licitação internacional'})}</div>
+  ${P.moeda==='USD'?`<div><label>Cotação do dólar ${anOrig('cambio')}</label>${mIn('cambio',P.cambio,'','BRL')}<small class="ev-hint">Converte os valores do PNCP e do histórico, que estão em reais.</small></div>`:''}</div><p class="ev-hint">Os custos e lances que você digitou não são convertidos ao trocar a moeda: confira-os.</p></div>
+ <div class="card"><h3>Tributos</h3>
   ${P.trib_auto?`<div class="an-auto"><b>${esc(TA.resumo)}</b><span>${origem('empresa')} calculado pelo perfil tributário da empresa${A.op.esfera==='F'&&TA.tributos.some(x=>x.natureza==='retencao')?' e pela esfera do órgão (federal)':''}.</span></div>
    ${TA.pend.length?TA.pend.map(x=>`<p class="lc-note"><span>!</span><span>${esc(x)}</span></p>`).join('')+`<div class="ev-actions"><button onclick="ir('empresa',{aba:'dados'})">Completar o perfil da empresa</button></div>`:''}
    ${TA.tributos.length?`<ul class="an-ul">${TA.tributos.map(x=>`<li>${esc(x.nome)}: <b>${String(x.valor).replace('.',',')}%</b>${x.natureza==='retencao'?' (retenção: só caixa)':''}</li>`).join('')}</ul>`:''}
@@ -970,15 +1006,15 @@ function anPrem(C){
   ${f('operacao.atraso','Atraso esperado no pagamento',[[0,'Nenhum'],[15,'15 dias'],[30,'30 dias'],[60,'60 dias'],[90,'90 dias']],'Nenhum')}
   ${f('operacao.prazo_fornecedor','Você paga o fornecedor em',DIAS)}
   ${f('operacao.meses','Duração do contrato',[1,3,6,12,24,36,48,60].map(v=>[v,v+(v===1?' mês':' meses')]),'Não informada')}
-  ${f('operacao.caixa','Caixa disponível para a operação',REAIS,'Não informar')}
-  ${f('operacao.credito','Crédito que consegue usar',REAIS,'Nenhum')}</div></div>
+  ${f('operacao.caixa','Caixa disponível para a operação',REAIS_V.map(v=>[v,v===0?'Nenhum':mfmt(v).replace(/,00$|\.00$/,'')]),'Não informar')}
+  ${f('operacao.credito','Crédito que consegue usar',REAIS_V.map(v=>[v,v===0?'Nenhum':mfmt(v).replace(/,00$|\.00$/,'')]),'Nenhum')}</div></div>
  <details class="card an-grp2"><summary><b>Mais opções</b><small>precisão do preço, financiamento, caução, custo do dinheiro, recolhimento dos tributos</small></summary>
   <div class="ev-form"><div><label>Casas decimais no preço</label>${sIn('precisao',P.precisao??2,{2:'2 (centavos)',3:'3',4:'4'})}</div>
   ${f('operacao.prazo_faturamento','Faturamento após a entrega',DIAS,'No mesmo dia')}${f('operacao.dias_tributo','Recolhimento dos tributos após receber',DIAS,'No mesmo dia')}
   ${f('operacao.taxa_mensal','Custo do dinheiro',[[1,'1% ao mês'],[1.5,'1,5% ao mês'],[2,'2% ao mês'],[3,'3% ao mês'],[4,'4% ao mês'],[5,'5% ao mês']],'Não considerar')}
   <div><label class="pf-sw"><input type="checkbox" data-p="operacao.incluir_custo_giro" ${O.incluir_custo_giro?'checked':''} onchange="anSet(this)"> incluir o custo do capital de giro no custo</label></div></div>
-  <h4>Financiamento</h4><div class="ev-form">${f('operacao.financiamento.valor','Valor liberado',REAIS,'Sem financiamento')}${F.valor?f('operacao.financiamento.dia','Liberado no dia',DIAS,'0')+f('operacao.financiamento.quitacao','Quitado no dia',DIAS.concat([[150,'150 dias'],[180,'180 dias']]))+`<div><label>Juros (R$)</label>${nIn('operacao.financiamento.juros',F.juros,'min="0"')}</div><div><label>Tarifas (R$)</label>${nIn('operacao.financiamento.tarifas',F.tarifas,'min="0"')}</div>`:''}</div>
-  <h4>Garantia em caução</h4><div class="ev-form">${f('operacao.caucao.valor','Valor da caução',REAIS,'Sem caução')}${K.valor?f('operacao.caucao.devolucao','Devolvida no dia',DIAS.concat([[180,'180 dias'],[365,'365 dias']]),'Ao fim do contrato'):''}</div></details>
+  <h4>Financiamento</h4><div class="ev-form">${f('operacao.financiamento.valor','Valor liberado',REAIS_V.map(v=>[v,v===0?'Nenhum':mfmt(v).replace(/,00$|\.00$/,'')]),'Sem financiamento')}${F.valor?f('operacao.financiamento.dia','Liberado no dia',DIAS,'0')+f('operacao.financiamento.quitacao','Quitado no dia',DIAS.concat([[150,'150 dias'],[180,'180 dias']]))+`<div><label>Juros</label>${mIn('operacao.financiamento.juros',F.juros,'min="0"')}</div><div><label>Tarifas</label>${mIn('operacao.financiamento.tarifas',F.tarifas,'min="0"')}</div>`:''}</div>
+  <h4>Garantia em caução</h4><div class="ev-form">${f('operacao.caucao.valor','Valor da caução',REAIS_V.map(v=>[v,v===0?'Nenhum':mfmt(v).replace(/,00$|\.00$/,'')]),'Sem caução')}${K.valor?f('operacao.caucao.devolucao','Devolvida no dia',DIAS.concat([[180,'180 dias'],[365,'365 dias']]),'Ao fim do contrato'):''}</div></details>
  <div class="card"><h3>Efeito no preço</h3><div id="anOut">${anTribOut(C)}</div></div>`;
 }
 function anTribLinhas(){return anTrib(anCalc()).replace(/^[\s\S]*?(<div class="an-custo">|<p class="ev-hint">Nenhum tributo)/,'$1').replace(/<\/div>\s*<div class="card"><h3>Meta comercial[\s\S]*$/,'');}
@@ -999,7 +1035,7 @@ async function anSalvar(silencioso){
  const A=window.__AN,C=anCalc(),u=C.u,r=C.r;
  const alerta=C.us.some(x=>x.lance&&(x.lance.folga<0||x.lance.lucro<0))||C.us.some(x=>x.teto_reducao>0)||C.us.some(x=>x.caixa.ok&&x.caixa.falta>0);
  const tipo=r.erros.length?'erro':r.parcial?'incompleta':alerta?'atencao':'favoravel';
- const res={versao_calculo:2,calculado_em:new Date().toISOString(),pendencias:r.pendencias,
+ const res={versao_calculo:2,moeda:A.P.moeda||'BRL',calculado_em:new Date().toISOString(),pendencias:r.pendencias,
   unidades:C.us.map(x=>({id:x.id,nome:x.nome,Q:x.Q,C:x.C,equilibrio:x.equilibrio_total,minimo:x.minimo_total,alvo:x.alvo_total,lance:x.lance&&{R:x.lance.R,lucro:x.lance.lucro,margem:x.lance.margem},capital:x.caixa.ok?x.caixa.capital:null,falta:x.caixa.ok?x.caixa.falta:null})),
   total:{margem:u&&u.lance?u.lance.margem*100:null,lucro:u&&u.lance?u.lance.lucro:null,minimo:u?u.minimo_total:null,capital:u&&u.caixa.ok?u.caixa.capital:null},
   recomendacao:{tipo}};
