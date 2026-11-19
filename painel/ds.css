@@ -350,3 +350,9 @@ html body input[type=checkbox],html body input[type=radio]{color-scheme:light;wi
  #app table.an-m td[data-l]::before{content:attr(data-l);color:var(--mut);font-size:12.5px}
  #app table.an-m td[data-l] input,#app table.an-m td[data-l] select{max-width:60%}
 }
+/* Licitações: origem do direcionamento (linha de perfil ou perfis de busca) */
+.ev-origem{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2) var(--sp-3);margin:calc(-1 * var(--sp-2)) 0 var(--sp-4)}
+.ev-origem>span{font-size:13px;color:var(--mut)}
+.ev-origem .ev-sub{margin:0}
+.ev-voltar{margin:0 0 var(--sp-3)}
+details#etrib>summary small{flex-basis:100%;padding-left:18px}

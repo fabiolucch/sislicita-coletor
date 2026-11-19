@@ -68,7 +68,7 @@ V.home=async()=>{
  const blocoEmpresa=linhaOk?`<div class="card"><h3>Busca automática pela linha de fornecimento${pj&&pj.razao_social?' · '+esc(pj.razao_social):''}</h3><p class="sub">Classes e grupos da empresa cruzados com licitações abertas e com o PCA. ${temPerfil?'Os perfis de busca continuam valendo em paralelo.':'Você também pode criar perfis de busca para refinar.'}</p>
   <div class="ev-kpis">${kp(fmtN(r.lic_confirmadas),'Licitações na sua linha','código ou classificação confirmados',"ir('oport',{conf:'confirmada'})")}${kp(fmtN(r.lic_revisar),'Possíveis, para revisar','pela descrição',"ir('oport',{conf:'revisar'})")}${kp(fmtN(r.pca_confirmadas),'Compras planejadas (PCA)','planejamento, não é licitação aberta',"ir('pca')")}${kp(fmtN(ints.length),'Minhas licitações',ints.filter(x=>x.status==='em_analise').length+' em análise',"ir('interesses')")}</div>
   <p class="ev-hint">Itens lidos em ${fmtN(r.abertas_com_itens)} de ${fmtN(r.abertas)} licitações abertas; a leitura avança a cada coleta. Última coleta: ${r.ultima_coleta?dt(r.ultima_coleta):'—'}.</p></div>`:'';
- const briefing=!temPerfil?avisoPerfilBusca(pode('perfis')):(brs.length?brs.map(b=>`<div class="card brief"><h3>${AI('Briefing gerado por IA (Gemini)')}${esc(b.titulo||'Briefing')} <span class="m">· ${esc(b.perfis_busca&&b.perfis_busca.nome||'')} · há ${ago(b.gerado_em)}</span></h3><p style="margin:6px 0 8px;line-height:1.5">${esc(b.resumo||'')}</p>${(b.destaques||[]).map(d=>`<div class="br" style="grid-template-columns:1fr"><span class="bl" style="cursor:pointer" onclick="ir('triagem')"><b>${esc(((bop[d.id]||{}).objeto||'#'+d.id).slice(0,90))}</b> <span class="m">${esc((bop[d.id]||{}).uf||'')} — ${esc(d.motivo||'')}</span></span></div>`).join('')}${(b.alertas||[]).length?`<div style="margin-top:6px">${b.alertas.map(a=>`<span class="tag w">${esc(a)}</span>`).join(' ')}</div>`:''}</div>`).join(''):`<div class="card"><h3>Briefing</h3><p class="sub">Seus perfis de busca estão salvos. O briefing é gerado a cada coleta completa; o primeiro aparece aqui assim que for gerado.</p></div>`);
+ const briefing=!temPerfil?avisoPerfilBusca(pode('perfis')):(brs.length?brs.map(b=>`<div class="card brief"><h3>${AI('Briefing gerado por IA (Gemini)')}${esc(b.titulo||'Briefing')} <span class="m">· ${esc(b.perfis_busca&&b.perfis_busca.nome||'')} · há ${ago(b.gerado_em)}</span></h3><p style="margin:6px 0 8px;line-height:1.5">${esc(b.resumo||'')}</p>${(b.destaques||[]).map(d=>`<div class="br" style="grid-template-columns:1fr"><span class="bl" style="cursor:pointer" onclick="ir('radar')"><b>${esc(((bop[d.id]||{}).objeto||'#'+d.id).slice(0,90))}</b> <span class="m">${esc((bop[d.id]||{}).uf||'')} — ${esc(d.motivo||'')}</span></span></div>`).join('')}${(b.alertas||[]).length?`<div style="margin-top:6px">${b.alertas.map(a=>`<span class="tag w">${esc(a)}</span>`).join(' ')}</div>`:''}</div>`).join(''):`<div class="card"><h3>Briefing</h3><p class="sub">Seus perfis de busca estão salvos. O briefing é gerado a cada coleta completa; o primeiro aparece aqui assim que for gerado.</p></div>`);
  const nAn=ints.filter(x=>['a_analisar','em_analise'].includes(x.status)).length,nPart=ints.filter(x=>['viavel','proposta_enviada'].includes(x.status)).length;
  const passo=(n,t,s,feito,go,bt)=>`<button class="ev-passo ${feito?'ok':''}" onclick="${go}"><i>${feito?'✓':n}</i><span><b>${t}</b><small>${s}</small></span><em>${bt}</em></button>`;
  const caminho=`<div class="card ev-caminho"><h3>Seu caminho</h3><div class="ev-passos">
@@ -78,7 +78,7 @@ V.home=async()=>{
   ${passo(4,'Minhas licitações',`${nAn} em análise · ${nPart} participando`,false,"ir('interesses')",'Abrir')}</div></div>`;
  main.innerHTML=bannerPlano()+`<div class="top"><div><h2>${pj&&pj.razao_social?esc(pj.razao_social):'Início'}</h2><p class="sub">Pesquise por perfis de busca${linhaOk?' e pela linha de fornecimento da empresa':''}; a empresa é opcional.</p></div></div>
  ${caminho}
- <div class="ev-kpis">${kp(fmtN(D.abertos),'Editais abertos','no PNCP agora',"ir('oportunidades')")}${kp(fmtN(D.abertos7),'Encerram em 7 dias','editais abertos',"ir('oportunidades')")}${kp(fmtN(D.pca),'Itens de PCA','previsão de compras',"ir('pca')")}${temPerfil?kp(fmtN(D.radar),'No radar',fmtN(D.radar_novo)+' novos',"ir('triagem')"):''}</div>
+ <div class="ev-kpis">${kp(fmtN(D.abertos),'Editais abertos','no PNCP agora',"ir('oportunidades')")}${kp(fmtN(D.abertos7),'Encerram em 7 dias','editais abertos',"ir('oportunidades')")}${kp(fmtN(D.pca),'Itens de PCA','previsão de compras',"ir('pca')")}${temPerfil?kp(fmtN(D.radar),'No radar',fmtN(D.radar_novo)+' novos',"ir('radar')"):''}</div>
  ${avisoEmpresa}${briefing}${blocoEmpresa}
  ${temPerfil&&top.length?`<div class="card"><h3>Melhores oportunidades dos seus perfis</h3>${top.map(x=>cardOp(x.oportunidades,{score:x.score,perfil:x.perfis_busca&&x.perfis_busca.nome,just:x.justificativa})).join('')}</div>`:''}`;
 };
@@ -91,17 +91,16 @@ async function habResumo(pjId){
 }
 
 // ------------------------------------------------------------------ empresa + linha de fornecimento
-TELAS.empresa='Empresa e linha de fornecimento';
+TELAS.empresa='Dados da empresa';TELAS.linha='Linha de fornecimento';
+V.linha=()=>{window.ARG=Object.assign({},window.ARG||{},{aba:'linha',_tela:'linha'});return V.empresa();};
 V.empresa=async()=>{
  const [{data:pjs},linhas,R]=await Promise.all([sb.from('pessoas_juridicas').select('*').order('propria',{ascending:false}).limit(1),rpc('minha_linha').catch(()=>[]),rpc('resumo_linha').catch(()=>null)]);
  const pj=(pjs||[])[0];window.__EMP={pj,linhas:linhas||[],R};
- const aba=abaIni('emp',(window.ARG&&window.ARG.aba)||((linhas||[]).length?'linha':(pj&&pj.uf&&pj.cnae_principal?'linha':'dados')),['dados','linha']);
+ // Dados e Linha de fornecimento são telas próprias no menu: a rota decide qual mostrar
+ const aba=(window.ARG&&window.ARG.aba==='linha')||tela==='linha'?'linha':'dados';
  const inc=(linhas||[]).filter(l=>l.modo==='incluir'),exc=(linhas||[]).filter(l=>l.modo==='excluir');
- main.innerHTML=`<div class="top"><div><h2>Empresa</h2><p class="sub">Comece pelo que a empresa fornece. Você pode salvar e continuar depois.</p></div><div id="lfst" class="ev-hint"></div></div>
+ main.innerHTML=`<div class="top"><div><h2>${aba==='linha'?'Linha de fornecimento':'Dados da empresa'}</h2><p class="sub">${aba==='linha'?'O que a empresa fornece: é por aqui que o Radar encontra licitações e compras previstas.':'Preenchidos pelo CNPJ. Confira e ajuste se precisar.'}</p></div><div id="lfst" class="ev-hint"></div></div>
  <div class="ev-root">
- <div class="ev-tabs" data-g="emp" data-mem="emp" role="tablist">
-  <button type="button" class="${aba==='dados'?'on':''}" data-t="dados" onclick="abaSel(this)">Dados da empresa</button>
-  <button type="button" class="${aba==='linha'?'on':''}" data-t="linha" onclick="abaSel(this)">Linha de fornecimento<span class="n ${inc.length?'c-green':'c-red'}">${inc.length||'!'}</span></button></div>
  <div class="ev-pane" data-g="emp" data-t="linha" ${aba==='linha'?'':'hidden'}>
   <div id="lfauto"></div><div id="lfcnae"></div>
   <div class="card ev-destaque"><h3>Informe o que sua empresa fornece para encontrar licitações e compras planejadas compatíveis.</h3>
@@ -279,11 +278,14 @@ async function lfSugerir(){
 async function empDadosAuto(){
  const E=window.__EMP,pj=E&&E.pj;if(!pj||!pj.cnpj||!$('#ecn'))return;
  const falta=!pj.uf||!pj.municipio||!pj.porte||!pj.cnae_principal||!pj.razao_social||!(pj.cnaes||[]).length;
- const h=$('#ecnh');if(!falta||window.__DADOS_AUTO===pj.cnpj)return;window.__DADOS_AUTO=pj.cnpj;
+ const h=$('#ecnh');if(!falta)return;
+ // tenta de novo a cada abertura (no máximo uma vez por minuto), em vez de uma vez por sessão
+ if(window.__DADOS_AUTO===pj.cnpj&&Date.now()-(window.__DADOS_AUTO_EM||0)<6e4)return;window.__DADOS_AUTO=pj.cnpj;window.__DADOS_AUTO_EM=Date.now();
+ if(h)h.textContent='Consultando o CNPJ na Receita Federal…';
  try{
   const tk=(await sb.auth.getSession()).data.session.access_token;
   const r=await fetch('/api/catalogo?cnpj='+encodeURIComponent(pj.cnpj),{headers:{authorization:'Bearer '+tk}}).then(x=>x.json());
-  const rf=r&&r.receita;if(!rf){if(h)h.textContent='Não foi possível consultar o CNPJ agora; preencha manualmente ou tente de novo mais tarde.';return;}
+  const rf=r&&r.receita;if(!rf){if(h)h.innerHTML='As fontes públicas do CNPJ não responderam agora. <a class="l" onclick="window.__DADOS_AUTO_EM=0;empDadosAuto()">Tentar de novo</a> ou preencha manualmente.';return;}
   const upd={},set=(id,v)=>{const e=$('#'+id);if(e&&v&&!e.value){e.value=v;}};
   if(!pj.razao_social&&rf.razao_social){upd.razao_social=rf.razao_social;set('erz',rf.razao_social);}
   if(!pj.nome_fantasia&&rf.nome_fantasia){upd.nome_fantasia=rf.nome_fantasia;set('efa',rf.nome_fantasia);}
@@ -293,7 +295,8 @@ async function empDadosAuto(){
   if(!pj.cnae_principal&&rf.cnae){upd.cnae_principal=String(rf.cnae);set('ecn',String(rf.cnae));}
   if(rf.cnae_desc&&$('#ecnd')&&!$('#ecnd').textContent)$('#ecnd').textContent=rf.cnae_desc;
   if(!(pj.cnaes||[]).length&&rf.cnae){upd.cnaes=[{codigo:String(rf.cnae),descricao:rf.cnae_desc||'',principal:true},...(rf.cnaes_sec||[]).map(x=>({codigo:String(x.codigo),descricao:x.descricao||'',principal:false}))];}
-  if(Object.keys(upd).length){const {error}=await sb.from('pessoas_juridicas').update(upd).eq('id',pj.id);if(!error){Object.assign(pj,upd);if(h)h.textContent='Dados preenchidos automaticamente pela Receita Federal (CNPJ). Confira e ajuste se precisar.'+(upd.cnaes&&upd.cnaes.length>1?` Mais ${upd.cnaes.length-1} atividade(s) secundária(s) usadas nas sugestões da linha.`:'');}}
+  if(Object.keys(upd).length){const {error}=await sb.from('pessoas_juridicas').update(upd).eq('id',pj.id);if(!error){Object.assign(pj,upd);if(h)h.textContent=`Dados preenchidos automaticamente pela Receita Federal (fonte: ${rf.fonte||'CNPJ'}). Confira e ajuste se precisar.`+(upd.cnaes&&upd.cnaes.length>1?` Mais ${upd.cnaes.length-1} atividade(s) secundária(s) usadas nas sugestões da linha.`:'');empTribAuto();}else if(h)h.textContent='Os dados do CNPJ foram encontrados, mas não puderam ser salvos: '+error.message;}
+  else if(h)h.textContent='Os dados já estão preenchidos.';
  }catch(e){if(h)h.textContent='Não foi possível consultar o CNPJ agora.';}
 }
 async function empAuto(forcar){
@@ -382,7 +385,7 @@ function empTribCard(pj){
  const sel=(k,v,ops,ph)=>`<select data-t="${k}" onchange="empTribSet(this)">${ph?`<option value="">${ph}</option>`:''}${ops.map(([a,b])=>`<option value="${a}" ${String(a)===String(v??'')?'selected':''}>${b}</option>`).join('')}</select>`;
  const MG=[5,8,10,12,15,18,20,25,30,35,40].map(v=>[v,v+'%']);
  const an=T.anexo;
- return `<div class="card" id="etrib"><h3>Tributação e metas padrão</h3><p class="sub">Usados para preencher sozinha cada análise de viabilidade: você só escolhe os itens e informa o custo. Tudo aqui é escolha, sem digitar.</p>
+ return `<details class="card an-grp2" id="etrib" ${R.pend.length?'open':''}><summary><b>Tributação e metas</b><small>${esc(R.resumo)}${R.pend.length?' · falta completar':' · margem mínima '+(T.margem_min??10)+'%'}</small></summary><p class="sub">Preenchem sozinhas cada análise de viabilidade: você só escolhe os itens e informa o custo. Tudo aqui é escolha, sem digitar.</p>
  <div class="ev-form emp-form">
   <div><label>Regime tributário ${oT(O.regime)}</label>${sel('regime',T.regime,Object.entries(REG_TXT),'Escolha')}${O.regime==='cnpj'?'':`<small class="ev-hint" id="etribh">${T.regime?'':'Consultando o CNPJ…'}</small>`}</div>
   ${T.regime==='simples'?`<div><label>Anexo do Simples ${oT(O.anexo)}</label>${sel('anexo',an,Object.entries(VIAB.ANEXO_TXT),'Escolha')}${T.anexo_motivo?`<small class="ev-hint">${esc(T.anexo_motivo)}</small>`:''}${pode('ia')?`<button type="button" class="sec sm" style="margin-top:6px" onclick="empAnexoIA(this)">${AI()} Pedir à IA para conferir</button>`:''}</div>
@@ -396,7 +399,7 @@ function empTribCard(pj){
   <div><label>Caixa disponível para contratos públicos</label>${sel('caixa',T.caixa,[0,5e3,1e4,2.5e4,5e4,1e5,2.5e5,5e5,1e6,2e6,5e6].map(v=>[v,v===0?'Nenhum':brl(v)]),'Prefiro não informar')}</div>
   <div><label>Crédito que consegue usar</label>${sel('credito',T.credito,[0,1e4,2.5e4,5e4,1e5,2.5e5,5e5,1e6].map(v=>[v,v===0?'Nenhum':brl(v)]),'Prefiro não informar')}</div>
  </div>
- <div class="an-auto"><b>${esc(R.resumo)}</b>${R.pend.length?`<span>${esc(R.pend[0])}</span>`:`<span>É o que entra em cada análise.${R.notas.length?' '+esc(R.notas[0]):''}</span>`}</div></div>`;
+ <div class="an-auto"><b>${esc(R.resumo)}</b>${R.pend.length?`<span>${esc(R.pend[0])}</span>`:`<span>É o que entra em cada análise.${R.notas.length?' '+esc(R.notas[0]):''}</span>`}</div></details>`;
 }
 async function empTribSalvar(T){const pj=window.__EMP.pj;pj.tributacao=T;const {error}=await sb.from('pessoas_juridicas').update({tributacao:T}).eq('id',pj.id);if(error){toast(error.message);return false;}return true;}
 async function empTribSet(el){
@@ -406,7 +409,7 @@ async function empTribSet(el){
  if(k==='regime'&&v==='simples'&&!T.anexo){const s=VIAB.anexoPorCnae(pj.cnae_principal);if(s){T.anexo=s.anexo;T.anexo_motivo=s.motivo;T.origem.anexo='cnae';}}
  if(k==='regime'&&(v==='presumido'||v==='real')&&!T.atividade){const s=VIAB.anexoPorCnae(pj.cnae_principal);if(s){T.atividade={I:'comercio',II:'industria'}[s.anexo]||'servico';T.origem.atividade='cnae';}}
  if(k==='anexo')delete T.anexo_motivo;
- if(await empTribSalvar(T)){toast('Salvo');$('#etrib').outerHTML=empTribCard(pj);}
+ if(await empTribSalvar(T)){toast('Salvo');$('#etrib').outerHTML=empTribCard(pj);$('#etrib').open=true;}
 }
 // detecção automática: regime pelo CNPJ (Simples/MEI) e anexo pelo CNAE, só onde ainda está vazio
 async function empTribAuto(){
@@ -437,7 +440,7 @@ async function empAnexoIA(btn){
 function empForm(pj){
  if(!pj)return pend('Nenhuma empresa cadastrada nesta organização','',"Cadastre o CNPJ em Minha empresa › Dados.");
  const dp=pj.dados_publicos||null;
- return `<div class="card"><h3>Dados da empresa</h3><p class="sub">Poucos campos agora; o restante pode ser preenchido depois.</p>
+ return `<div class="card"><h3>Cadastro</h3>
  <div class="ev-form emp-form"><div><label for="ecnpj">CNPJ</label><input id="ecnpj" value="${esc(pj.cnpj)}" disabled></div>
  <div><label for="erz">Razão social</label><input id="erz" value="${esc(pj.razao_social||'')}"></div>
  <div><label for="efa">Nome fantasia</label><input id="efa" value="${esc(pj.nome_fantasia||'')}"></div>
@@ -471,24 +474,28 @@ async function empPublicos(){
 async function empAplicar(d){Object.entries({erz:d.razao_social,efa:d.nome_fantasia,ecn:d.cnae_principal}).forEach(([k,v])=>{if(v&&$('#'+k))$('#'+k).value=v;});if(d.uf&&$('#euf'))$('#euf').value=d.uf;if($('#emun')){const m=$('#emun');m.dataset.uf=d.uf||$('#euf').value;m.dataset.atual=d.municipio||'';munPreencher(m);}toast('Campos preenchidos; confira e salve.');}
 
 // ------------------------------------------------------------------ subnavegação de Licitações e PCA
-const SUB_OP=[['oport','Linha de perfil'],['triagem','Pelos perfis de busca'],['radar','Ranking dos perfis'],['oportunidades','Pesquisa ampla']];
-const SUB_PCA=[['pca','Pela linha de fornecimento'],['pca_ampla','Pesquisa ampla']];
-const subnav=(lst,at)=>`<nav class="ev-sub" aria-label="Visões">${lst.map(([k,r])=>`<button type="button" class="${k===at?'on':''}" onclick="ir('${k}')">${r}${(k==='triagem'||k==='radar')&&!pode('radar')?' 🔒':''}</button>`).join('')}</nav>`;
-['triagem','radar','oportunidades'].forEach(k=>{const f=V[k];if(!f)return;V[k]=async()=>{await f();main.insertAdjacentHTML('afterbegin',subnav(SUB_OP,k)+(k==='oportunidades'?'<p class="ev-hint ev-amplo">Pesquisa ampla: mostra licitações fora da sua linha de fornecimento. Use quando quiser explorar além do direcionamento.</p>':''));};});
+const SUB_OP=[['oport','Para mim'],['oportunidades','Pesquisa ampla']];
+const SUB_PCA=[['pca','Para mim'],['pca_ampla','Pesquisa ampla']];
+const subnav=(lst,at)=>`<nav class="ev-sub" aria-label="Visões">${lst.map(([k,r])=>`<button type="button" class="${k===(at==='radar'?'oport':at)?'on':''}" onclick="ir('${k}')">${r}</button>`).join('')}</nav>`;
+// "Para mim" junta as duas origens do direcionamento: a linha de fornecimento (linha de perfil) e os perfis de busca
+const origemOp=at=>`<div class="ev-origem"><span>Encontradas pela</span><div class="ev-sub sm"><button type="button" class="${at==='oport'?'on':''}" onclick="ir('oport')">Linha de perfil</button><button type="button" class="${at==='radar'?'on':''}" onclick="ir('radar')">Perfis de busca${!pode('radar')?' 🔒':''}</button></div></div>`;
+['radar','oportunidades'].forEach(k=>{const f=V[k];if(!f)return;V[k]=async()=>{await f();main.insertAdjacentHTML('afterbegin',subnav(SUB_OP,k)+(k==='radar'?origemOp('radar'):'<p class="ev-hint ev-amplo">Pesquisa ampla: mostra licitações fora da sua linha de fornecimento e dos seus perfis. Use quando quiser explorar além do direcionamento.</p>'));};});
+// ajuste fino do perfil (antiga "Triagem por perfil"): sai das abas de Licitações e fica dentro de Perfis de busca
+{const f=V.triagem;if(f)V.triagem=async()=>{await f();main.insertAdjacentHTML('afterbegin',`<p class="ev-voltar"><a class="l" onclick="ir('perfis')">← Perfis de busca</a></p>`);};}
 V.pca_ampla=V.pca;V.pca_ampla=(f=>async()=>{await f();main.insertAdjacentHTML('afterbegin',subnav(SUB_PCA,'pca_ampla')+'<p class="ev-hint ev-amplo">Pesquisa ampla no PCA, fora da sua linha de fornecimento.</p>');})(V.pca);
 // o bloqueio de plano das telas antigas vale também para a subnavegação
-const _telaBloq=telaBloqueada;window.telaBloqueada=t=>{_telaBloq(t);if(['triagem','radar'].includes(t))main.insertAdjacentHTML('afterbegin',subnav(SUB_OP,t));};
+const _telaBloq=telaBloqueada;window.telaBloqueada=t=>{_telaBloq(t);if(t==='radar')main.insertAdjacentHTML('afterbegin',subnav(SUB_OP,t)+origemOp(t));};
 
 // ------------------------------------------------------------------ licitações direcionadas pela linha
 V.oport=async()=>{
  const F=window.__OPF=Object.assign({conf:null,uf:'',busca:'',ordem:'prazo',refinos:true,pag:0},window.__OPF||{},window.ARG&&window.ARG.conf?{conf:window.ARG.conf,pag:0}:{});
  const R=await rpc('resumo_linha').catch(()=>null)||{};
- if(!(R.linhas_incluir>0)){main.innerHTML=subnav(SUB_OP,'oport')+`<div class="top"><div><h2>Licitações</h2></div></div>`+pend('Cadastre a linha de fornecimento para ver licitações direcionadas',`<button onclick="ir('empresa',{aba:'linha'})">Cadastrar linha de fornecimento</button>`,'Sem ela, nada aqui seria personalizado. A pesquisa ampla continua disponível na aba acima.');return;}
+ if(!(R.linhas_incluir>0)){main.innerHTML=subnav(SUB_OP,'oport')+origemOp('oport')+`<div class="top"><div><h2>Licitações</h2></div></div>`+pend('Cadastre a linha de fornecimento para ver licitações direcionadas',`<button onclick="ir('empresa',{aba:'linha'})">Cadastrar linha de fornecimento</button>`,'Sem ela, nada aqui seria personalizado. A pesquisa ampla continua disponível na aba acima.');return;}
  const PL=R.perfil_linha||{};
  const rows=await rpc('oportunidades_linha',{p_conf:F.conf,p_busca:F.busca||null,p_uf:F.uf||null,p_ordem:F.ordem,p_limite:30,p_offset:F.pag*30,p_aplicar_refinos:F.refinos});
  const tot=rows&&rows.length?Number(rows[0].total):0;
  const refinos=[PL.ufs&&PL.ufs.length?'UF: '+PL.ufs.join(', '):'',PL.modalidades&&PL.modalidades.length?PL.modalidades.length+' modalidade(s)':'',PL.valor_min!=null?'mín. '+brl(PL.valor_min):'',PL.valor_max!=null?'máx. '+brl(PL.valor_max):'',PL.dias?`≥ ${PL.dias} dias para propostas`:''].filter(Boolean);
- main.innerHTML=subnav(SUB_OP,'oport')+`<div class="top"><div><h2>Licitações da linha de perfil</h2><p class="sub">Encontradas pela linha de fornecimento: primeiro as confirmadas por código ou classificação, depois as possíveis para revisar.</p></div></div>
+ main.innerHTML=subnav(SUB_OP,'oport')+origemOp('oport')+`<div class="top"><div><h2>Licitações</h2><p class="sub">Abertas e ligadas ao que a sua empresa fornece: primeiro as confirmadas por código ou classificação, depois as possíveis para revisar.</p></div></div>
  <div class="card ev-filtros"><div class="bar">
   <select id="ofc"><option value="">Confirmadas e para revisar</option><option value="confirmada" ${F.conf==='confirmada'?'selected':''}>Só confirmadas</option><option value="revisar" ${F.conf==='revisar'?'selected':''}>Só para revisar</option></select>
   <select id="ofu"><option value="">Todas as UFs</option>${UFS.map(u=>`<option ${u===F.uf?'selected':''}>${u}</option>`).join('')}</select>
@@ -522,15 +529,15 @@ async function opRefinoSalvar(){
 }
 
 // ------------------------------------------------------------------ compras planejadas (PCA)
-TELAS.pca='Compras planejadas — PCA';
+TELAS.pca='Compras previstas';
 V.pca=async()=>{
  const F=window.__PCF=Object.assign({conf:null,uf:'',ano:'',de:'',ate:'',orgao:'',pag:0},window.__PCF||{});
  const R=await rpc('resumo_linha').catch(()=>null)||{};
  const aviso='<p class="ev-pca-aviso"><b>PCA é planejamento.</b> Os itens abaixo são compras que os órgãos pretendem fazer; podem mudar ou não acontecer. Não são licitações abertas nem contratação garantida.</p>';
- if(!(R.linhas_incluir>0)){main.innerHTML=subnav(SUB_PCA,'pca')+`<div class="top"><div><h2>Compras planejadas — PCA</h2></div></div>`+aviso+pend('Cadastre a linha de fornecimento para ver compras planejadas compatíveis',`<button onclick="ir('empresa',{aba:'linha'})">Cadastrar linha de fornecimento</button>`);return;}
+ if(!(R.linhas_incluir>0)){main.innerHTML=subnav(SUB_PCA,'pca')+`<div class="top"><div><h2>Compras previstas</h2></div></div>`+aviso+pend('Cadastre a linha de fornecimento para ver compras planejadas compatíveis',`<button onclick="ir('empresa',{aba:'linha'})">Cadastrar linha de fornecimento</button>`);return;}
  const rows=await rpc('pca_linha',{p_conf:F.conf,p_uf:F.uf||null,p_ano:F.ano?Number(F.ano):null,p_de:F.de||null,p_ate:F.ate||null,p_orgao:F.orgao||null,p_limite:30,p_offset:F.pag*30});
  const tot=rows&&rows.length?Number(rows[0].total):0;const ano=new Date().getFullYear();
- main.innerHTML=subnav(SUB_PCA,'pca')+`<div class="top"><div><h2>Compras planejadas — PCA</h2><p class="sub">Itens dos Planos de Contratações Anuais compatíveis com a sua linha de fornecimento.</p></div></div>${aviso}
+ main.innerHTML=subnav(SUB_PCA,'pca')+`<div class="top"><div><h2>Compras previstas</h2><p class="sub">Itens dos Planos de Contratações Anuais compatíveis com a sua linha de fornecimento.</p></div></div>${aviso}
  <div class="card ev-filtros"><div class="bar">
   <select id="pfc"><option value="">Confirmadas e para revisar</option><option value="confirmada" ${F.conf==='confirmada'?'selected':''}>Só confirmadas</option><option value="revisar" ${F.conf==='revisar'?'selected':''}>Só para revisar</option></select>
   <select id="pfu"><option value="">Todas as UFs</option>${UFS.map(u=>`<option ${u===F.uf?'selected':''}>${u}</option>`).join('')}</select>

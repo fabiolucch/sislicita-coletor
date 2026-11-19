@@ -67,17 +67,32 @@ export async function onRequestGet({ request }) {
     if (q.get("cnpj")) {
       const c = (q.get("cnpj") || "").replace(/\D/g, "");
       if (c.length !== 14) return J({ erro: "CNPJ inválido" }, 400);
-      const [rf, sf] = await Promise.allSettled([obter(`https://brasilapi.com.br/api/cnpj/v1/${c}`),
-        obter(`${DA}/modulo-fornecedor/1_consultarFornecedor?pagina=1&tamanhoPagina=10&cnpj=${c}&ativo=true`)]);
-      const r = rf.status === "fulfilled" && rf.value ? rf.value : null;
-      const s = sf.status === "fulfilled" && sf.value ? (sf.value.resultado || [])[0] || null : null;
-      if (!r && rf.status === "rejected" && sf.status === "rejected") return J({ erro: "fontes públicas indisponíveis agora" }, 503);
-      return J({
-        receita: r ? { razao_social: r.razao_social, nome_fantasia: r.nome_fantasia || null, uf: r.uf, municipio: r.municipio,
-          porte: r.porte, cnae: r.cnae_fiscal ? String(r.cnae_fiscal) : null, cnae_desc: r.cnae_fiscal_descricao || null, cnaes_sec: (r.cnaes_secundarios || []).slice(0, 30).map(x => ({ codigo: String(x.codigo), descricao: x.descricao })), situacao: r.descricao_situacao_cadastral || null,
-          simples: r.opcao_pelo_simples ?? null, mei: r.opcao_pelo_mei ?? null } : null,
-        sicaf: s ? { ativo: s.ativo, habilitadoLicitar: s.habilitadoLicitar, porteEmpresaNome: s.porteEmpresaNome, naturezaJuridicaNome: s.naturezaJuridicaNome } : null,
-        receita_erro: rf.status === "rejected" ? String(rf.reason.message) : null, sicaf_erro: sf.status === "rejected" ? String(sf.reason.message) : null });
+      // Receita Federal por fontes públicas, uma depois da outra (BrasilAPI → CNPJ.ws → CNPJá), no mesmo formato
+      const PORTE = t => { t = String(t || "").toUpperCase(); return /MEI|MICROEMPREENDEDOR/.test(t) ? "MEI" : /MICRO/.test(t) ? "Microempresa" : /PEQUENO/.test(t) ? "Empresa de pequeno porte" : t ? "Demais" : null; };
+      const sim = v => v === true || /^s/i.test(String(v || "")) ? true : v === false || /^n/i.test(String(v || "")) ? false : null;
+      const fontes = [
+        [`https://brasilapi.com.br/api/cnpj/v1/${c}`, r => ({ razao_social: r.razao_social, nome_fantasia: r.nome_fantasia || null, uf: r.uf, municipio: r.municipio, porte: PORTE(r.porte),
+          cnae: r.cnae_fiscal ? String(r.cnae_fiscal) : null, cnae_desc: r.cnae_fiscal_descricao || null, cnaes_sec: (r.cnaes_secundarios || []).filter(x => x.codigo).slice(0, 30).map(x => ({ codigo: String(x.codigo), descricao: x.descricao })),
+          situacao: r.descricao_situacao_cadastral || null, simples: r.opcao_pelo_simples ?? null, mei: r.opcao_pelo_mei ?? null, fonte: "BrasilAPI" })],
+        [`https://publica.cnpj.ws/cnpj/${c}`, r => { const e = r.estabelecimento || {}; return { razao_social: r.razao_social, nome_fantasia: e.nome_fantasia || null, uf: e.estado && e.estado.sigla, municipio: e.cidade && e.cidade.nome,
+          porte: PORTE(r.porte && r.porte.descricao), cnae: e.atividade_principal && String(e.atividade_principal.id || "").replace(/\D/g, ""), cnae_desc: e.atividade_principal && e.atividade_principal.descricao,
+          cnaes_sec: (e.atividades_secundarias || []).slice(0, 30).map(x => ({ codigo: String(x.id || "").replace(/\D/g, ""), descricao: x.descricao })), situacao: e.situacao_cadastral || null,
+          simples: r.simples ? sim(r.simples.simples) : null, mei: r.simples ? sim(r.simples.mei) : null, fonte: "CNPJ.ws" }; }],
+        [`https://open.cnpja.com/office/${c}`, r => { const co = r.company || {}, ad = r.address || {}; return { razao_social: co.name, nome_fantasia: r.alias || null, uf: ad.state, municipio: ad.city,
+          porte: PORTE(co.size && co.size.text), cnae: r.mainActivity && String(r.mainActivity.id || ""), cnae_desc: r.mainActivity && r.mainActivity.text,
+          cnaes_sec: (r.sideActivities || []).slice(0, 30).map(x => ({ codigo: String(x.id || ""), descricao: x.text })), situacao: r.status && r.status.text || null,
+          simples: co.simples ? !!co.simples.optant : null, mei: co.simei ? !!co.simei.optant : null, fonte: "CNPJá" }; }],
+      ];
+      let receita = null; const erros = [];
+      for (const [url, map] of fontes) {
+        try { const r = await obter(url); if (r) { const m = map(r); if (m.razao_social || m.uf) { receita = m; break; } } else erros.push(url.split("/")[2] + ": não encontrado"); }
+        catch (e) { erros.push(url.split("/")[2] + ": " + String(e.message || e).slice(0, 80)); }
+      }
+      let s = null, sicaf_erro = null;
+      try { const sv = await obter(`${DA}/modulo-fornecedor/1_consultarFornecedor?pagina=1&tamanhoPagina=10&cnpj=${c}&ativo=true`); s = sv ? (sv.resultado || [])[0] || null : null; } catch (e) { sicaf_erro = String(e.message || e); }
+      if (!receita && !s) return J({ erro: "fontes públicas indisponíveis agora", detalhes: erros }, 503);
+      return J({ receita, sicaf: s ? { ativo: s.ativo, habilitadoLicitar: s.habilitadoLicitar, porteEmpresaNome: s.porteEmpresaNome, naturezaJuridicaNome: s.naturezaJuridicaNome } : null,
+        receita_erro: receita ? null : erros.join("; "), sicaf_erro });
     }
     return J({ erro: "informe pdm ou cnpj" }, 400);
   } catch (e) { return J({ erro: String(e.message || e).slice(0, 160) }, 502); }
