@@ -272,5 +272,432 @@
     return { tipo: 'atencao', texto: base + ' Pontos de atenção: ' + t.join('; ') + '.' };
   }
 
-  return { calcular, cenarios, sensibilidade, recomendacao, capitalDeGiro, CATEGORIAS, BASES, CENARIOS_PADRAO, _t: { teto2, c2, rateio } };
+
+  // ==================================================================================================
+  // v2 — Análise de viabilidade orientada ao lance (ver docs/viabilidade.md)
+  //   Q = quantidade, C = custo total da execução (R$), t = Σ percentuais sobre a mesma receita bruta,
+  //   R = preço × Q, lucro = R(1 − t) − C, margem = lucro ÷ R,
+  //   equilíbrio = C ÷ (1 − t) ÷ Q, lance mínimo = C ÷ (1 − t − m_min) ÷ Q, alvo = C ÷ (1 − t − m_alvo) ÷ Q,
+  //   custo máximo no lance = R(1 − t − m_min), redução necessária = máx(0, C − custo máximo).
+  // Pisos arredondados PARA CIMA na precisão do edital; a margem é recalculada com o valor exibido.
+  // Campo vazio ≠ zero: vazio vira pendência e marca o cálculo como parcial.
+  // ==================================================================================================
+  const GRUPOS2 = {
+    produto: { nome: 'Produto ou serviço', cats: ['Compra de mercadorias', 'Fabricação', 'Insumos', 'Mão de obra', 'Encargos', 'Benefícios', 'Substituições', 'Equipamentos', 'Subcontratação'] },
+    execucao: { nome: 'Execução e entrega', cats: ['Frete', 'Seguro', 'Embalagem', 'Instalação', 'Armazenagem', 'Deslocamento', 'Assistência técnica', 'Despesas com garantia'] },
+    indireta: { nome: 'Despesas indiretas', cats: ['Mobilização', 'Administração', 'Custo compartilhado entre itens', 'Garantia contratual', 'Outros'] },
+  };
+  const BASES2 = { unidade: 'Por unidade fornecida', pedido: 'Por pedido de compra', entrega: 'Por entrega', mes: 'Por mês de contrato',
+    contrato: 'Uma vez no contrato', lote: 'Uma vez por lote', pct_receita: '% sobre a venda' };
+  const CEN2 = { base: { custo: 0, frete: 0, cambio: 0, qtd: 0, atraso: 0 }, conservador: { custo: 10, frete: 20, cambio: 10, qtd: 0, atraso: 30 } };
+
+  const pot = d => Math.pow(10, d);
+  const cima = (v, d = 2) => Math.ceil(Math.round(v * pot(d) * 1e6) / 1e6) / pot(d);   // para cima, imune a 0,1+0,2
+  const rd = (v, d = 2) => Math.round(v * pot(d)) / pot(d);
+
+  // ---------------------------------------------------------------- custo direto do item (com unidade de cotação)
+  function custoDireto(it, modo, aj, pend) {
+    const q0 = num(it.qtd_sim) !== null ? num(it.qtd_sim) : num(it.qtd);
+    const q = (q0 || 0) * (1 + (aj.qtd || 0) / 100);
+    const fat = (1 + (aj.custo || 0) / 100) * (1 + Math.min(Math.max(num(it.importado_pct) || 0, 0), 100) / 100 * (aj.cambio || 0) / 100);
+    const r = { q, q0: q0 || 0, econ: 0, desembolso: 0, sobra: 0, ok: true, origem: '' };
+    if (q0 === null || q0 < 0) { pend.push(`Item ${it.n}: quantidade não informada.`); r.ok = false; return r; }
+    if (modo === 'rapido') {
+      const v = num(it.custo_total_est);
+      if (v === null) { pend.push(`Item ${it.n}: informe o custo total estimado (vazio não é zero).`); r.ok = false; return r; }
+      // estimativa total: varia proporcionalmente à quantidade (sem diluição de fixos)
+      r.econ = r.desembolso = q0 > 0 ? v * fat * q / q0 : 0; r.origem = 'estimativa total'; return r;
+    }
+    const ct = it.cotacao || {};
+    const pe = num(ct.preco_emb), ue = num(ct.unid_por_emb);
+    if (pe !== null && ue !== null && ue > 0) {
+      const unit = pe / ue * fat;
+      const minE = Math.max(0, num(ct.minimo_emb) || 0);
+      const emb = q > 0 ? Math.max(Math.ceil(q / ue - 1e-9), minE) : 0;
+      r.desembolso = emb * pe * fat; r.sobra = emb * ue - q; r.emb = emb; r.unit = unit;
+      r.econ = ct.sobra === 'estoque' ? unit * q : r.desembolso;
+      r.origem = `cotação: ${pe} por embalagem de ${ue}`;
+      return r;
+    }
+    const cu = num(it.custo_unit);
+    if (cu === null) { pend.push(`Item ${it.n}: informe o custo de compra ou execução por unidade (ou a cotação do fornecedor).`); r.ok = false; return r; }
+    r.unit = cu * fat; r.econ = r.desembolso = cu * fat * q; r.origem = 'custo por unidade';
+    return r;
+  }
+
+  // ---------------------------------------------------------------- monta itens, custos, tributos (sem preço)
+  function preparar(E, aj) {
+    aj = Object.assign({ custo: 0, frete: 0, cambio: 0, qtd: 0, atraso: 0, entregas_fator: 1 }, aj || {});
+    const pend = [], avisos = [], erros = [], memoria = [];
+    const modo = E.modo_custo === 'rapido' ? 'rapido' : 'detalhado';
+    const op = E.operacao || {};
+    const ent0 = num(op.entregas) !== null && Number(op.entregas) >= 1 ? Math.round(Number(op.entregas)) : 1;
+    const entregas = Math.max(1, Math.round(ent0 * (aj.entregas_fator || 1)));
+    const meses = num(op.meses);
+    const itens = (E.itens || []).map(it => {
+      const d = custoDireto(it, modo, aj, pend);
+      return { n: it.n, descricao: it.descricao || '', unidade: it.unidade || '', lote: it.lote || '', q: d.q, q0: d.q0,
+        ref: num(it.ref), teto: num(it.teto), historico: num(it.historico), base_desc: num(it.base_desc),
+        direto: d.econ, desembolso: d.desembolso, sobra: d.sobra, emb: d.emb, origem: d.origem, okCusto: d.ok,
+        ind: 0, comprometido: 0, linhas: [], ev: [] };   // ev: {quando, valor} para o fluxo de caixa
+    });
+    if (!itens.length) pend.push('Selecione ao menos um item ou lote para disputar.');
+    const porN = Object.fromEntries(itens.map(i => [i.n, i]));
+    itens.forEach(i => { if (i.desembolso) i.ev.push({ quando: 'compra', valor: i.desembolso, rot: 'Compra/execução do item ' + i.n }); });
+
+    let t = 0; const tNomes = [];
+    const retencoes = [];
+    // linhas de custo (só na composição detalhada)
+    if (modo === 'detalhado') {
+      const vistos = {};
+      (E.custos || []).forEach(l => {
+        const v = num(l.valor); const rot = `${l.categoria || 'Custo'}${l.descricao ? ' – ' + l.descricao : ''}`;
+        if (v === null) { pend.push(`${rot}: valor não informado.`); return; }
+        if (v < 0) { erros.push(`${rot}: valor negativo.`); return; }
+        const alvo = itensDoAlvo(l.alvo, itens);
+        if (!alvo.length) { avisos.push(`${rot}: não se aplica a nenhum item selecionado.`); return; }
+        const ch = (l.categoria || '') + '|' + (l.base || '') + '|' + alvo.slice().sort().join(',');
+        if (vistos[ch] && l.categoria !== 'Outros') avisos.push(`${l.categoria}: mais de uma linha igual sobre os mesmos itens; confira se não há dupla contagem.`);
+        vistos[ch] = true;
+        const fator = l.categoria === 'Frete' ? 1 + aj.frete / 100 : 1;
+        const comp = l.comprometido === undefined ? ['contrato', 'lote'].includes(l.base) : !!l.comprometido;
+        if (l.base === 'pct_receita') {
+          if (v >= 100) { erros.push(`${rot}: ${v}% é inválido.`); return; }
+          t += v / 100; tNomes.push(`${rot} ${v}%`); return;
+        }
+        let total = 0, quando = 'inicio', multip = '';
+        const alocar = (ns, valor, crit) => { const r = rateio(crit || l.rateio, ns, porN); ns.forEach(n => {
+          const x = valor * (r[n] || 0); porN[n].ind += x; porN[n].linhas.push(rot); if (comp) porN[n].comprometido += x;
+          porN[n].ev.push({ quando, valor: x, rot }); }); };
+        if (l.base === 'unidade') {
+          quando = 'entrega';
+          alvo.forEach(n => { const x = v * fator * porN[n].q; porN[n].ind += x; porN[n].linhas.push(rot); porN[n].ev.push({ quando, valor: x, rot }); if (comp) porN[n].comprometido += x; });
+          return;
+        }
+        if (l.base === 'pedido' || l.base === 'entrega') { total = v * fator * entregas; quando = l.base === 'pedido' ? 'compra' : 'entrega'; multip = `× ${entregas} ${l.base === 'pedido' ? 'pedido(s)' : 'entrega(s)'}`; }
+        else if (l.base === 'mes') {
+          if (meses === null) { pend.push(`${rot}: informe a duração do contrato em meses.`); return; }
+          total = v * fator * meses; quando = 'mensal'; multip = `× ${meses} mês(es)`;
+        } else if (l.base === 'lote') {
+          const lotes = {}; alvo.forEach(n => { (lotes[porN[n].lote || '(sem lote)'] = lotes[porN[n].lote || '(sem lote)'] || []).push(n); });
+          Object.values(lotes).forEach(ns => alocar(ns, v * fator)); quando = 'inicio';
+          memoria.push(`${rot}: ${brl2(v * fator)} por lote, rateado ${RATEIO_TXT[l.rateio || 'valor']}.`); return;
+        } else { total = v * fator; quando = 'inicio'; }
+        alocar(alvo, total);
+        memoria.push(`${rot}: ${brl2(v * fator)} ${BASES2[l.base] ? BASES2[l.base].toLowerCase() : ''} ${multip} = ${brl2(total)}${alvo.length > 1 ? `, rateado ${RATEIO_TXT[l.rateio || 'valor']} e contado uma vez` : ''}.`);
+      });
+    } else if ((E.custos || []).length) {
+      avisos.push('Estimativa rápida em uso: as linhas da composição detalhada ficam guardadas, mas não entram no cálculo.');
+    }
+
+    // tributos e taxas
+    (E.tributos || []).forEach(x => {
+      const v = num(x.valor); const rot = x.nome || 'Tributo';
+      if (v === null) { pend.push(`${rot}: alíquota ou valor não informado.`); return; }
+      if (v < 0) { erros.push(`${rot}: valor negativo.`); return; }
+      const tipo = x.tipo || 'pct', base = x.base || 'receita';
+      if (x.natureza === 'retencao') {
+        if (tipo !== 'pct') { erros.push(`${rot}: retenção deve ser percentual sobre o valor faturado.`); return; }
+        retencoes.push({ rot, pct: v / 100, dias: num(x.compensa_dias) }); return;
+      }
+      if (tipo === 'pct' && base === 'receita') {
+        if (v >= 100) { erros.push(`${rot}: ${v}% é inválido.`); return; }
+        t += v / 100; tNomes.push(`${rot} ${v}%`); return;
+      }
+      if (tipo === 'pct' && base === 'custo') {
+        itens.forEach(i => { const z = i.direto * v / 100; i.ind += z; i.ev.push({ quando: 'compra', valor: z, rot }); });
+        memoria.push(`${rot}: ${v}% sobre o custo de compra.`); return;
+      }
+      if (tipo === 'unit') { itens.forEach(i => { const z = v * i.q; i.ind += z; i.ev.push({ quando: 'receb', valor: z, rot }); }); memoria.push(`${rot}: ${brl2(v)} por unidade.`); return; }
+      // fixo: rateado pelo valor
+      const r = rateio('valor', itens.map(i => i.n), porN);
+      itens.forEach(i => { const z = v * (r[i.n] || 0); i.ind += z; i.ev.push({ quando: 'receb', valor: z, rot }); });
+      memoria.push(`${rot}: ${brl2(v)} fixo, rateado pelo valor.`);
+    });
+    if (!(E.tributos || []).length) pend.push('Informe os tributos e taxas sobre a venda (pode ser 0 se de fato não houver).');
+
+    // financiamento: só juros e tarifas entram no custo econômico
+    const fin = op.financiamento || {};
+    const finJT = (num(fin.juros) || 0) + (num(fin.tarifas) || 0);
+    if (num(fin.valor) > 0 && finJT > 0) {
+      const r = rateio('valor', itens.map(i => i.n), porN);
+      itens.forEach(i => { i.ind += finJT * (r[i.n] || 0); });
+      memoria.push(`Financiamento: juros e tarifas de ${brl2(finJT)} entram no custo; liberação e amortização só no caixa.`);
+    }
+    const mMin = num(E.margem_min), mAlvo = num(E.margem_alvo);
+    if (mMin === null) pend.push('Informe a margem mínima aceitável (sobre a venda).');
+    if (mAlvo === null) pend.push('Informe a margem-alvo (sobre a venda).');
+    if (mMin !== null && mAlvo !== null && mAlvo < mMin) avisos.push('A margem-alvo está abaixo da margem mínima.');
+    if (t >= 1) erros.push(`Percentuais sobre a venda somam ${rd(t * 100, 2)}%: a fórmula não se aplica.`);
+    if (mMin !== null && 1 - t - mMin / 100 <= 0) erros.push('Margem mínima + percentuais sobre a venda ≥ 100%.');
+    if (mAlvo !== null && 1 - t - mAlvo / 100 <= 0) erros.push('Margem-alvo + percentuais sobre a venda ≥ 100%.');
+    itens.forEach(i => { i.custo = i.direto + i.ind; });
+    return { itens, porN, t, tNomes, retencoes, mMin: mMin === null ? null : mMin / 100, mAlvo: mAlvo === null ? null : mAlvo / 100,
+      pend, avisos, erros, memoria, modo, entregas, meses, aj, op };
+  }
+  const RATEIO_TXT = { valor: 'pelo valor estimado', quantidade: 'pela quantidade', igual: 'igualmente' };
+  const brl2 = v => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // ---------------------------------------------------------------- unidades de disputa
+  function unidades(E, itens) {
+    const j = E.julgamento || 'item';
+    const u = [];
+    if (j === 'item') itens.forEach(i => u.push({ id: 'i' + i.n, nome: 'Item ' + i.n, tipo: 'item', itens: [i.n] }));
+    else {
+      const g = {};
+      itens.forEach(i => { const k = i.lote || (j === 'desconto' ? 'Global' : 'Item ' + i.n); (g[k] = g[k] || []).push(i.n); });
+      Object.entries(g).forEach(([k, ns]) => u.push({ id: 'l' + k, nome: /^Item |^Global$/.test(k) ? k : 'Lote ' + k, tipo: j === 'desconto' ? 'desconto' : (ns.length > 1 || !/^Item /.test(k) ? 'lote' : 'item'), itens: ns }));
+    }
+    if (u.length > 1) u.unshift({ id: 'todos', nome: 'Todos os selecionados', tipo: j === 'desconto' ? 'desconto' : 'consolidado', itens: itens.map(i => i.n) });
+    return u;
+  }
+
+  // ---------------------------------------------------------------- fluxo de caixa de uma unidade
+  // Dia 0 = assinatura/empenho. Pedido k em k × intervalo; pagamento ao fornecedor = pedido + prazo do fornecedor;
+  // entrega = pedido + prazo de entrega; recebimento = entrega + faturamento + prazo do órgão + atraso.
+  // Tributos devidos são recolhidos no recebimento + dias informados; retenções saem do recebimento e voltam na compensação.
+  function fluxo(prep, ns, R, extraCusto) {
+    const op = prep.op, aj = prep.aj;
+    const falta = [];
+    if (vazio(op.prazo_fornecedor)) falta.push('prazo para pagar o fornecedor');
+    if (vazio(op.prazo_entrega)) falta.push('prazo de entrega');
+    if (vazio(op.prazo_recebimento)) falta.push('prazo de pagamento do órgão');
+    if (falta.length) return { ok: false, falta };
+    const N = prep.entregas;
+    const inter = num(op.intervalo) !== null ? Number(op.intervalo) : (prep.meses ? prep.meses * 30 / Math.max(1, N) : 30);
+    const Pf = Number(op.prazo_fornecedor), Pe = Number(op.prazo_entrega), Pr = Number(op.prazo_recebimento);
+    const Pfat = num(op.prazo_faturamento) || 0, At = Math.max(0, (num(op.atraso) || 0) + (aj.atraso || 0));
+    const Dt = num(op.dias_tributo) || 0;
+    const ev = [];
+    const add = (d, v, rot, tipo) => { if (Math.abs(v) > 1e-9) ev.push({ d: Math.max(0, d), v, rot, tipo: tipo || 'op' }); };
+    const its = ns.map(n => prep.porN[n]);
+    its.forEach(i => i.ev.forEach(e => {
+      if (e.quando === 'inicio') add(0, -e.valor, e.rot);
+      else if (e.quando === 'mensal') { const m = Math.max(1, Math.round(prep.meses || 1)); for (let k = 1; k <= m; k++) add(k * 30, -e.valor / m, e.rot); }
+      else if (N > 0) for (let k = 0; k < N; k++) {
+        const ped = k * inter;
+        const d = e.quando === 'compra' ? ped + Pf : e.quando === 'entrega' ? ped + Pe : ped + Pe + Pfat + Pr + At;
+        add(d, -e.valor / N, e.rot);
+      }
+    }));
+    if (extraCusto) add(0, -extraCusto, 'Custo financeiro do capital de giro');
+    if (N > 0 && R > 0) for (let k = 0; k < N; k++) {
+      const ped = k * inter, rec = ped + Pe + Pfat + Pr + At, parc = R / N;
+      add(rec, parc, 'Recebimento ' + (k + 1) + '/' + N);
+      add(rec + Dt, -parc * prep.t, 'Tributos e percentuais sobre a venda');
+      prep.retencoes.forEach(x => { add(rec, -parc * x.pct, 'Retenção: ' + x.rot); if (x.dias !== null) add(rec + x.dias, parc * x.pct, 'Compensação: ' + x.rot); });
+    }
+    const cau = op.caucao || {};
+    if (num(cau.valor) > 0) { add(num(cau.dia) || 0, -Number(cau.valor), 'Caução (saída)'); if (num(cau.devolucao) !== null) add(Number(cau.devolucao), Number(cau.valor), 'Caução (devolução)'); }
+    const fin = op.financiamento || {};
+    if (num(fin.valor) > 0) {
+      add(num(fin.dia) || 0, Number(fin.valor), 'Financiamento (liberação)', 'fin');
+      if (num(fin.quitacao) !== null) add(Number(fin.quitacao), -(Number(fin.valor) + (num(fin.juros) || 0) + (num(fin.tarifas) || 0)), 'Financiamento (amortização, juros e tarifas)', 'fin');
+    }
+    ev.sort((a, b) => a.d - b.d || b.v - a.v);
+    const caixa = num(op.caixa), cred = num(op.credito) || 0, credDia = num(op.credito_dia) || 0;
+    let so = 0, sf = 0, min = 0, diaMin = 0, maxFalta = 0, diaFalta = null, area = 0, ult = 0;
+    const serie = [];
+    ev.forEach(e => {
+      if (so < 0) area += -so * (e.d - ult); ult = e.d;
+      if (e.tipo === 'fin') sf += e.v; else so += e.v;
+      if (so < min - 1e-9) { min = so; diaMin = e.d; }
+      const disp = (caixa || 0) + (e.d >= credDia ? cred : 0) + sf;
+      const f = -(so + disp);
+      if (f > maxFalta + 1e-9) { maxFalta = f; diaFalta = e.d; }
+      serie.push({ dia: Math.round(e.d), evento: e.rot, valor: rd(e.v), saldo: rd(so), disponivel: rd(so + disp) });
+    });
+    const taxa = num(op.taxa_mensal);
+    return { ok: true, capital: rd(-min) + 0, dia: Math.round(diaMin), falta: caixa === null ? null : rd(maxFalta), dia_falta: diaFalta === null ? null : Math.round(diaFalta),
+      caixa_informado: caixa !== null, custo_giro: taxa === null ? null : rd(area * taxa / 100 / 30), serie };
+  }
+
+  // ---------------------------------------------------------------- resultado de uma unidade de disputa
+  function resultadoUnidade(prep, u, lanceIn, E) {
+    const prec = num(E.precisao) !== null ? Math.max(0, Math.min(4, Number(E.precisao))) : 2;
+    const its = u.itens.map(n => prep.porN[n]).filter(Boolean);
+    const Q = its.reduce((a, i) => a + i.q, 0);
+    const C0 = its.reduce((a, i) => a + i.custo, 0);
+    const t = prep.t, mMin = prep.mMin, mAlvo = prep.mAlvo;
+    const unit = u.tipo === 'item';
+    const ok = its.length && its.every(i => i.okCusto) && !prep.erros.length;
+    const out = { id: u.id, nome: u.nome, tipo: u.tipo, Q: rd(Q, 4), C: rd(C0), t, unit, unidade: unit ? its[0].unidade : '', parcial: !ok || prep.pend.length > 0, aproximacao: false };
+    if (!its.length || Q <= 0) return Object.assign(out, { vazio: true });
+    // custo financeiro do giro no custo (opcional): depende do lance → recalcula em cada preço
+    const op = prep.op;
+    const incluirGiro = op.incluir_custo_giro && num(op.taxa_mensal) !== null;
+    const custoEm = R => { if (!incluirGiro) return C0; const f = fluxo(prep, u.itens, R); return f.ok && f.custo_giro !== null ? C0 + f.custo_giro : C0; };
+    const piso = m => {
+      const den = 1 - t - m; if (den <= 0) return null;
+      let R = C0 / den;
+      if (incluirGiro) { for (let k = 0; k < 30; k++) { const R2 = custoEm(R) / den; if (Math.abs(R2 - R) < 0.005) { R = R2; break; } R = R2; } out.aproximacao = true; }
+      return unit ? cima(R / Q, prec) : cima(R, 2);
+    };
+    const tot = p => unit ? rd(p * Q) : p;
+    out.equilibrio = piso(0);
+    out.minimo = mMin === null ? null : piso(mMin);
+    out.alvo = mAlvo === null ? null : piso(mAlvo);
+    ['equilibrio', 'minimo', 'alvo'].forEach(k => { if (out[k] != null) out[k + '_total'] = tot(out[k]); });
+    if (out.minimo_total != null) { const Cm = custoEm(out.minimo_total); out.margem_no_minimo = (out.minimo_total * (1 - t) - Cm) / out.minimo_total; }
+    // referências do edital e histórico (totais só quando todos os itens têm o dado)
+    const soma = k => its.every(i => i[k] != null && i[k] > 0) ? rd(its.reduce((a, i) => a + i[k] * i.q, 0)) : null;
+    out.ref_total = soma('ref'); out.teto_total = soma('teto'); out.hist_total = soma('historico');
+    if (unit) { out.ref = its[0].ref; out.teto = its[0].teto; out.historico = its[0].historico; }
+    // base para maior desconto
+    if (u.tipo === 'desconto') {
+      out.base_desc = its.every(i => (i.base_desc ?? i.ref) > 0) ? rd(its.reduce((a, i) => a + (i.base_desc ?? i.ref) * i.q, 0)) : null;
+      if (out.base_desc && out.minimo_total != null) out.desconto_max = Math.max(0, Math.floor((1 - out.minimo_total / out.base_desc) * 1e4) / 1e4);
+      if (out.base_desc && out.equilibrio_total != null) out.desconto_equilibrio = Math.floor((1 - out.equilibrio_total / out.base_desc) * 1e4) / 1e4;
+    }
+    // lance simulado
+    let R = null, lanceUnit = null, lanceDesc = null;
+    const L = lanceIn || {};
+    if (u.tipo === 'desconto') {
+      const d = num(L.desconto);
+      if (d !== null && out.base_desc) { lanceDesc = d / 100; R = rd(out.base_desc * (1 - lanceDesc)); }
+      else if (out.alvo_total != null && out.base_desc) { R = out.alvo_total; lanceDesc = 1 - R / out.base_desc; out.lance_padrao = true; }
+    } else if (unit) {
+      lanceUnit = num(L.valor) !== null ? Number(L.valor) : out.alvo;
+      if (num(L.valor) === null) out.lance_padrao = true;
+      if (lanceUnit != null) R = rd(lanceUnit * Q);
+    } else {
+      // lote/consolidado: valor global ou composição manual por item
+      const man = L.itens && its.every(i => num(L.itens[i.n]) !== null);
+      if (man) { R = rd(its.reduce((a, i) => a + Number(L.itens[i.n]) * i.q, 0)); out.composicao_manual = true; }
+      else if (num(L.valor) !== null) R = Number(L.valor);
+      else if (out.alvo_total != null) { R = out.alvo_total; out.lance_padrao = true; }
+    }
+    if (R != null && R > 0) {
+      const C = custoEm(R);
+      const lucro = rd(R * (1 - t) - C);
+      const custoMax = mMin === null ? null : rd(R * (1 - t - mMin));
+      out.lance = { R, unit: lanceUnit, desconto: lanceDesc, lucro, margem: lucro / R, custo: rd(C),
+        custo_max: custoMax, reducao: custoMax === null ? null : rd(Math.max(0, C - custoMax)),
+        folga: out.minimo_total == null ? null : rd(R - out.minimo_total),
+        folga_unit: unit && out.minimo != null ? rd(lanceUnit - out.minimo, prec) : null,
+        abaixo_equilibrio: out.equilibrio_total != null && R < out.equilibrio_total };
+      out.lance.folga_pct = out.lance.folga === null ? null : out.lance.folga / R;
+      if (u.tipo === 'desconto' && out.desconto_max != null) out.lance.folga_desc = out.desconto_max - lanceDesc;
+      // composição dos unitários do lote (proporcional ao valor estimado, ou manual)
+      if (!unit) {
+        const w = its.map(i => (i.ref > 0 ? i.ref : (i.custo / Math.max(i.q, 1e-9))) * i.q), sw = w.reduce((a, b) => a + b, 0) || 1;
+        out.composicao = its.map((i, k) => {
+          const p = out.composicao_manual ? Number(L.itens[i.n]) : (i.q > 0 ? rd(R * w[k] / sw / i.q, prec) : null);
+          return { n: i.n, q: i.q, preco: p, teto: i.teto, acima_teto: i.teto != null && p != null && p > i.teto + 1e-9, custo: rd(i.custo) };
+        });
+        out.composicao_total = rd(out.composicao.reduce((a, c) => a + (c.preco || 0) * c.q, 0));
+      }
+    }
+    // compatibilidade com o teto confirmado
+    if (out.teto_total != null && mMin !== null) {
+      const Cmax = rd(out.teto_total * (1 - t - mMin));
+      out.teto_reducao = rd(Math.max(0, custoEm(out.teto_total) - Cmax));
+      out.teto_ok = out.minimo_total != null && out.minimo_total <= out.teto_total + 1e-9;
+    }
+    // se precisasse chegar ao preço histórico
+    if (out.hist_total != null) {
+      const Rh = out.hist_total, Ch = custoEm(Rh), lh = rd(Rh * (1 - t) - Ch);
+      out.hist = { R: Rh, lucro: lh, margem: lh / Rh, reducao: mMin === null ? null : rd(Math.max(0, Ch - Rh * (1 - t - mMin))) };
+    }
+    // caixa no lance simulado
+    out.caixa = R != null && R > 0 ? fluxo(prep, u.itens, R) : { ok: false, falta: ['lance para simular'] };
+    return out;
+  }
+
+  // ---------------------------------------------------------------- frases do resumo (determinísticas)
+  const fR = v => brl2(v);
+  const fP = (v, d = 2) => (v * 100).toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d }) + '%';
+  function frases(r, mMin) {
+    const f = {};
+    const L = r.lance;
+    if (L) {
+      const quanto = r.unit ? `A ${fR(L.unit)} por ${r.unidade || 'unidade'}` : r.tipo === 'desconto' ? `Com desconto de ${fP(L.desconto)} (${fR(L.R)})` : `A ${fR(L.R)} no total`;
+      f.margem = L.lucro >= 0 ? `${quanto}, você lucra ${fR(L.lucro)}, com margem de ${fP(L.margem)}.${mMin != null ? ` Sua margem mínima é de ${fP(mMin, 0)}.` : ''}`
+        : `${quanto}, você tem prejuízo de ${fR(-L.lucro)} (margem de ${fP(L.margem)}).`;
+      if (L.folga != null) {
+        if (L.folga > 0) f.limite = r.tipo === 'desconto' ? `Você ainda pode aumentar o desconto em ${fP(L.folga_desc)} (até ${fP(r.desconto_max)}) sem ficar abaixo da margem mínima.`
+          : `Você ainda pode baixar ${r.unit ? fR(L.folga_unit) + ' por ' + (r.unidade || 'unidade') + ' (' + fR(L.folga) + ' no total)' : fR(L.folga)}, ou ${fP(L.folga_pct)} do lance, sem ficar abaixo da margem mínima. Seu limite é ${r.unit ? fR(r.minimo) + ' por ' + (r.unidade || 'unidade') : fR(r.minimo_total)}.`;
+        else if (L.abaixo_equilibrio) f.limite = `Este lance está abaixo do preço de equilíbrio: prejuízo de ${fR(-L.lucro)}. Não baixe mais; o limite pela margem mínima é ${r.unit ? fR(r.minimo) + ' por ' + (r.unidade || 'unidade') : fR(r.minimo_total)}.`;
+        else f.limite = `Este lance já está abaixo do seu limite (${r.unit ? fR(r.minimo) + ' por ' + (r.unidade || 'unidade') : fR(r.minimo_total)}). Para manter a margem mínima neste preço, reduza o custo em ${fR(L.reducao)}.`;
+      }
+    }
+    if (r.caixa && r.caixa.ok) {
+      if (r.caixa.falta == null) f.caixa = `Para executar este cenário você precisa de ${fR(r.caixa.capital)} de capital de giro (pico no dia ${r.caixa.dia}). Informe o caixa disponível para ver se falta dinheiro.`;
+      else if (r.caixa.falta > 0) f.caixa = `Para executar este cenário até o primeiro recebimento, faltam ${fR(r.caixa.falta)} (capital de giro necessário: ${fR(r.caixa.capital)}, pico no dia ${r.caixa.dia_falta}).`;
+      else f.caixa = `O caixa e o crédito informados cobrem o capital de giro necessário de ${fR(r.caixa.capital)}.`;
+    } else if (r.caixa && r.caixa.falta) f.caixa = `Capital de giro pendente: informe ${r.caixa.falta.join(', ')}.`;
+    if (r.teto_total != null && mMin != null) {
+      f.edital = r.teto_reducao > 0 ? `Para ofertar dentro do teto e manter a margem mínima de ${fP(mMin, 0)}, você precisa reduzir o custo ${r.unit ? 'do item' : 'do lote'} em ${fR(r.teto_reducao)}.`
+        : `Seu lance mínimo (${r.unit ? fR(r.minimo) : fR(r.minimo_total)}) cabe no teto confirmado (${r.unit ? fR(r.teto) : fR(r.teto_total)}).`;
+    } else if (r.ref_total != null && r.minimo_total != null) {
+      f.edital = r.minimo_total > r.ref_total ? `Seu lance mínimo fica ${fR(r.minimo_total - r.ref_total)} acima do valor estimado do órgão; confirme no edital se o estimado é o teto de aceitabilidade.`
+        : `Seu lance mínimo fica abaixo do valor estimado do órgão. O teto de aceitabilidade ainda não foi confirmado no edital.`;
+    }
+    if (r.hist) f.historico = `Se precisasse chegar ao preço histórico (${fR(r.hist.R)}), seu ${r.hist.lucro >= 0 ? 'lucro seria ' + fR(r.hist.lucro) : 'prejuízo seria ' + fR(-r.hist.lucro)} (margem ${fP(r.hist.margem)})${r.hist.reducao > 0 ? `; para manter a margem mínima seria preciso reduzir o custo em ${fR(r.hist.reducao)}` : ''}.`;
+    return f;
+  }
+
+  // ---------------------------------------------------------------- análise completa
+  function analisar(E, opcoes) {
+    const o = opcoes || {};
+    const prep = preparar(E, o.ajuste);
+    const us = unidades(E, prep.itens);
+    const lances = E.lances || {};
+    const res = us.map(u => { const r = resultadoUnidade(prep, u, lances[u.id], E); r.frases = frases(r, prep.mMin); return r; });
+    const avisos = [...prep.avisos];
+    res.forEach(r => {
+      if (r.composicao) r.composicao.filter(c => c.acima_teto).forEach(c => avisos.push(`${r.nome}: item ${c.n} ficaria acima do teto unitário confirmado (${brl2(c.teto)}). Ajuste a composição.`));
+      if (r.aproximacao) avisos.push(`${r.nome}: custo financeiro do giro incluído no custo; pisos calculados por aproximação sucessiva (o custo depende do lance).`);
+      if (r.lance && r.lance_padrao) {} // lance padrão = preço-alvo
+      if (r.minimo != null && r.teto != null && r.minimo > r.teto) avisos.push(`${r.nome}: lance mínimo acima do teto confirmado.`);
+    });
+    prep.itens.filter(i => i.sobra > 0).forEach(i => avisos.push(`Item ${i.n}: a compra por embalagem deixa sobra de ${rd(i.sobra, 2)} unidade(s); ${E.itens.find(x => x.n === i.n).cotacao.sobra === 'estoque' ? 'a sobra fica em estoque (desembolso no caixa, fora do custo)' : 'o custo da sobra entra no custo do item'}.`));
+    const pend = [...new Set(prep.pend)];
+    return { unidades: res, pendencias: pend, avisos: [...new Set(avisos)], erros: [...new Set(prep.erros)], memoria: prep.memoria, t: prep.t,
+      tNomes: prep.tNomes, mMin: prep.mMin, mAlvo: prep.mAlvo, itens: prep.itens.map(i => ({ n: i.n, q: i.q, direto: rd(i.direto), indireto: rd(i.ind), custo: rd(i.custo), desembolso: rd(i.desembolso), sobra: i.sobra, emb: i.emb, origem: i.origem })),
+      parcial: pend.length > 0 || prep.erros.length > 0, modo: prep.modo };
+  }
+
+  // cenários: o preço simulado fica fixo por unidade (unitário ou proporcional à quantidade)
+  function cenarios2(E, uid, defs) {
+    const base = analisar(E); const ub = base.unidades.find(x => x.id === uid) || base.unidades[0];
+    if (!ub || !ub.lance) return null;
+    const precoUnit = ub.lance.R / ub.Q;
+    const roda = aj => {
+      const r = analisar(Object.assign({}, E, { lances: {} }), { ajuste: aj });
+      const u = r.unidades.find(x => x.id === ub.id); if (!u || u.vazio) return { vazio: true, comprometido: comprometidos(E, aj) };
+      const E2 = Object.assign({}, E, { lances: { [ub.id]: u.tipo === 'desconto' ? { desconto: ub.lance.desconto * 100 } : u.unit ? { valor: ub.lance.unit } : { valor: rd(precoUnit * u.Q) } } });
+      const r2 = analisar(E2, { ajuste: aj }).unidades.find(x => x.id === ub.id);
+      return { minimo: r2.minimo, minimo_total: r2.minimo_total, lucro: r2.lance && r2.lance.lucro, margem: r2.lance && r2.lance.margem, R: r2.lance && r2.lance.R,
+        capital: r2.caixa.ok ? r2.caixa.capital : null, falta: r2.caixa.ok ? r2.caixa.falta : null, Q: r2.Q };
+    };
+    const out = {};
+    Object.entries(defs || E.cenarios || CEN2).forEach(([k, aj]) => { out[k] = roda(aj); });
+    if (E.srp) {
+      const S = E.srp_cfg || {};
+      const prov = num(S.provavel_pct) !== null ? Number(S.provavel_pct) : null;
+      out.srp_maxima = roda({ qtd: 0 });
+      if (prov !== null) { out.srp_provavel = roda({ qtd: prov - 100 }); out.srp_menores = roda({ qtd: prov - 100, entregas_fator: Math.max(1, num(S.fator_pedidos) || 2) }); }
+      const c = comprometidos(E, {});
+      out.srp_sem_pedidos = { vazio: true, comprometido: c.custo, caixa: -c.caixa, linhas: c.linhas };
+    }
+    return out;
+  }
+  // custos que a empresa assume mesmo sem nenhum pedido (marcados como comprometidos) + caução
+  function comprometidos(E) {
+    const linhas = [];
+    let custo = 0;
+    if (E.modo_custo !== 'rapido') (E.custos || []).forEach(l => {
+      const comp = l.comprometido === undefined ? ['contrato', 'lote'].includes(l.base) : !!l.comprometido;
+      const v = num(l.valor); if (!comp || v === null || l.base === 'pct_receita' || l.base === 'unidade' || l.base === 'pedido' || l.base === 'entrega') return;
+      const tot = l.base === 'mes' ? v * (num((E.operacao || {}).meses) || 0) : v;
+      custo += tot; linhas.push(`${l.categoria}${l.descricao ? ' – ' + l.descricao : ''}: ${brl2(tot)}`);
+    });
+    (E.tributos || []).forEach(x => { if (x.tipo === 'fixo' && num(x.valor)) { custo += Number(x.valor); linhas.push(`${x.nome}: ${brl2(x.valor)}`); } });
+    const cau = num(((E.operacao || {}).caucao || {}).valor) || 0;
+    if (cau) linhas.push(`Caução (recuperável): ${brl2(cau)}`);
+    return { custo: rd(custo), caixa: rd(custo + cau), linhas };
+  }
+
+  return { analisar, cenarios2, fluxo, comprometidos, GRUPOS2, BASES2, CEN2, cima, calcular, cenarios, sensibilidade, recomendacao, capitalDeGiro, CATEGORIAS, BASES, CENARIOS_PADRAO, _t: { teto2, c2, rateio } };
 });
