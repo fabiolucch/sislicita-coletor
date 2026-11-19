@@ -740,6 +740,10 @@
     return null;
   }
   const ATIV = { I: 'comercio', II: 'industria', III: 'servico', IV: 'servico', V: 'servico' };
+  // alíquota interna geral (modal) do ICMS por UF em 2026. Em venda para órgão (não contribuinte) a carga total é a
+  // alíquota interna do estado de destino: na mesma UF, direto; de outra UF, interestadual + DIFAL ao destino.
+  const ICMS_UF = { AC: 19, AL: 20.5, AM: 20, AP: 18, BA: 20.5, CE: 20, DF: 20, ES: 17, GO: 19, MA: 23, MG: 18, MS: 17, MT: 17, PA: 19,
+    PB: 20, PE: 20.5, PI: 22.5, PR: 19.5, RJ: 22, RN: 20, RO: 19.5, RR: 20, RS: 17, SC: 17, SE: 19, SP: 18, TO: 20 };
   // gera as linhas de tributos da análise a partir do perfil da empresa
   function tributacao(T, ctx) {
     T = T || {}; ctx = ctx || {};
@@ -779,8 +783,11 @@
       lin('PIS (não cumulativo, sem créditos)', 1.65); lin('Cofins (não cumulativa, sem créditos)', 7.6);
       out.notas.push('No Lucro Real, os créditos de PIS/Cofins sobre compras reduzem esse percentual, e IRPJ/CSLL incidem sobre o lucro: a margem mostrada é antes desses dois.');
     }
-    if (serv) { const v = num(T.iss); if (v === null) out.pend.push('Escolha a alíquota de ISS em Minha empresa › Dados.'); else lin('ISS', v); }
-    else { const v = num(T.icms); if (v === null) out.pend.push('Escolha o ICMS efetivo em Minha empresa › Dados.'); else lin('ICMS efetivo', v); }
+    if (serv) { const v = num(T.iss); if (v === null) { lin('ISS (5%, teto legal: estimativa conservadora)', 5, { origem: 'padrao' }); out.notas.push('ISS em 5%, o teto legal; escolha a alíquota do município em Minha empresa › Dados para refinar.'); } else lin('ISS', v); }
+    else { const v = num(T.icms), uf = ctx.uf && ICMS_UF[ctx.uf];
+      if (v !== null) lin('ICMS efetivo', v);
+      else if (uf) { lin(`ICMS (${ctx.uf}: ${String(uf).replace('.', ',')}%, alíquota geral do estado do órgão, sem créditos)`, uf, { origem: 'uf' }); out.notas.push(`ICMS pela alíquota geral de ${ctx.uf} (${String(uf).replace('.', ',')}%), sem descontar créditos das compras: estimativa conservadora. Produtos com alíquota própria ou substituição tributária podem pagar menos.`); }
+      else out.pend.push('Não foi possível saber a UF do órgão para estimar o ICMS: escolha o ICMS em Minha empresa › Dados.'); }
     if (ctx.esfera === 'F') {
       out.tributos.push({ nome: serv ? 'Retenção federal (IR 4,8% + CSLL, PIS e Cofins 4,65%)' : 'Retenção federal (IR 1,2% + CSLL, PIS e Cofins 4,65%)', tipo: 'pct', base: 'receita',
         valor: serv ? 9.45 : 5.85, natureza: 'retencao', compensa_dias: 30, status: 'estimado', auto: true });
@@ -789,5 +796,5 @@
     out.resumo = `${reg === 'presumido' ? 'Lucro Presumido' : 'Lucro Real'} · ${at === 'comercio' ? 'comércio' : at === 'industria' ? 'indústria' : 'serviços'} · ${rd(out.tributos.filter(x => x.natureza !== 'retencao').reduce((a, x) => a + (x.valor || 0), 0), 2).toString().replace('.', ',')}% sobre a venda`;
     return out;
   }
-  return { tributacao, anexoPorCnae, aliqSimples, faixaSimples, FAIXA_TXT, ANEXO_TXT, analisar, cenarios2, fluxo, comprometidos, GRUPOS2, BASES2, CEN2, cima, calcular, cenarios, sensibilidade, recomendacao, capitalDeGiro, CATEGORIAS, BASES, CENARIOS_PADRAO, _t: { teto2, c2, rateio } };
+  return { ICMS_UF, tributacao, anexoPorCnae, aliqSimples, faixaSimples, FAIXA_TXT, ANEXO_TXT, analisar, cenarios2, fluxo, comprometidos, GRUPOS2, BASES2, CEN2, cima, calcular, cenarios, sensibilidade, recomendacao, capitalDeGiro, CATEGORIAS, BASES, CENARIOS_PADRAO, _t: { teto2, c2, rateio } };
 });

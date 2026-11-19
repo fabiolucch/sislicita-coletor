@@ -356,3 +356,5 @@ html body input[type=checkbox],html body input[type=radio]{color-scheme:light;wi
 .ev-origem .ev-sub{margin:0}
 .ev-voltar{margin:0 0 var(--sp-3)}
 details#etrib>summary small{flex-basis:100%;padding-left:18px}
+
+.an-brl{display:block;font:500 11.5px/1.3 Inter,system-ui,sans-serif;font-style:normal;color:var(--mut);margin-top:1px}

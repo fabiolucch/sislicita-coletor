@@ -174,3 +174,12 @@ test('tributação automática: Simples pela fórmula oficial, faixa pelo teto e
   const E = ex(); E.tributos = []; E.pend_extra = m.pend;
   assert.equal(V.analisar(E).parcial, true);
 });
+
+test('ICMS automático pela UF do órgão e ISS no teto quando não escolhidos', () => {
+  const t = V.tributacao({ regime: 'presumido', atividade: 'comercio' }, { uf: 'RJ' });
+  assert.equal(t.pend.length, 0);
+  assert.equal(t.tributos.find(x => /ICMS/.test(x.nome)).valor, 22);
+  const s = V.tributacao({ regime: 'presumido', atividade: 'servico' }, { uf: 'SP' });
+  assert.equal(s.tributos.find(x => /ISS/.test(x.nome)).valor, 5);
+  assert.equal(V.tributacao({ regime: 'presumido', atividade: 'comercio', icms: 7 }, { uf: 'RJ' }).tributos.find(x => /ICMS/.test(x.nome)).valor, 7);
+});
